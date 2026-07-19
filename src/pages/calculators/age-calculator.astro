@@ -1,0 +1,143 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'age-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    생년월일을 입력하면 <strong>만나이</strong>, <strong>연나이</strong>,
+    <strong>세는나이</strong>를 한 번에 계산합니다.
+  </p>
+
+  <form class="calc-form" id="age-form">
+    <label>
+      생년월일
+      <input type="date" id="birthdate" name="birthdate" required />
+    </label>
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">만나이</span>
+        <span class="value"><span id="intl-age">-</span>세</span>
+      </div>
+      <div class="result-item">
+        <span class="label">연나이</span>
+        <span class="value"><span id="year-age">-</span>세</span>
+      </div>
+      <div class="result-item">
+        <span class="label">세는나이</span>
+        <span class="value"><span id="korean-age">-</span>세</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="disclaimer">
+    2023년 6월 28일부터 대한민국의 나이 기준은 <strong>만나이</strong>로
+    통일되었습니다. 별도의 규정이 없으면 법령·계약·공문서 등에서의 나이는 만나이를
+    의미합니다.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>만나이는 어떻게 계산하나요?</summary>
+      <p>
+        생일이 지났으면 (올해 연도 − 태어난 연도), 아직 생일이 지나지 않았으면 거기서
+        1을 뺀 값이 만나이입니다. 태어난 날을 0세로 보고 생일마다 한 살씩 늘어납니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>연나이는 무엇인가요?</summary>
+      <p>
+        연나이는 생일과 관계없이 (현재 연도 − 태어난 연도)로 계산합니다. 병역법,
+        청소년보호법 등 일부 법령에서 나이 기준으로 사용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>세는나이(한국식 나이)는 무엇인가요?</summary>
+      <p>
+        태어나자마자 1세가 되고 매년 1월 1일에 한 살씩 더하는 전통적인 계산법입니다.
+        (현재 연도 − 태어난 연도 + 1)로 구합니다. 2023년 6월 28일 만나이 통일 이후로는
+        법적 기준이 아니며 일상 대화에서 주로 쓰입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 세 가지 나이가 서로 다른가요?</summary>
+      <p>
+        기준점이 다르기 때문입니다. 만나이는 생일, 연나이·세는나이는 연도를 기준으로
+        하며, 세는나이는 태어난 해를 1세로 셉니다. 그래서 생일 전후와 계산 방식에 따라
+        최대 두 살까지 차이가 날 수 있습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  const form = document.getElementById('age-form') as HTMLFormElement;
+  const birthInput = document.getElementById('birthdate') as HTMLInputElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const intlEl = document.getElementById('intl-age') as HTMLSpanElement;
+  const yearEl = document.getElementById('year-age') as HTMLSpanElement;
+  const koreanEl = document.getElementById('korean-age') as HTMLSpanElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const value = birthInput.value;
+    if (!value) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '생년월일을 입력해 주세요.';
+      return;
+    }
+
+    const [by, bm, bd] = value.split('-').map(Number);
+    const birth = new Date(by, bm - 1, bd);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (Number.isNaN(birth.getTime()) || birth > today) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '올바른 생년월일을 입력해 주세요. (미래 날짜는 불가)';
+      return;
+    }
+
+    const currentYear = today.getFullYear();
+
+    // 만나이: 올해 - 태어난 해, 생일이 아직 안 지났으면 -1
+    let intlAge = currentYear - by;
+    const monthDay = today.getMonth() + 1 < bm || (today.getMonth() + 1 === bm && today.getDate() < bd);
+    if (monthDay) intlAge -= 1;
+
+    // 연나이: 현재 연도 - 태어난 연도
+    const yearAge = currentYear - by;
+
+    // 세는나이: 현재 연도 - 태어난 연도 + 1
+    const koreanAge = currentYear - by + 1;
+
+    intlEl.textContent = String(intlAge);
+    yearEl.textContent = String(yearAge);
+    koreanEl.textContent = String(koreanAge);
+    result.classList.remove('hidden');
+  });
+</script>

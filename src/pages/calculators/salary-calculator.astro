@@ -1,0 +1,203 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'salary-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    연봉과 부양가족수를 입력하면 4대보험과 세금을 제외한 <strong>월 실수령액</strong>과
+    <strong>연 실수령액</strong>을 추정합니다.
+  </p>
+
+  <form class="calc-form" id="salary-form">
+    <label>
+      연봉 (세전, 원)
+      <input
+        type="number"
+        id="annualSalary"
+        name="annualSalary"
+        min="0"
+        step="100000"
+        placeholder="예: 40000000"
+        required
+      />
+    </label>
+    <label>
+      월 비과세액 (원)
+      <span class="hint">식대 등 비과세 항목. 기본값 200,000원.</span>
+      <input
+        type="number"
+        id="monthlyNonTaxable"
+        name="monthlyNonTaxable"
+        min="0"
+        step="10000"
+        value="200000"
+      />
+    </label>
+    <label>
+      부양가족수 (본인 포함)
+      <span class="hint">본인을 포함한 기본공제 대상 인원. 기본값 1명.</span>
+      <input
+        type="number"
+        id="dependents"
+        name="dependents"
+        min="1"
+        step="1"
+        value="1"
+      />
+    </label>
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">월 실수령액</span>
+        <span class="value"><span id="monthly-net">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">연 실수령액</span>
+        <span class="value"><span id="annual-net">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        월 기준 공제 내역
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">항목</th>
+          <th scope="col">금액 (월)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>국민연금 (4.5%)</td><td id="row-pension">-</td></tr>
+        <tr><td>건강보험 (3.545%)</td><td id="row-health">-</td></tr>
+        <tr><td>장기요양보험 (건강보험료의 12.95%)</td><td id="row-ltc">-</td></tr>
+        <tr><td>고용보험 (0.9%)</td><td id="row-employment">-</td></tr>
+        <tr><td>소득세</td><td id="row-income-tax">-</td></tr>
+        <tr><td>지방소득세</td><td id="row-local-tax">-</td></tr>
+        <tr class="total"><td>공제 합계</td><td id="row-deduction-total">-</td></tr>
+        <tr class="total"><td>월 실수령액</td><td id="row-monthly-net">-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>이며, 국세청 근로소득 간이세액표
+    기준과 다를 수 있습니다(실제 원천징수세액표 기준과 다를 수 있음). 4대보험 요율과
+    세율은 매년 변경되므로 실제 실수령액과 차이가 있을 수 있습니다.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>4대보험은 어떤 항목으로 구성되나요?</summary>
+      <p>
+        국민연금(노후 대비), 건강보험(의료비), 장기요양보험(노인 장기요양, 건강보험료에
+        연동), 고용보험(실업급여 등) 네 가지입니다. 근로자와 사업주가 나누어 부담하며,
+        이 계산기는 근로자 부담분만 공제합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>부양가족수는 실수령액에 어떤 영향을 주나요?</summary>
+      <p>
+        부양가족수가 늘면 인적공제(기본공제)가 커져 과세표준이 낮아지고, 결과적으로
+        소득세·지방소득세가 줄어 실수령액이 늘어납니다. 본 계산기는 본인을 포함한 기본공제만
+        단순 반영합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>만나이나 나이가 계산에 영향을 주나요?</summary>
+      <p>
+        기본 실수령액 계산에는 나이가 직접 쓰이지 않습니다. 다만 만 60세 이상 등 특정
+        연령대에서는 국민연금 납부 의무나 요율 적용이 달라질 수 있어 실제 공제액이 이
+        추정치와 차이가 날 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>월 비과세액은 무엇인가요?</summary>
+      <p>
+        식대처럼 세금이 부과되지 않는 급여 항목입니다. 비과세액이 클수록 과세소득이 줄어
+        세금과 일부 보험료가 낮아집니다. 기본값 200,000원은 흔한 식대 비과세 한도를 예시로
+        둔 값이며, 본인 급여명세서 기준으로 조정하세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateSalary } from '../../lib/salaryCalculator';
+
+  const form = document.getElementById('salary-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setText = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const annualSalary = Number(
+      (document.getElementById('annualSalary') as HTMLInputElement).value,
+    );
+    const monthlyNonTaxable = Number(
+      (document.getElementById('monthlyNonTaxable') as HTMLInputElement).value,
+    );
+    const dependents = Number(
+      (document.getElementById('dependents') as HTMLInputElement).value,
+    );
+
+    if (!annualSalary || annualSalary <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '연봉을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateSalary({
+      annualSalary,
+      monthlyNonTaxable: Number.isFinite(monthlyNonTaxable) ? monthlyNonTaxable : undefined,
+      dependents: Number.isFinite(dependents) ? dependents : undefined,
+    });
+
+    setText('monthly-net', r.monthlyNet);
+    setText('annual-net', r.annualNet);
+    setText('row-pension', r.pension);
+    setText('row-health', r.healthIns);
+    setText('row-ltc', r.longTermCare);
+    setText('row-employment', r.employmentIns);
+    setText('row-income-tax', r.monthlyIncomeTax);
+    setText('row-local-tax', r.monthlyLocalTax);
+    setText('row-deduction-total', r.monthlyDeductionTotal);
+    setText('row-monthly-net', r.monthlyNet);
+
+    result.classList.remove('hidden');
+  });
+</script>

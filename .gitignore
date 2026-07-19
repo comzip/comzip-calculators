@@ -1,0 +1,21 @@
+# build output
+dist/
+
+# dependencies
+node_modules/
+
+# generated types
+.astro/
+
+# macOS
+.DS_Store
+
+# environment variables
+.env
+.env.production
+
+# logs
+npm-debug.log*
+
+# local tooling state (unrelated to the site project)
+.omc/

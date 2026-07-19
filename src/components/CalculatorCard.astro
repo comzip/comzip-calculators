@@ -1,0 +1,43 @@
+---
+import type { Calculator } from '../data/calculators';
+
+export interface Props {
+  calculator: Calculator;
+}
+
+const { calculator } = Astro.props;
+---
+
+<a class="calc-card" href={`/calculators/${calculator.slug}`}>
+  <h3>{calculator.title}</h3>
+  <p>{calculator.description}</p>
+</a>
+
+<style>
+  .calc-card {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    background: var(--bg);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      border-color 0.15s ease,
+      transform 0.15s ease;
+  }
+  .calc-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .calc-card h3 {
+    margin: 0 0 6px;
+    font-size: 1.05rem;
+    color: var(--accent-dark);
+  }
+  .calc-card p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+</style>

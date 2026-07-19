@@ -1,0 +1,57 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CalculatorCard from '../components/CalculatorCard.astro';
+import { categoryOrder, calculatorsByCategory } from '../data/calculators';
+---
+
+<BaseLayout title="계산기 허브" path="/">
+  <section class="intro">
+    <h1>일상에 필요한 계산기 모음</h1>
+    <p>
+      계산기 허브는 만나이, 연봉 실수령액처럼 자주 찾게 되는 생활·급여 계산기를 한곳에
+      모아둔 무료 사이트입니다. 복잡한 설치 없이 브라우저에서 바로 계산하고, 필요한
+      계산기를 계속 추가해 나갑니다.
+    </p>
+  </section>
+
+  {
+    categoryOrder.map((category) => {
+      const items = calculatorsByCategory(category);
+      if (items.length === 0) return null;
+      return (
+        <section class="category">
+          <h2>{category}</h2>
+          <div class="card-grid">
+            {items.map((calculator) => (
+              <CalculatorCard calculator={calculator} />
+            ))}
+          </div>
+        </section>
+      );
+    })
+  }
+</BaseLayout>
+
+<style>
+  .intro h1 {
+    font-size: 1.6rem;
+    margin: 8px 0 12px;
+  }
+  .intro p {
+    color: var(--text-muted);
+  }
+  .category {
+    margin-top: 32px;
+  }
+  .category h2 {
+    font-size: 1.2rem;
+    border-left: 4px solid var(--accent);
+    padding-left: 10px;
+    margin-bottom: 16px;
+  }
+  .card-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+</style>
