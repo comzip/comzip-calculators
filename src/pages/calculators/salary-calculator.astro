@@ -29,6 +29,7 @@ const meta = calculators.find((c) => c.slug === 'salary-calculator')!;
         placeholder="예: 40000000"
         required
       />
+      <span class="amount-preview" id="annualSalary-preview" aria-live="polite"></span>
     </label>
     <label>
       월 비과세액 (원)
@@ -145,10 +146,20 @@ const meta = calculators.find((c) => c.slug === 'salary-calculator')!;
 
 <script>
   import { calculateSalary } from '../../lib/salaryCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
 
   const form = document.getElementById('salary-form') as HTMLFormElement;
   const result = document.getElementById('result') as HTMLDivElement;
   const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // 연봉 입력값의 한글 단위 미리보기를 입력 즉시 갱신합니다.
+  const annualSalaryInput = document.getElementById('annualSalary') as HTMLInputElement;
+  const annualSalaryPreview = document.getElementById('annualSalary-preview') as HTMLSpanElement;
+  annualSalaryInput.addEventListener('input', () => {
+    const value = Number(annualSalaryInput.value);
+    annualSalaryPreview.textContent =
+      value > 0 ? formatKoreanWon(value) : '';
+  });
 
   const won = new Intl.NumberFormat('ko-KR', {
     style: 'currency',

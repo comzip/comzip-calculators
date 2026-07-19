@@ -30,6 +30,7 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
         placeholder="예: 100000000"
         required
       />
+      <span class="amount-preview" id="principal-preview" aria-live="polite"></span>
     </label>
     <label>
       연이자율 (%)
@@ -225,11 +226,20 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
 <script>
   import { calculateLoan } from '../../lib/loanCalculator';
   import type { LoanMethod } from '../../lib/loanCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
 
   const form = document.getElementById('loan-form') as HTMLFormElement;
   const result = document.getElementById('result') as HTMLDivElement;
   const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
   const monthlyLabel = document.getElementById('monthly-label') as HTMLSpanElement;
+
+  // 대출원금 입력값의 한글 단위 미리보기를 입력 즉시 갱신합니다.
+  const principalInput = document.getElementById('principal') as HTMLInputElement;
+  const principalPreview = document.getElementById('principal-preview') as HTMLSpanElement;
+  principalInput.addEventListener('input', () => {
+    const value = Number(principalInput.value);
+    principalPreview.textContent = value > 0 ? formatKoreanWon(value) : '';
+  });
   const scheduleBody = document.getElementById('schedule-body') as HTMLTableSectionElement;
 
   const won = new Intl.NumberFormat('ko-KR', {

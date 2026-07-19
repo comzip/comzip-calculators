@@ -21,7 +21,8 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
   <!-- ============================================================
        Part A — 재산세 (재산세 본세 + 지방교육세 + 도시지역분)
        ============================================================ -->
-  <h2>1. 재산세 계산</h2>
+  <section class="tax-part tax-part-local">
+  <h2>1. 재산세 계산 <span class="scope-tag scope-local">지방세 · 물건 1건</span></h2>
   <p class="note">
     개별 부동산 1건에 대한 재산세를 계산합니다. 과세대상을 고르면 필요한
     입력 항목이 바뀝니다.
@@ -58,6 +59,7 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
         placeholder="예: 500000000"
         required
       />
+      <span class="amount-preview" id="baseValue-preview" aria-live="polite"></span>
     </label>
 
     <!-- 주택 전용 옵션 -->
@@ -127,10 +129,13 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     </table>
   </div>
 
+  </section>
+
   <!-- ============================================================
        Part B — 종합부동산세 (주택분)
        ============================================================ -->
-  <h2 style="margin-top:36px;">2. 종합부동산세 계산 (주택분)</h2>
+  <section class="tax-part tax-part-national">
+  <h2>2. 종합부동산세 계산 (주택분) <span class="scope-tag scope-national">국세 · 주택 합산</span></h2>
   <p class="note">
     개인이 보유한 <strong>모든 주택의 공시가격을 합산</strong>하여, 공제금액을
     넘는 부분에 부과되는 국세입니다. 위 재산세와 별개로 계산됩니다.
@@ -149,6 +154,7 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
         placeholder="예: 1500000000"
         required
       />
+      <span class="amount-preview" id="totalPublicPrice-preview" aria-live="polite"></span>
     </label>
 
     <label>
@@ -208,6 +214,7 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
       차이가 매우 클 수 있습니다.
     </div>
   </div>
+  </section>
 
   <div class="disclaimer">
     본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세·종합부동산세는
@@ -364,6 +371,39 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
   .law-refs li {
     margin: 6px 0;
   }
+
+  /* 두 세금 섹션을 좌측 보더와 배지로 시각적으로 구분합니다. */
+  .tax-part {
+    padding-left: 16px;
+    margin: 8px 0;
+  }
+  .tax-part-local {
+    border-left: 4px solid var(--accent);
+  }
+  .tax-part-national {
+    border-left: 4px solid #4f46e5;
+    margin-top: 36px;
+  }
+  .tax-part h2 {
+    margin-top: 0;
+  }
+  .scope-tag {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .scope-local {
+    background: #ccfbf1;
+    color: var(--accent-dark);
+  }
+  .scope-national {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
 </style>
 
 <script>
@@ -377,6 +417,19 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     BuildingType,
     HouseCount,
   } from '../../lib/propertyTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  // 큰 금액 입력값의 한글 단위 미리보기를 입력 즉시 갱신합니다.
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('baseValue', 'baseValue-preview');
+  bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
 
   const won = new Intl.NumberFormat('ko-KR', {
     style: 'currency',
