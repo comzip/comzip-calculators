@@ -1,0 +1,333 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    대출원금·연이자율·대출기간을 입력하면 <strong>원리금균등상환</strong>과
+    <strong>원금균등상환</strong> 방식별로 월 상환액, 총 이자, 총 상환금액과
+    회차별 상환 스케줄을 계산합니다.
+  </p>
+
+  <form class="calc-form" id="loan-form">
+    <label>
+      대출원금 (원)
+      <input
+        type="number"
+        id="principal"
+        name="principal"
+        min="0"
+        step="1000000"
+        placeholder="예: 100000000"
+        required
+      />
+    </label>
+    <label>
+      연이자율 (%)
+      <span class="hint">소수점 입력 가능. 예: 4.5</span>
+      <input
+        type="number"
+        id="annualRate"
+        name="annualRate"
+        min="0"
+        step="0.1"
+        placeholder="예: 4.5"
+        required
+      />
+    </label>
+    <label>
+      대출기간 (개월)
+      <span class="hint">개월 단위로 입력하세요. 예: 5년 = 60개월</span>
+      <input
+        type="number"
+        id="months"
+        name="months"
+        min="1"
+        step="1"
+        placeholder="예: 60"
+        required
+      />
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>상환방식</legend>
+      <label class="method-option">
+        <input type="radio" name="method" value="원리금균등" checked />
+        <span>원리금균등상환</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="method" value="원금균등" />
+        <span>원금균등상환</span>
+      </label>
+    </fieldset>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label" id="monthly-label">월 상환액</span>
+        <span class="value"><span id="monthly-payment">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">총 이자</span>
+        <span class="value"><span id="total-interest">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">총 상환금액</span>
+        <span class="value"><span id="total-payment">-</span></span>
+      </div>
+    </div>
+
+    <div class="schedule-scroll">
+      <table class="breakdown schedule">
+        <caption class="note" style="text-align:left;margin-bottom:6px;">
+          회차별 상환 스케줄
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">회차</th>
+            <th scope="col">납입원금</th>
+            <th scope="col">납입이자</th>
+            <th scope="col">월 상환액</th>
+            <th scope="col">대출잔액</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-body">
+          <!-- rows injected by client script -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 실제 대출 상품은
+    중도상환수수료 등 수수료 구조, 변동금리(금리 변동), 이자 계산 방식이나
+    원 단위 반올림 규칙이 다를 수 있어, 실제 상환액과 차이가 있을 수 있습니다.
+    실제 조건은 금융기관의 안내를 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>원리금균등상환과 원금균등상환은 무엇이 다른가요?</summary>
+      <p>
+        원리금균등상환은 매달 갚는 총 금액(원금+이자)이 일정하게 유지되는 방식입니다.
+        반면 원금균등상환은 매달 갚는 <strong>원금</strong>이 일정하고 이자는 남은
+        잔액에 따라 줄어들어, 매달 상환액이 조금씩 감소합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>총 이자는 어느 방식이 더 적나요?</summary>
+      <p>
+        일반적으로 <strong>원금균등상환</strong>이 총 이자가 더 적습니다. 초기에 원금을
+        빠르게 갚아 남은 잔액이 더 빨리 줄어들기 때문에, 잔액에 붙는 이자 총액이
+        원리금균등상환보다 작아집니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>초기 상환 부담은 어떻게 다른가요?</summary>
+      <p>
+        원금균등상환은 첫 달 상환액이 가장 크고 이후 점점 줄어들어, 초기 부담이
+        상대적으로 큽니다. 원리금균등상환은 매달 상환액이 같아 초기 부담이 더 적고
+        자금 계획을 세우기 쉽습니다. 초기 현금 흐름이 넉넉하면 원금균등, 매달 일정한
+        금액을 원하면 원리금균등이 유리할 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>중도에 갚으면 이자는 어떻게 되나요?</summary>
+      <p>
+        이자는 남은 대출잔액에 대해 붙으므로, 중도상환으로 잔액을 줄이면 이후 이자
+        부담이 줄어듭니다. 다만 상품에 따라 <strong>중도상환수수료</strong>가 발생할 수
+        있으므로 실제 절감액은 계약 조건에 따라 달라집니다. 이 계산기는 중도상환을
+        반영하지 않은 단순 추정치입니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .method-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 0;
+  }
+  .method-toggle legend {
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0 4px;
+  }
+  .method-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .method-option input {
+    width: auto;
+    margin: 0;
+  }
+  .schedule-scroll {
+    max-height: 360px;
+    overflow-y: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table.schedule {
+    margin-top: 0;
+    font-size: 0.9rem;
+  }
+  table.schedule caption {
+    padding: 8px 8px 0;
+  }
+  table.schedule th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-soft);
+    z-index: 1;
+  }
+  table.schedule td,
+  table.schedule th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  table.schedule td:first-child,
+  table.schedule th:first-child {
+    text-align: center;
+  }
+</style>
+
+<script>
+  import { calculateLoan } from '../../lib/loanCalculator';
+  import type { LoanMethod } from '../../lib/loanCalculator';
+
+  const form = document.getElementById('loan-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const monthlyLabel = document.getElementById('monthly-label') as HTMLSpanElement;
+  const scheduleBody = document.getElementById('schedule-body') as HTMLTableSectionElement;
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setText = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  const recalculate = () => {
+    errorMsg.textContent = '';
+
+    const principal = Number(
+      (document.getElementById('principal') as HTMLInputElement).value,
+    );
+    const annualRatePercent = Number(
+      (document.getElementById('annualRate') as HTMLInputElement).value,
+    );
+    const months = Number(
+      (document.getElementById('months') as HTMLInputElement).value,
+    );
+    const method = (
+      form.querySelector('input[name="method"]:checked') as HTMLInputElement
+    ).value as LoanMethod;
+
+    if (!principal || principal <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '대출원금을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!Number.isFinite(annualRatePercent) || annualRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '연이자율을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!months || months < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '대출기간(개월)을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateLoan({ principal, annualRatePercent, months, method });
+
+    if (method === '원리금균등' && r.monthlyPayment !== undefined) {
+      monthlyLabel.textContent = '월 상환액';
+      setText('monthly-payment', r.monthlyPayment);
+    } else {
+      // 원금균등: 첫 달이 가장 크고 마지막 달이 가장 작으므로 범위로 표시.
+      const first = r.schedule[0].payment;
+      const last = r.schedule[r.schedule.length - 1].payment;
+      monthlyLabel.textContent = '첫 달 ~ 마지막 달 상환액';
+      const el = document.getElementById('monthly-payment');
+      if (el) {
+        el.textContent = `${won.format(Math.round(first))} ~ ${won.format(
+          Math.round(last),
+        )}`;
+      }
+    }
+
+    setText('total-interest', r.totalInterest);
+    setText('total-payment', r.totalPayment);
+
+    scheduleBody.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (const row of r.schedule) {
+      const tr = document.createElement('tr');
+      const cells = [
+        String(row.month),
+        won.format(Math.round(row.principalPortion)),
+        won.format(Math.round(row.interestPortion)),
+        won.format(Math.round(row.payment)),
+        won.format(Math.round(row.remainingBalance)),
+      ];
+      for (const text of cells) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        tr.appendChild(td);
+      }
+      fragment.appendChild(tr);
+    }
+    scheduleBody.appendChild(fragment);
+
+    result.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalculate();
+  });
+
+  // 상환방식을 바꾸면 (결과가 이미 보이는 경우) 즉시 재계산합니다.
+  form.querySelectorAll('input[name="method"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!result.classList.contains('hidden')) recalculate();
+    });
+  });
+</script>
