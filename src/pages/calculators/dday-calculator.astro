@@ -1,0 +1,169 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'dday-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    목표 날짜를 입력하면 오늘을 기준으로 <strong>D-day</strong>(남은 날 또는 지난 날)를
+    계산합니다. 수능, 시험, 결혼기념일 등 원하는 날짜까지 며칠 남았는지 확인하세요.
+  </p>
+
+  <form class="calc-form" id="dday-form">
+    <label>
+      목표 날짜
+      <input type="date" id="target-date" name="target-date" required />
+    </label>
+    <label>
+      라벨/제목 (선택)
+      <span class="hint">예: 수능일, 결혼기념일. 결과 문장에 표시됩니다.</span>
+      <input
+        type="text"
+        id="dday-label"
+        name="dday-label"
+        maxlength="40"
+        placeholder="예: 수능일"
+      />
+    </label>
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">D-day</span>
+        <span class="value" id="dday-value">-</span>
+      </div>
+      <div class="result-item">
+        <span class="label">목표 날짜</span>
+        <span class="value" id="target-formatted">-</span>
+      </div>
+    </div>
+    <p class="dday-sentence" id="dday-sentence"></p>
+  </div>
+
+  <div class="note">
+    이 계산은 브라우저의 <strong>로컬 날짜(자정 기준)</strong>로 이루어집니다. 자정 전후나
+    다른 시간대(timezone)에서는 결과가 하루 달라질 수 있습니다.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>목표 당일은 왜 D-0이 아니라 D-DAY인가요?</summary>
+      <p>
+        한국식 D-day 표기에서는 목표 날짜 자체를 기준점(0일)이 아니라 그 날이 "온 날",
+        즉 <strong>D-DAY</strong>로 부릅니다. 하루 전은 D-1, 이틀 전은 D-2처럼 남은 일수를
+        붙이며, 남은 날이 0일이 되는 목표 당일을 D-0 대신 D-DAY로 표기하는 것이 관례입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>D-1과 D+1은 어떻게 다른가요?</summary>
+      <p>
+        <strong>D-1</strong>은 목표일이 <strong>내일</strong>, 즉 하루 <em>남았다</em>는
+        뜻입니다. 반대로 <strong>D+1</strong>은 목표일이 <strong>어제</strong>였고 하루가
+        <em>지났다</em>는 뜻입니다. 앞의 부호(−)는 남은 날, 뒤의 부호(+)는 지난 날을
+        나타냅니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>D-day는 한국에서 어떻게 쓰이나요?</summary>
+      <p>
+        수능(대학수학능력시험)이나 각종 시험, 결혼식, 입대, 전역, 생일·기념일 등 중요한
+        날을 앞두고 "며칠 남았는지"를 세는 데 널리 쓰입니다. "수능 D-100"처럼 목표까지의
+        카운트다운으로, 지난 뒤에는 "결혼 D+365"처럼 경과일을 세는 용도로도 사용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>과거 날짜를 입력하면 어떻게 되나요?</summary>
+      <p>
+        목표 날짜가 이미 지났으면 지난 일수만큼 <strong>D+</strong> 형태로 표시됩니다.
+        예를 들어 50일 전 날짜를 입력하면 D+50이 됩니다. 기념일로부터 며칠이 지났는지
+        확인할 때 활용할 수 있습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateDday } from '../../lib/ddayCalculator';
+
+  const form = document.getElementById('dday-form') as HTMLFormElement;
+  const targetInput = document.getElementById('target-date') as HTMLInputElement;
+  const labelInput = document.getElementById('dday-label') as HTMLInputElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const ddayValue = document.getElementById('dday-value') as HTMLSpanElement;
+  const targetFormatted = document.getElementById('target-formatted') as HTMLSpanElement;
+  const sentence = document.getElementById('dday-sentence') as HTMLParagraphElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const value = targetInput.value;
+    if (!value) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '목표 날짜를 입력해 주세요.';
+      return;
+    }
+
+    let r;
+    try {
+      r = calculateDday(value);
+    } catch {
+      result.classList.add('hidden');
+      errorMsg.textContent = '올바른 날짜를 입력해 주세요.';
+      return;
+    }
+
+    const [ty, tm, td] = value.split('-').map(Number);
+    const formatted = `${ty}년 ${tm}월 ${td}일 (${r.weekday}요일)`;
+
+    ddayValue.textContent = r.label;
+    targetFormatted.textContent = formatted;
+
+    const label = labelInput.value.trim();
+    if (r.diffDays > 0) {
+      sentence.textContent = label
+        ? `${label}까지 ${r.label}`
+        : `목표일까지 ${r.label}`;
+    } else if (r.diffDays === 0) {
+      sentence.textContent = label
+        ? `${label}까지 ${r.label}`
+        : `바로 오늘이 ${r.label}입니다`;
+    } else {
+      sentence.textContent = label
+        ? `${label}로부터 ${r.label}`
+        : `목표일로부터 ${r.label}`;
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>
+
+<style>
+  .dday-sentence {
+    margin-top: 16px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text);
+  }
+</style>

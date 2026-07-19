@@ -1,5 +1,5 @@
 ---
-import { calculators } from '../data/calculators';
+import { categoryOrder, calculatorsByCategory } from '../data/calculators';
 
 export interface Props {
   title: string;
@@ -51,15 +51,20 @@ const year = new Date().getFullYear();
       <div class="container header-inner">
         <a href="/" class="brand">계산기 허브</a>
         <nav class="site-nav" aria-label="주요 계산기">
-          <ul>
-            {
-              calculators.map((c) => (
-                <li>
-                  <a href={`/calculators/${c.slug}`}>{c.title}</a>
-                </li>
-              ))
-            }
-          </ul>
+          {
+            categoryOrder.map((category) => (
+              <details class="nav-dropdown">
+                <summary>{category}</summary>
+                <ul>
+                  {calculatorsByCategory(category).map((c) => (
+                    <li>
+                      <a href={`/calculators/${c.slug}`}>{c.title}</a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))
+          }
         </nav>
       </div>
     </header>
@@ -155,21 +160,94 @@ const year = new Date().getFullYear();
         color: var(--accent-dark);
         text-decoration: none;
       }
-      .site-nav ul {
-        list-style: none;
+      .site-nav {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
-        margin: 0;
-        padding: 0;
+        gap: 4px 8px;
       }
-      .site-nav a {
+      .nav-dropdown {
+        position: relative;
+      }
+      .nav-dropdown > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
         color: var(--text-muted);
+        white-space: nowrap;
+        user-select: none;
+      }
+      /* Hide the native disclosure triangle across engines. */
+      .nav-dropdown > summary::-webkit-details-marker {
+        display: none;
+      }
+      .nav-dropdown > summary::after {
+        content: '▾';
+        font-size: 0.7em;
+        margin-left: 5px;
+        color: var(--text-muted);
+      }
+      .nav-dropdown > summary:hover {
+        color: var(--accent);
+        background: var(--bg-soft);
+      }
+      .nav-dropdown[open] > summary {
+        color: var(--accent);
+        background: var(--bg-soft);
+      }
+      .nav-dropdown[open] > summary::after {
+        content: '▴';
+      }
+      .nav-dropdown > ul {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 20;
+        list-style: none;
+        margin: 0;
+        padding: 6px;
+        min-width: 180px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      }
+      .nav-dropdown > ul li {
+        margin: 0;
+      }
+      .nav-dropdown > ul a {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: var(--text);
         text-decoration: none;
         font-size: 0.9rem;
+        white-space: nowrap;
       }
-      .site-nav a:hover {
+      .nav-dropdown > ul a:hover {
         color: var(--accent);
+        background: var(--bg-soft);
+      }
+
+      @media (max-width: 480px) {
+        .header-inner {
+          gap: 8px;
+        }
+        .site-nav {
+          gap: 2px 4px;
+        }
+        .nav-dropdown > summary {
+          padding: 6px 8px;
+          font-size: 0.85rem;
+        }
+        /* Anchor panels to the right edge on the last trigger so they
+           don't overflow the viewport on narrow screens. */
+        .nav-dropdown:last-child > ul {
+          left: auto;
+          right: 0;
+        }
       }
 
       /* Footer */
@@ -330,5 +408,41 @@ const year = new Date().getFullYear();
         display: none;
       }
     </style>
+
+    <script>
+      // Header nav dropdown behavior: only one open at a time, close on
+      // outside click, close on Escape.
+      const dropdowns = Array.from(
+        document.querySelectorAll<HTMLDetailsElement>('.nav-dropdown')
+      );
+
+      dropdowns.forEach((dropdown) => {
+        dropdown.addEventListener('toggle', () => {
+          if (!dropdown.open) return;
+          dropdowns.forEach((other) => {
+            if (other !== dropdown) other.open = false;
+          });
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const target = event.target as Node;
+        dropdowns.forEach((dropdown) => {
+          if (dropdown.open && !dropdown.contains(target)) {
+            dropdown.open = false;
+          }
+        });
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        dropdowns.forEach((dropdown) => {
+          if (dropdown.open) {
+            dropdown.open = false;
+            dropdown.querySelector('summary')?.focus();
+          }
+        });
+      });
+    </script>
   </body>
 </html>
