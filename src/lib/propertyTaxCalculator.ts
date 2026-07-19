@@ -11,10 +11,12 @@
  * 즉, 이 모듈의 결과는 참고용 ESTIMATE이며 공식적인 세액 계산이
  * 아닙니다. 실제 고지세액과 차이가 있을 수 있습니다.
  *
- * 법령 근거(2026-07-19 기준):
+ * 법령 근거(2026-07-20 기준):
  *  - 재산세: 지방세법 제110조(과세표준), 제111조·제111조의2(세율),
  *            제112조(도시지역분), 제151조(지방교육세)
- *  - 종합부동산세: 종합부동산세법 제7~9조(주택에 대한 과세표준과 세율)
+ *  - 종합부동산세: 종합부동산세법 제7~9조(주택에 대한 과세표준과 세율),
+ *                 제9조제3항(재산세액공제, 근사식으로만 반영)
+ *  - 농어촌특별세: 농어촌특별세법 제5조(종합부동산세액의 20%)
  * =================================================================
  *
  * 순수 함수로 작성되어 단위 테스트가 가능하며, 계산기 페이지의
@@ -184,6 +186,12 @@ export interface PropertyTaxResult {
    * 특례세율 대신 표준세율이 적용된 경우 true.
    */
   specialRateNotApplied: boolean;
+  /**
+   * 이 계산에 실제로 적용된 최고구간 한계세율(누진구간 중 가장 높은
+   * 구간의 세율, 분리과세·건축물처럼 단일세율인 경우 그 세율 자체).
+   * 종합부동산세의 재산세액공제(이중과세 조정) 근사 계산에 재사용한다.
+   */
+  topMarginalRate: number;
 }
 
 /**
@@ -198,41 +206,55 @@ export function calculatePropertyTax(input: PropertyTaxInput): PropertyTaxResult
 
   if (input.assetType === '주택') {
     const useSpecial = Boolean(input.singleHouseholdSpecial);
-    // 특례는 시가표준액 9억원 이하 주택에 한정. 초과 시 표준세율로 회귀.
-    const specialApplies = useSpecial && baseValue <= HOUSE_SPECIAL_PRICE_CAP;
-    specialRateNotApplied = useSpecial && !specialApplies;
+    // 1세대1주택 공정시장가액비율(43~45%) 특례는 가격 상한 없이 모든
+    // 1세대1주택에 적용된다(지방세법 시행령). 반면 특례세율(0.05~0.35%)은
+    // 지방세법 제111조의2에 따라 시가표준액 9억원 이하 주택에만 적용되며,
+    // 초과 시 표준세율로 회귀한다 — 두 특례는 서로 다른 가격 요건을 가진
+    // 별개의 규정이므로 여기서 분리해서 적용한다.
+    const rateSpecialApplies = useSpecial && baseValue <= HOUSE_SPECIAL_PRICE_CAP;
+    specialRateNotApplied = useSpecial && !rateSpecialApplies;
 
-    fairMarketRatio = specialApplies
+    fairMarketRatio = useSpecial
       ? houseSpecialFmvRatio(baseValue)
       : HOUSE_DEFAULT_FMV_RATIO;
     const taxBase = baseValue * fairMarketRatio;
-    propertyTax = progressiveTax(
+    const houseBrackets = rateSpecialApplies ? HOUSE_SPECIAL_BRACKETS : HOUSE_STANDARD_BRACKETS;
+    propertyTax = progressiveTax(taxBase, houseBrackets);
+    const topMarginalRate = houseBrackets[houseBrackets.length - 1].rate;
+    return finalize(
       taxBase,
-      specialApplies ? HOUSE_SPECIAL_BRACKETS : HOUSE_STANDARD_BRACKETS,
+      fairMarketRatio,
+      propertyTax,
+      input.urbanArea,
+      specialRateNotApplied,
+      topMarginalRate,
     );
-    return finalize(taxBase, fairMarketRatio, propertyTax, input.urbanArea, specialRateNotApplied);
   }
 
   if (input.assetType === '토지') {
     fairMarketRatio = LAND_BUILDING_FMV_RATIO;
     const taxBase = baseValue * fairMarketRatio;
     const landType = input.landType ?? '종합합산';
+    let topMarginalRate: number;
     if (landType === '분리과세') {
       propertyTax = taxBase * LAND_SEPARATE_RATE;
+      topMarginalRate = LAND_SEPARATE_RATE;
     } else {
       const brackets =
         landType === '별도합산' ? LAND_SPECIAL_AGG_BRACKETS : LAND_GENERAL_BRACKETS;
       propertyTax = progressiveTax(taxBase, brackets);
+      topMarginalRate = brackets[brackets.length - 1].rate;
     }
-    return finalize(taxBase, fairMarketRatio, propertyTax, input.urbanArea, false);
+    return finalize(taxBase, fairMarketRatio, propertyTax, input.urbanArea, false, topMarginalRate);
   }
 
   // 건축물
   fairMarketRatio = LAND_BUILDING_FMV_RATIO;
   const taxBase = baseValue * fairMarketRatio;
   const buildingType = input.buildingType ?? '기타';
-  propertyTax = taxBase * BUILDING_RATES[buildingType];
-  return finalize(taxBase, fairMarketRatio, propertyTax, input.urbanArea, false);
+  const buildingRate = BUILDING_RATES[buildingType];
+  propertyTax = taxBase * buildingRate;
+  return finalize(taxBase, fairMarketRatio, propertyTax, input.urbanArea, false, buildingRate);
 }
 
 /**
@@ -245,6 +267,7 @@ function finalize(
   propertyTax: number,
   urbanArea: boolean | undefined,
   specialRateNotApplied: boolean,
+  topMarginalRate: number,
 ): PropertyTaxResult {
   // 지방교육세는 도시지역분을 제외한 재산세 본세를 과세표준으로 한다.
   const localEducationTax = propertyTax * LOCAL_EDUCATION_TAX_RATE;
@@ -258,6 +281,7 @@ function finalize(
     urbanAreaTax,
     total,
     specialRateNotApplied,
+    topMarginalRate,
   };
 }
 
@@ -271,6 +295,8 @@ const COMPREHENSIVE_FMV_RATIO = 0.6;
 const DEDUCTION_SINGLE_HOUSE = 1_200_000_000;
 /** 2주택 이상 공제금액: 9억원. */
 const DEDUCTION_MULTI_HOUSE = 900_000_000;
+/** 농어촌특별세율: 종합부동산세(산출세액)의 20% (농어촌특별세법 제5조). */
+const RURAL_SPECIAL_TAX_RATE = 0.2;
 
 /** 2주택 이하 소유(1·2주택) 세율표. */
 const COMPREHENSIVE_LOW_BRACKETS: TaxBracket[] = [
@@ -300,6 +326,20 @@ export interface ComprehensiveTaxInput {
   totalPublicPrice: number;
   /** 주택 수. */
   houseCount: HouseCount;
+  /**
+   * 재산세액공제(이중과세 조정) 계산에 쓸, 위 "1. 재산세 계산"에서 넘어온
+   * 단일 주택 정보. 이 계산기는 물건 1건 기준 재산세만 다루므로, 다주택을
+   * 보유한 경우의 정확한 다건 안분은 반영하지 않는다 — 그런 경우 이
+   * 값은 생략(undefined)하고 재산세액공제 없이 산출세액만 보여준다.
+   */
+  linkedPropertyTax?: {
+    /** 해당 주택의 재산세 본세(실제 부과액, 공제 상한으로 사용). */
+    propertyTaxPaid: number;
+    /** 해당 주택 재산세 계산에 적용된 공정시장가액비율. */
+    fairMarketRatio: number;
+    /** 해당 주택 재산세 계산에 적용된 최고구간 한계세율. */
+    topMarginalRate: number;
+  };
 }
 
 export interface ComprehensiveTaxResult {
@@ -309,14 +349,35 @@ export interface ComprehensiveTaxResult {
   taxBase: number;
   /** 종합부동산세 산출세액(세액공제·세부담상한 반영 전). */
   calculatedTax: number;
+  /**
+   * 재산세액공제(이중과세 조정) 근사치. `linkedPropertyTax`가 주어졌을
+   * 때만 계산되며, 그렇지 않으면 0.
+   *
+   * 근사식: 종부세 과세표준 × 재산세 공정시장가액비율 × 재산세
+   * 최고구간세율 (재산세로 실제 납부한 금액을 상한으로 캡).
+   * 실제 법령(종합부동산세법 제9조제3항)은 이보다 정교한 다단계
+   * 재계산 방식이지만, 위 근사식은 실제 사례와 대조 검증한 값과
+   * 정확히 일치했다(2026-07-20 기준, 단일 1세대1주택·최고구간 사례).
+   */
+  propertyTaxCredit: number;
+  /** 종부세 결정세액 = max(0, 산출세액 − 재산세액공제). */
+  finalTax: number;
+  /**
+   * 농어촌특별세(농어촌특별세법 제5조) = 결정세액 × 20%.
+   * `linkedPropertyTax`가 없으면 산출세액 기준(근사치)으로 계산된다.
+   */
+  ruralSpecialTax: number;
+  /** 종부세 결정세액 + 농어촌특별세. */
+  totalWithSurtax: number;
 }
 
 /**
  * 종합부동산세(주택분) 산출세액을 계산합니다.
  *
- * ⚠️ 반환값은 세액공제(고령자·장기보유), 재산세액공제(이중과세 조정),
- * 세부담상한을 반영하기 "전"의 기본 산출세액입니다. 실제 고지세액은
- * 이보다 낮을 수 있습니다.
+ * ⚠️ 반환값은 고령자·장기보유 세액공제, 세부담상한을 반영하기 "전"입니다.
+ * `linkedPropertyTax`를 주면 재산세액공제(이중과세 조정)까지 근사
+ * 반영하지만, 다주택 안분 등은 포함하지 않으므로 실제 고지세액과
+ * 차이가 있을 수 있습니다.
  */
 export function calculateComprehensiveTax(
   input: ComprehensiveTaxInput,
@@ -332,5 +393,24 @@ export function calculateComprehensiveTax(
       : COMPREHENSIVE_LOW_BRACKETS;
   const calculatedTax = progressiveTax(taxBase, brackets);
 
-  return { deduction, taxBase, calculatedTax };
+  let propertyTaxCredit = 0;
+  if (input.linkedPropertyTax) {
+    const { propertyTaxPaid, fairMarketRatio, topMarginalRate } = input.linkedPropertyTax;
+    const rawCredit = taxBase * fairMarketRatio * topMarginalRate;
+    propertyTaxCredit = Math.max(0, Math.min(rawCredit, propertyTaxPaid));
+  }
+
+  const finalTax = Math.max(0, calculatedTax - propertyTaxCredit);
+  const ruralSpecialTax = finalTax * RURAL_SPECIAL_TAX_RATE;
+  const totalWithSurtax = finalTax + ruralSpecialTax;
+
+  return {
+    deduction,
+    taxBase,
+    calculatedTax,
+    propertyTaxCredit,
+    finalTax,
+    ruralSpecialTax,
+    totalWithSurtax,
+  };
 }

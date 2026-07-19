@@ -100,6 +100,9 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
 
   <div class="result-box hidden" id="property-result" aria-live="polite">
     <p class="note" id="special-fallback-note" style="margin-top:0;"></p>
+    <button class="btn-link hidden" id="copy-to-comprehensive" type="button">
+      ↓ 이 공시가격으로 아래 종합부동산세도 계산하기
+    </button>
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
         재산세 산출 내역
@@ -172,6 +175,7 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
   <p class="note" id="comprehensive-error" role="alert"></p>
 
   <div class="result-box hidden" id="comprehensive-result" aria-live="polite">
+    <p class="note" id="credit-linked-note" style="margin-top:0;"></p>
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
         종합부동산세 산출 내역
@@ -185,29 +189,50 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
           <td>과세표준 <span class="hint">(공시가격합계 − 공제금액) × 60%</span></td>
           <td id="ct-taxbase">-</td>
         </tr>
-        <tr class="total">
+        <tr>
           <td>종합부동산세 산출세액</td>
           <td id="ct-tax">-</td>
+        </tr>
+        <tr id="ct-credit-row" class="hidden">
+          <td>재산세액공제 <span class="hint">(이중과세 조정, 근사치)</span></td>
+          <td id="ct-credit">-</td>
+        </tr>
+        <tr id="ct-final-row" class="hidden">
+          <td>종부세 결정세액</td>
+          <td id="ct-final">-</td>
+        </tr>
+        <tr>
+          <td>농어촌특별세 <span class="hint" id="ct-rural-hint">(산출세액의 20%)</span></td>
+          <td id="ct-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>종부세 + 농어촌특별세 합계</td>
+          <td id="ct-total">-</td>
         </tr>
       </tbody>
     </table>
 
     <div class="disclaimer strong-disclaimer">
-      <strong>이 금액은 세액공제·세부담상한을 반영하기 전의 기본 산출세액입니다.</strong>
-      실제 고지세액은 이보다 <strong>낮을 수 있습니다.</strong> 특히 다음 항목이
-      반영되지 않았습니다.
+      <strong
+        >아래 항목들은 이 계산기에 반영되지 않았거나 근사치입니다.</strong>
+      실제 고지세액은 이보다 <strong>낮을 수 있습니다.</strong>
       <ul>
         <li>
           <strong>고령자·장기보유 세액공제</strong> — 1세대 1주택자에게 적용되며
           합산 최대 80%까지 감면될 수 있어, 장기보유자의 실제 부담은 훨씬 낮을 수
-          있습니다.
+          있습니다. (이 계산기는 반영하지 않습니다.)
         </li>
         <li>
-          <strong>재산세액공제(이중과세 조정)</strong> — 이미 납부한 재산세 중
-          종부세 과세분과 겹치는 금액을 공제합니다.
+          <strong>재산세액공제(이중과세 조정)</strong> — 위 "1. 재산세 계산"에서
+          <em>같은 주택</em>을 계산하고 "이 공시가격으로 종부세도 계산하기" 버튼으로
+          넘어온 경우에만 근사치로 반영됩니다(위 표에 관련 행이 표시됨). 직접 입력한
+          경우, 또는 여러 채를 합산 입력한 경우에는 반영되지 않습니다 — 실제 법령은
+          주택마다 개별 안분하는 다단계 계산이라 다주택 사례까지 정확히 재현하기
+          어렵기 때문입니다.
         </li>
         <li>
           <strong>세부담상한</strong> — 전년 대비 급격한 세액 인상을 제한합니다.
+          (이 계산기는 반영하지 않습니다.)
         </li>
       </ul>
       특히 <strong>1세대 1주택 장기보유자</strong>는 이 계산 결과와 실제 고지세액의
@@ -240,6 +265,14 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
         근거: <strong>종합부동산세법</strong> 제7~9조(주택에 대한 과세표준과 세율) —
         <a
           href="https://www.law.go.kr/법령/종합부동산세법"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+      <li>
+        근거: <strong>농어촌특별세법</strong> 제5조(종합부동산세액의 20%) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EB%86%8D%EC%96%B4%EC%B4%8C%ED%8A%B9%EB%B3%84%EC%84%B8%EB%B2%95"
           target="_blank"
           rel="noopener noreferrer">법령 본문 보기</a
         >
@@ -290,10 +323,12 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
       <summary>1세대 1주택 특례가 무엇인가요?</summary>
       <p>
         한 세대가 국내에 주택 1채만 보유한 경우 세부담을 낮춰 주는 제도입니다.
-        재산세에서는 시가표준액 9억원 이하 1세대 1주택에 대해 표준세율보다 낮은
-        <strong>특례세율</strong>과 낮은 공정시장가액비율(43~45%)이 적용됩니다.
-        종합부동산세에서는 공제금액이 9억원이 아닌 <strong>12억원</strong>으로
-        높아지고, 고령자·장기보유 세액공제도 이 경우에만 적용됩니다.
+        재산세에서는 1세대 1주택이면 시가표준액과 무관하게 낮은
+        <strong>공정시장가액비율(43~45%)</strong>이 적용되고, 그중에서도 시가표준액
+        9억원 이하인 경우에는 한 단계 더 낮은 <strong>특례세율(0.05~0.35%)</strong>까지
+        적용됩니다(9억원 초과분은 특례세율 대신 표준세율로 계산). 종합부동산세에서는
+        공제금액이 9억원이 아닌 <strong>12억원</strong>으로 높아지고, 고령자·장기보유
+        세액공제도 이 경우에만 적용됩니다.
       </p>
     </details>
   </section>
@@ -404,6 +439,22 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     background: #e0e7ff;
     color: #4338ca;
   }
+  .btn-link {
+    display: inline-block;
+    margin-top: 12px;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-dark);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .btn-link:hover {
+    color: var(--accent);
+  }
 </style>
 
 <script>
@@ -416,8 +467,21 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     LandType,
     BuildingType,
     HouseCount,
+    PropertyTaxResult,
   } from '../../lib/propertyTaxCalculator';
   import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  // "1. 재산세 계산"에서 "종부세도 계산하기" 버튼으로 넘어온 단일 주택
+  // 정보. 재산세액공제(이중과세 조정) 근사 계산에 쓰인다. 사용자가 종부세
+  // 입력값을 직접 수정하면(연결된 값과 어긋날 수 있으므로) 초기화한다.
+  let linkedPropertyTax: {
+    propertyTaxPaid: number;
+    fairMarketRatio: number;
+    topMarginalRate: number;
+  } | null = null;
+  // 가장 최근 "1. 재산세 계산" 결과(주택인 경우만). "종부세도 계산하기"
+  // 버튼을 눌렀을 때 linkedPropertyTax를 채우는 데 쓰인다.
+  let lastPropertyResult: PropertyTaxResult | null = null;
 
   // 큰 금액 입력값의 한글 단위 미리보기를 입력 즉시 갱신합니다.
   const bindAmountPreview = (inputId: string, previewId: string) => {
@@ -519,8 +583,12 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
       'special-fallback-note',
     ) as HTMLParagraphElement;
     fallbackNote.textContent = result.specialRateNotApplied
-      ? '※ 공시가격이 9억원을 초과하여 1세대 1주택 특례세율이 적용되지 않고 표준세율로 계산되었습니다.'
+      ? '※ 공시가격이 9억원을 초과하여 1세대 1주택 특례세율은 적용되지 않고 표준세율로 계산되었습니다. (공정시장가액비율 43~45% 특례는 가격과 무관하게 그대로 적용됩니다.)'
       : '';
+
+    // 주택을 계산한 경우에만 "종부세도 같이 계산하기" 버튼을 보여줍니다.
+    copyToComprehensiveBtn.classList.toggle('hidden', assetType !== '주택');
+    lastPropertyResult = assetType === '주택' ? result : null;
 
     propertyResult.classList.remove('hidden');
   };
@@ -528,6 +596,41 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
   propertyForm.addEventListener('submit', (event) => {
     event.preventDefault();
     recalcProperty();
+  });
+
+  // 재산세에서 입력한 주택 공시가격을 종부세 폼으로 그대로 옮기고,
+  // 두 번 입력하지 않아도 되도록 종부세 계산까지 이어서 실행합니다.
+  const copyToComprehensiveBtn = document.getElementById(
+    'copy-to-comprehensive',
+  ) as HTMLButtonElement;
+  copyToComprehensiveBtn.addEventListener('click', () => {
+    const baseValueInput = document.getElementById('baseValue') as HTMLInputElement;
+    const totalPublicPriceInput = document.getElementById(
+      'totalPublicPrice',
+    ) as HTMLInputElement;
+    totalPublicPriceInput.value = baseValueInput.value;
+    // input 이벤트가 아래 "수동 수정 시 연결 해제" 리스너를 먼저 태우므로,
+    // linkedPropertyTax는 반드시 이 dispatch 이후에 설정해야 한다.
+    totalPublicPriceInput.dispatchEvent(new Event('input'));
+
+    const isSingleHousehold = (
+      document.getElementById('singleHouseholdSpecial') as HTMLInputElement
+    ).checked;
+    const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+    houseCountSelect.value = isSingleHousehold ? '1주택' : houseCountSelect.value;
+
+    linkedPropertyTax = lastPropertyResult
+      ? {
+          propertyTaxPaid: lastPropertyResult.propertyTax,
+          fairMarketRatio: lastPropertyResult.fairMarketRatio,
+          topMarginalRate: lastPropertyResult.topMarginalRate,
+        }
+      : null;
+
+    recalcComprehensive();
+    document
+      .getElementById('comprehensive-form')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // -------------------- Part B: 종합부동산세 --------------------
@@ -541,27 +644,67 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     'comprehensive-error',
   ) as HTMLParagraphElement;
 
+  // 종부세 입력값을 사용자가 직접 손대면(버튼으로 채워진 값과 어긋날 수
+  // 있으므로) 재산세액공제 연결을 해제한다.
+  const totalPublicPriceInput = document.getElementById(
+    'totalPublicPrice',
+  ) as HTMLInputElement;
+  totalPublicPriceInput.addEventListener('input', () => {
+    linkedPropertyTax = null;
+  });
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  houseCountSelect.addEventListener('change', () => {
+    linkedPropertyTax = null;
+  });
+
   const recalcComprehensive = () => {
     comprehensiveError.textContent = '';
 
-    const totalPublicPrice = Number(
-      (document.getElementById('totalPublicPrice') as HTMLInputElement).value,
-    );
+    const totalPublicPrice = Number(totalPublicPriceInput.value);
     if (!totalPublicPrice || totalPublicPrice <= 0) {
       comprehensiveResult.classList.add('hidden');
       comprehensiveError.textContent = '주택 공시가격 합계를 올바르게 입력해 주세요.';
       return;
     }
 
+    const houseCount = houseCountSelect.value as HouseCount;
     const result = calculateComprehensiveTax({
       totalPublicPrice,
-      houseCount: (document.getElementById('houseCount') as HTMLSelectElement)
-        .value as HouseCount,
+      houseCount,
+      // 재산세액공제 근사식은 "물건 1건" 기준이므로, 연결된 값이 있고
+      // 1주택(1세대1주택)을 선택한 경우에만 적용한다.
+      linkedPropertyTax:
+        linkedPropertyTax && houseCount === '1주택' ? linkedPropertyTax : undefined,
     });
 
     setWon('ct-deduction', result.deduction);
     setWon('ct-taxbase', result.taxBase);
     setWon('ct-tax', result.calculatedTax);
+
+    const creditRow = document.getElementById('ct-credit-row') as HTMLTableRowElement;
+    const finalRow = document.getElementById('ct-final-row') as HTMLTableRowElement;
+    const ruralHint = document.getElementById('ct-rural-hint') as HTMLSpanElement;
+    const linkedNote = document.getElementById(
+      'credit-linked-note',
+    ) as HTMLParagraphElement;
+
+    if (result.propertyTaxCredit > 0) {
+      creditRow.classList.remove('hidden');
+      finalRow.classList.remove('hidden');
+      setWon('ct-credit', result.propertyTaxCredit);
+      setWon('ct-final', result.finalTax);
+      ruralHint.textContent = '(종부세 결정세액의 20%)';
+      linkedNote.textContent =
+        '✓ 위 "1. 재산세 계산"에서 넘어온 주택 정보로 재산세액공제(이중과세 조정)를 근사 반영했습니다.';
+    } else {
+      creditRow.classList.add('hidden');
+      finalRow.classList.add('hidden');
+      ruralHint.textContent = '(산출세액의 20%, 재산세액공제 미반영 근사치)';
+      linkedNote.textContent = '';
+    }
+
+    setWon('ct-rural', result.ruralSpecialTax);
+    setWon('ct-total', result.totalWithSurtax);
 
     comprehensiveResult.classList.remove('hidden');
   };
