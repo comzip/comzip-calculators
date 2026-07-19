@@ -19,6 +19,11 @@ const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
 // Astro.site comes from `site` in astro.config.mjs.
 const canonicalURL = Astro.site ? new URL(path, Astro.site).href : path;
 const year = new Date().getFullYear();
+
+// TODO: replace with your real GA4 Measurement ID (from analytics.google.com).
+// Left as a placeholder so no tracking script loads until you set a real ID.
+const GA_MEASUREMENT_ID = 'G-0H2MTD7S3L';
+const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
 ---
 
 <!doctype html>
@@ -45,6 +50,25 @@ const year = new Date().getFullYear();
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
+
+    {
+      analyticsEnabled && (
+        <>
+          <script
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          />
+          <script define:vars={{ GA_MEASUREMENT_ID }}>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+              dataLayer.push(arguments);
+            }
+            gtag('js', new Date());
+            gtag('config', GA_MEASUREMENT_ID);
+          </script>
+        </>
+      )
+    }
   </head>
   <body>
     <header class="site-header">
