@@ -6,7 +6,7 @@
 // The home page and any navigation are generated from this array, so there is
 // no separate hardcoded list to keep in sync.
 
-export type CalculatorCategory = '급여/세금' | '부동산/대출' | '생활';
+export type CalculatorCategory = '급여' | '부동산' | '생활';
 
 export interface Calculator {
   /** URL slug; the page lives at `src/pages/calculators/<slug>.astro`. */
@@ -21,7 +21,7 @@ export interface Calculator {
 
 // The order categories appear in on the home page. Add new categories here as
 // they are introduced so grouping stays deterministic.
-export const categoryOrder: CalculatorCategory[] = ['급여/세금', '부동산/대출', '생활'];
+export const categoryOrder: CalculatorCategory[] = ['급여', '부동산', '생활'];
 
 export const calculators: Calculator[] = [
   {
@@ -34,16 +34,23 @@ export const calculators: Calculator[] = [
   {
     slug: 'salary-calculator',
     title: '연봉 실수령액 계산기',
-    category: '급여/세금',
+    category: '급여',
     description:
       '연봉과 부양가족수를 입력하면 4대보험과 세금을 제외한 월 실수령액과 연 실수령액을 추정합니다.',
   },
   {
     slug: 'loan-calculator',
     title: '대출이자 계산기',
-    category: '부동산/대출',
+    category: '부동산',
     description:
       '대출원금·연이자율·기간을 입력하면 원리금균등/원금균등 방식별 월 상환액, 총 이자, 총 상환금액과 상환 스케줄을 계산합니다.',
+  },
+  {
+    slug: 'property-tax-calculator',
+    title: '보유세 계산기 (재산세·종합부동산세)',
+    category: '부동산',
+    description:
+      '공시가격을 입력하면 재산세(주택·토지·건축물)와 종합부동산세를 함께 추정합니다. 공정시장가액비율·누진세율·지방교육세·도시지역분까지 반영한 간이 보유세 계산기입니다.',
   },
   {
     slug: 'dday-calculator',

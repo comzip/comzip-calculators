@@ -1,0 +1,520 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    주택을 소유하면 매년 <strong>재산세(지방세)</strong>를 내고, 보유 주택
+    공시가격 합계가 일정 기준을 넘으면 <strong>종합부동산세(국세)</strong>도
+    부과됩니다. 아래에서 공시가격을 입력해 두 세금을 각각 추정해 보세요.
+  </p>
+
+  <!-- ============================================================
+       Part A — 재산세 (재산세 본세 + 지방교육세 + 도시지역분)
+       ============================================================ -->
+  <h2>1. 재산세 계산</h2>
+  <p class="note">
+    개별 부동산 1건에 대한 재산세를 계산합니다. 과세대상을 고르면 필요한
+    입력 항목이 바뀝니다.
+  </p>
+
+  <form class="calc-form" id="property-form">
+    <fieldset class="method-toggle">
+      <legend>과세대상</legend>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="주택" checked />
+        <span>주택</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="토지" />
+        <span>토지</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="건축물" />
+        <span>건축물</span>
+      </label>
+    </fieldset>
+
+    <label>
+      <span id="base-value-label">공시가격 (원)</span>
+      <span class="hint" id="base-value-hint">
+        주택은 공시가격, 토지·건축물은 시가표준액을 입력하세요. 예: 500000000
+      </span>
+      <input
+        type="number"
+        id="baseValue"
+        name="baseValue"
+        min="0"
+        step="1000000"
+        placeholder="예: 500000000"
+        required
+      />
+    </label>
+
+    <!-- 주택 전용 옵션 -->
+    <label class="check-row" id="house-options">
+      <input type="checkbox" id="singleHouseholdSpecial" />
+      <span>1세대 1주택입니다 (시가표준액 9억원 이하 특례세율 적용)</span>
+    </label>
+
+    <!-- 토지 전용 옵션 -->
+    <label id="land-options" class="hidden">
+      토지 분류
+      <select id="landType">
+        <option value="종합합산">종합합산과세대상</option>
+        <option value="별도합산">별도합산과세대상</option>
+        <option value="분리과세">분리과세대상 (농지·임야 등)</option>
+      </select>
+    </label>
+
+    <!-- 건축물 전용 옵션 -->
+    <label id="building-options" class="hidden">
+      건축물 용도
+      <select id="buildingType">
+        <option value="기타">기타 건축물 (일반, 대부분 해당)</option>
+        <option value="골프장·고급오락장">골프장·고급오락장용</option>
+        <option value="특정지역공장">특정지역 공장용</option>
+      </select>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="urbanArea" />
+      <span>도시지역 내 소재 (도시지역분 추가 부과)</span>
+    </label>
+
+    <button class="btn" type="submit">재산세 계산하기</button>
+  </form>
+
+  <p class="note" id="property-error" role="alert"></p>
+
+  <div class="result-box hidden" id="property-result" aria-live="polite">
+    <p class="note" id="special-fallback-note" style="margin-top:0;"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        재산세 산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>과세표준 <span class="hint" id="fmv-detail"></span></td>
+          <td id="pt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>재산세 본세</td>
+          <td id="pt-property">-</td>
+        </tr>
+        <tr>
+          <td>지방교육세 (본세의 20%)</td>
+          <td id="pt-education">-</td>
+        </tr>
+        <tr id="pt-urban-row">
+          <td>도시지역분 (과세표준의 0.14%)</td>
+          <td id="pt-urban">-</td>
+        </tr>
+        <tr class="total">
+          <td>합계</td>
+          <td id="pt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       Part B — 종합부동산세 (주택분)
+       ============================================================ -->
+  <h2 style="margin-top:36px;">2. 종합부동산세 계산 (주택분)</h2>
+  <p class="note">
+    개인이 보유한 <strong>모든 주택의 공시가격을 합산</strong>하여, 공제금액을
+    넘는 부분에 부과되는 국세입니다. 위 재산세와 별개로 계산됩니다.
+  </p>
+
+  <form class="calc-form" id="comprehensive-form">
+    <label>
+      보유 주택 공시가격 합계 (원)
+      <span class="hint">보유한 모든 주택의 공시가격을 더한 금액. 예: 1500000000</span>
+      <input
+        type="number"
+        id="totalPublicPrice"
+        name="totalPublicPrice"
+        min="0"
+        step="1000000"
+        placeholder="예: 1500000000"
+        required
+      />
+    </label>
+
+    <label>
+      주택 수
+      <select id="houseCount">
+        <option value="1주택">1주택 (1세대 1주택)</option>
+        <option value="2주택">2주택</option>
+        <option value="3주택이상">3주택 이상</option>
+      </select>
+    </label>
+
+    <button class="btn" type="submit">종합부동산세 계산하기</button>
+  </form>
+
+  <p class="note" id="comprehensive-error" role="alert"></p>
+
+  <div class="result-box hidden" id="comprehensive-result" aria-live="polite">
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        종합부동산세 산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>공제금액</td>
+          <td id="ct-deduction">-</td>
+        </tr>
+        <tr>
+          <td>과세표준 <span class="hint">(공시가격합계 − 공제금액) × 60%</span></td>
+          <td id="ct-taxbase">-</td>
+        </tr>
+        <tr class="total">
+          <td>종합부동산세 산출세액</td>
+          <td id="ct-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>이 금액은 세액공제·세부담상한을 반영하기 전의 기본 산출세액입니다.</strong>
+      실제 고지세액은 이보다 <strong>낮을 수 있습니다.</strong> 특히 다음 항목이
+      반영되지 않았습니다.
+      <ul>
+        <li>
+          <strong>고령자·장기보유 세액공제</strong> — 1세대 1주택자에게 적용되며
+          합산 최대 80%까지 감면될 수 있어, 장기보유자의 실제 부담은 훨씬 낮을 수
+          있습니다.
+        </li>
+        <li>
+          <strong>재산세액공제(이중과세 조정)</strong> — 이미 납부한 재산세 중
+          종부세 과세분과 겹치는 금액을 공제합니다.
+        </li>
+        <li>
+          <strong>세부담상한</strong> — 전년 대비 급격한 세액 인상을 제한합니다.
+        </li>
+      </ul>
+      특히 <strong>1세대 1주택 장기보유자</strong>는 이 계산 결과와 실제 고지세액의
+      차이가 매우 클 수 있습니다.
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세·종합부동산세는
+    시행령·조례, 각종 세액공제, 세부담상한 등에 따라 실제 부과세액이 달라지며,
+    공정시장가액비율·세율·공제금액 등은 법령 개정으로 바뀔 수 있습니다. 실제
+    세액은 관할 지방자치단체(재산세) 및 국세청 홈택스(종합부동산세)의 안내를
+    확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>법령 근거</h2>
+    <ul>
+      <li>
+        근거: <strong>지방세법</strong> 제110조(과세표준), 제111조·제111조의2(세율),
+        제112조(도시지역분), 제151조(지방교육세) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+      <li>
+        근거: <strong>종합부동산세법</strong> 제7~9조(주택에 대한 과세표준과 세율) —
+        <a
+          href="https://www.law.go.kr/법령/종합부동산세법"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>공시가격이 무엇인가요? 어디서 확인하나요?</summary>
+      <p>
+        공시가격은 정부가 매년 조사·산정해 공시하는 부동산의 기준가격으로,
+        재산세·종합부동산세의 과세 기준이 됩니다. 실제 거래가격(시세)과는 다르며
+        보통 시세보다 낮게 책정됩니다. 본인 소유 부동산의 공시가격은
+        <strong>부동산공시가격 알리미</strong>에서 주소로 조회할 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>재산세와 종합부동산세는 무엇이 다른가요?</summary>
+      <p>
+        <strong>재산세</strong>는 부동산을 소유한 사람이 내는 <strong>지방세</strong>로,
+        관할 지방자치단체가 매년 부과하며 주택은 보통 7월과 9월에 절반씩
+        고지됩니다. <strong>종합부동산세</strong>는 개인이 보유한 주택 공시가격
+        합계가 공제금액(1세대 1주택 12억원, 그 외 9억원)을 넘을 때 그 초과분에
+        부과되는 <strong>국세</strong>로, 매년 12월에 국세청이 부과합니다. 즉
+        재산세는 모든 부동산 보유자가, 종부세는 고가·다주택 보유자가 추가로
+        부담하는 구조입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 이 계산기 결과가 실제 고지서와 다를 수 있나요?</summary>
+      <p>
+        이 계산기는 세율표와 공정시장가액비율만으로 기본 산출세액을 계산합니다.
+        실제 고지서에는 <strong>고령자·장기보유 세액공제, 재산세액공제(이중과세
+        조정), 세부담상한</strong> 등이 추가로 반영되어 세액이 낮아지는 경우가
+        많습니다. 또한 공정시장가액비율·세율·공제금액은 시행령 개정으로 매년 바뀔
+        수 있으므로, 정확한 금액은 반드시 지자체·홈택스 고지 내용을 확인하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>1세대 1주택 특례가 무엇인가요?</summary>
+      <p>
+        한 세대가 국내에 주택 1채만 보유한 경우 세부담을 낮춰 주는 제도입니다.
+        재산세에서는 시가표준액 9억원 이하 1세대 1주택에 대해 표준세율보다 낮은
+        <strong>특례세율</strong>과 낮은 공정시장가액비율(43~45%)이 적용됩니다.
+        종합부동산세에서는 공제금액이 9억원이 아닌 <strong>12억원</strong>으로
+        높아지고, 고령자·장기보유 세액공제도 이 경우에만 적용됩니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .method-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 0;
+  }
+  .method-toggle legend {
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0 4px;
+  }
+  .method-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .method-option input {
+    width: auto;
+    margin: 0;
+  }
+  .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-weight: 500;
+  }
+  .check-row input {
+    width: auto;
+    margin: 3px 0 0;
+  }
+  .calc-form select {
+    font: inherit;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    width: 100%;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import {
+    calculatePropertyTax,
+    calculateComprehensiveTax,
+  } from '../../lib/propertyTaxCalculator';
+  import type {
+    PropertyAssetType,
+    LandType,
+    BuildingType,
+    HouseCount,
+  } from '../../lib/propertyTaxCalculator';
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  // -------------------- Part A: 재산세 --------------------
+  const propertyForm = document.getElementById('property-form') as HTMLFormElement;
+  const propertyResult = document.getElementById('property-result') as HTMLDivElement;
+  const propertyError = document.getElementById('property-error') as HTMLParagraphElement;
+
+  const baseValueLabel = document.getElementById('base-value-label') as HTMLSpanElement;
+  const houseOptions = document.getElementById('house-options') as HTMLLabelElement;
+  const landOptions = document.getElementById('land-options') as HTMLLabelElement;
+  const buildingOptions = document.getElementById('building-options') as HTMLLabelElement;
+
+  const currentAssetType = (): PropertyAssetType =>
+    (propertyForm.querySelector('input[name="assetType"]:checked') as HTMLInputElement)
+      .value as PropertyAssetType;
+
+  // 과세대상에 따라 관련 입력만 노출하고 baseValue 레이블을 갱신합니다.
+  const syncAssetType = () => {
+    const type = currentAssetType();
+    houseOptions.classList.toggle('hidden', type !== '주택');
+    landOptions.classList.toggle('hidden', type !== '토지');
+    buildingOptions.classList.toggle('hidden', type !== '건축물');
+    baseValueLabel.textContent = type === '주택' ? '공시가격 (원)' : '시가표준액 (원)';
+  };
+
+  propertyForm.querySelectorAll('input[name="assetType"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      syncAssetType();
+      if (!propertyResult.classList.contains('hidden')) recalcProperty();
+    });
+  });
+  syncAssetType();
+
+  const recalcProperty = () => {
+    propertyError.textContent = '';
+
+    const baseValue = Number(
+      (document.getElementById('baseValue') as HTMLInputElement).value,
+    );
+    if (!baseValue || baseValue <= 0) {
+      propertyResult.classList.add('hidden');
+      propertyError.textContent = '공시가격(시가표준액)을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const assetType = currentAssetType();
+    const result = calculatePropertyTax({
+      assetType,
+      baseValue,
+      singleHouseholdSpecial: (
+        document.getElementById('singleHouseholdSpecial') as HTMLInputElement
+      ).checked,
+      landType: (document.getElementById('landType') as HTMLSelectElement)
+        .value as LandType,
+      buildingType: (document.getElementById('buildingType') as HTMLSelectElement)
+        .value as BuildingType,
+      urbanArea: (document.getElementById('urbanArea') as HTMLInputElement).checked,
+    });
+
+    (document.getElementById('fmv-detail') as HTMLSpanElement).textContent =
+      `(공정시장가액비율 ${pct(result.fairMarketRatio)})`;
+    setWon('pt-taxbase', result.taxBase);
+    setWon('pt-property', result.propertyTax);
+    setWon('pt-education', result.localEducationTax);
+    setWon('pt-total', result.total);
+
+    // 도시지역분은 선택 시에만 행을 표시합니다.
+    const urbanRow = document.getElementById('pt-urban-row') as HTMLTableRowElement;
+    if (result.urbanAreaTax > 0) {
+      urbanRow.classList.remove('hidden');
+      setWon('pt-urban', result.urbanAreaTax);
+    } else {
+      urbanRow.classList.add('hidden');
+    }
+
+    const fallbackNote = document.getElementById(
+      'special-fallback-note',
+    ) as HTMLParagraphElement;
+    fallbackNote.textContent = result.specialRateNotApplied
+      ? '※ 공시가격이 9억원을 초과하여 1세대 1주택 특례세율이 적용되지 않고 표준세율로 계산되었습니다.'
+      : '';
+
+    propertyResult.classList.remove('hidden');
+  };
+
+  propertyForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalcProperty();
+  });
+
+  // -------------------- Part B: 종합부동산세 --------------------
+  const comprehensiveForm = document.getElementById(
+    'comprehensive-form',
+  ) as HTMLFormElement;
+  const comprehensiveResult = document.getElementById(
+    'comprehensive-result',
+  ) as HTMLDivElement;
+  const comprehensiveError = document.getElementById(
+    'comprehensive-error',
+  ) as HTMLParagraphElement;
+
+  const recalcComprehensive = () => {
+    comprehensiveError.textContent = '';
+
+    const totalPublicPrice = Number(
+      (document.getElementById('totalPublicPrice') as HTMLInputElement).value,
+    );
+    if (!totalPublicPrice || totalPublicPrice <= 0) {
+      comprehensiveResult.classList.add('hidden');
+      comprehensiveError.textContent = '주택 공시가격 합계를 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const result = calculateComprehensiveTax({
+      totalPublicPrice,
+      houseCount: (document.getElementById('houseCount') as HTMLSelectElement)
+        .value as HouseCount,
+    });
+
+    setWon('ct-deduction', result.deduction);
+    setWon('ct-taxbase', result.taxBase);
+    setWon('ct-tax', result.calculatedTax);
+
+    comprehensiveResult.classList.remove('hidden');
+  };
+
+  comprehensiveForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalcComprehensive();
+  });
+</script>
