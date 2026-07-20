@@ -361,26 +361,30 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
         font-size: 0.95rem;
         padding: 0 4px;
       }
-      .method-option {
+      /* `.calc-form label` below sets display:grid at specificity (0,1,1);
+         a bare `.method-option`/`.check-row` class (0,1,0) would lose that
+         fight, so these are qualified with `.calc-form` to win at (0,2,0)
+         regardless of how deeply they're nested inside the form. */
+      .calc-form .method-option {
         display: flex;
         align-items: center;
         gap: 6px;
         font-weight: 500;
         cursor: pointer;
       }
-      .method-option input {
+      .calc-form .method-option input {
         width: auto;
         margin: 0;
       }
       /* Shared checkbox-plus-label row (e.g. "1세대 1주택입니다"). */
-      .check-row {
+      .calc-form .check-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
         font-weight: 500;
       }
-      .check-row input {
+      .calc-form .check-row input {
         width: auto;
         margin: 0;
         order: 1;
