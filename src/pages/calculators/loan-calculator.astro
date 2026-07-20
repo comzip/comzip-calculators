@@ -35,14 +35,14 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
     </label>
     <label>
       연이자율 (%)
-      <span class="hint">소수점 입력 가능. 예: 4.5</span>
+      <span class="hint">소수점 둘째 자리까지 입력 가능. 예: 4.55</span>
       <input
         type="number"
         id="annualRate"
         name="annualRate"
         min="0"
-        step="0.1"
-        placeholder="예: 4.5"
+        step="0.01"
+        placeholder="예: 4.55"
         required
       />
     </label>
@@ -235,6 +235,17 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
     const value = Number(principalInput.value);
     principalPreview.textContent = value > 0 ? formatKoreanWon(value) : '';
   });
+  // 연이자율은 소수점 둘째 자리까지만 허용합니다. 브라우저 기본 검증
+  // 메시지는 영어(또는 OS 언어)로 뜨므로, 한글 메시지로 바꿔서 보여줍니다.
+  const annualRateInput = document.getElementById('annualRate') as HTMLInputElement;
+  const validateAnnualRate = () => {
+    const decimals = annualRateInput.value.split('.')[1]?.length ?? 0;
+    annualRateInput.setCustomValidity(
+      decimals > 2 ? '연이자율은 소수점 둘째 자리까지만 입력할 수 있습니다.' : '',
+    );
+  };
+  annualRateInput.addEventListener('input', validateAnnualRate);
+
   const scheduleBody = document.getElementById('schedule-body') as HTMLTableSectionElement;
 
   const won = new Intl.NumberFormat('ko-KR', {
@@ -272,6 +283,11 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
     if (!Number.isFinite(annualRatePercent) || annualRatePercent < 0) {
       result.classList.add('hidden');
       errorMsg.textContent = '연이자율을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!annualRateInput.checkValidity()) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '연이자율은 소수점 둘째 자리까지만 입력할 수 있습니다.';
       return;
     }
     if (!months || months < 1) {
