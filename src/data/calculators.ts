@@ -60,6 +60,13 @@ export const calculators: Calculator[] = [
       '공시가격을 입력하면 재산세(주택·토지·건축물)와 종합부동산세를 함께 추정합니다. 공정시장가액비율·누진세율·지방교육세·도시지역분까지 반영한 간이 보유세 계산기입니다.',
   },
   {
+    slug: 'bmi-calculator',
+    title: 'BMI 계산기',
+    category: '생활',
+    description:
+      '신장과 체중을 입력하면 체질량지수(BMI)와 대한비만학회 기준 비만도 분류, 표준체중을 계산합니다.',
+  },
+  {
     slug: 'dday-calculator',
     title: 'D-Day 계산기',
     category: '생활',

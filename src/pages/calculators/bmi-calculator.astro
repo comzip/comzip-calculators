@@ -1,0 +1,178 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'bmi-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    신장과 체중을 입력하면 <strong>체질량지수(BMI)</strong>와 대한비만학회
+    기준 비만도 분류, 표준체중을 계산합니다.
+  </p>
+
+  <form class="calc-form" id="bmi-form">
+    <label>
+      신장 (cm)
+      <input
+        type="number"
+        id="heightCm"
+        name="heightCm"
+        min="0"
+        step="0.1"
+        placeholder="예: 170"
+        required
+      />
+    </label>
+    <label>
+      체중 (kg)
+      <input
+        type="number"
+        id="weightKg"
+        name="weightKg"
+        min="0"
+        step="0.1"
+        placeholder="예: 65"
+        required
+      />
+    </label>
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">BMI</span>
+        <span class="value"><span id="bmi-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">비만도 분류</span>
+        <span class="value"><span id="bmi-category">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        상세 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>표준체중 <span class="hint">(BMI 22 기준)</span></td>
+          <td id="row-standard-weight">-</td>
+        </tr>
+        <tr>
+          <td>표준체중과의 차이</td>
+          <td id="row-weight-diff">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    BMI는 신장과 체중만으로 계산하는 <strong>간이 지표</strong>이며, 근육량·
+    체지방률·체형 등을 반영하지 않습니다. 운동선수처럼 근육량이 많은
+    경우 BMI가 높게 나와도 비만이 아닐 수 있습니다. 건강 상태 판단은
+    체성분 검사나 의료 전문가 상담을 통해 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>BMI는 어떻게 계산하나요?</summary>
+      <p>
+        BMI(체질량지수) = 체중(kg) ÷ 신장(m)². 예를 들어 키 170cm(1.7m),
+        체중 65kg이면 65 ÷ 1.7² ≈ 22.5입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>비만도 분류 기준은 무엇인가요?</summary>
+      <p>
+        이 계산기는 <strong>대한비만학회(2018 비만진료지침)</strong> 기준을
+        사용합니다: 저체중 18.5 미만, 정상 18.5~22.9, 비만전단계 23~24.9,
+        1단계 비만 25~29.9, 2단계 비만 30~34.9, 3단계 비만(고도비만) 35
+        이상. WHO 국제 기준(과체중 25 이상, 비만 30 이상)과는 구간이 달라
+        해외 자료와 비교할 때 차이가 날 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>표준체중은 어떻게 계산되나요?</summary>
+      <p>
+        표준체중은 BMI가 정확히 22가 되는 체중(kg) = 22 × 신장(m)²로
+        계산합니다. BMI 22는 통계적으로 질병 발생 위험이 가장 낮다고
+        알려진 값이라 표준체중 기준으로 흔히 쓰입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>BMI가 높으면 무조건 건강에 안 좋은가요?</summary>
+      <p>
+        꼭 그렇지는 않습니다. BMI는 근육과 지방을 구분하지 못하기 때문에
+        근육량이 많은 사람은 체지방이 적어도 BMI가 높게 나올 수 있습니다.
+        반대로 근육량이 적고 체지방률이 높은 "마른 비만"은 BMI가 정상이어도
+        건강 위험이 있을 수 있습니다. BMI는 참고 지표로만 활용하세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateBmi } from '../../lib/bmiCalculator';
+
+  const form = document.getElementById('bmi-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const kg = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const heightCm = Number(
+      (document.getElementById('heightCm') as HTMLInputElement).value,
+    );
+    const weightKg = Number(
+      (document.getElementById('weightKg') as HTMLInputElement).value,
+    );
+
+    if (!heightCm || heightCm <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '신장을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!weightKg || weightKg <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '체중을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateBmi({ heightCm, weightKg });
+
+    (document.getElementById('bmi-value') as HTMLElement).textContent = r.bmi.toFixed(1);
+    (document.getElementById('bmi-category') as HTMLElement).textContent = r.category;
+    (document.getElementById('row-standard-weight') as HTMLElement).textContent =
+      `${kg.format(r.standardWeightKg)} kg`;
+
+    const diff = r.weightDiffKg;
+    const diffEl = document.getElementById('row-weight-diff') as HTMLElement;
+    diffEl.textContent =
+      diff === 0
+        ? '표준체중과 동일'
+        : `${diff > 0 ? '+' : ''}${kg.format(diff)} kg (표준체중 대비)`;
+
+    result.classList.remove('hidden');
+  });
+</script>
