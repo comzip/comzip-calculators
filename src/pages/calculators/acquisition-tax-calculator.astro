@@ -13,11 +13,24 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
 >
   <h1>{meta.title}</h1>
   <p class="note">
-    매매가·주택 수·조정대상지역 여부를 입력하면 <strong>취득세, 지방교육세,
-    농어촌특별세</strong>를 함께 추정합니다. (주택 유상거래 기준)
+    매매가와 물건 종류를 입력하면 <strong>취득세, 지방교육세, 농어촌특별세</strong>를
+    함께 추정합니다. 오피스텔은 지방세법상 "주택"이 아니라 세율 체계가
+    달라, 물건 종류를 나눠서 계산합니다.
   </p>
 
   <form class="calc-form" id="acquisition-form">
+    <fieldset class="method-toggle">
+      <legend>물건 종류</legend>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="주택" checked />
+        <span>주택 (아파트·연립·단독주택 등)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="오피스텔" />
+        <span>오피스텔</span>
+      </label>
+    </fieldset>
+
     <label>
       취득가액 (매매가, 원)
       <input
@@ -32,25 +45,33 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
       <span class="amount-preview" id="price-preview" aria-live="polite"></span>
     </label>
 
-    <label>
-      주택 수 <span class="hint">이번에 취득하는 주택을 포함한 1세대 기준</span>
-      <select id="houseCount">
-        <option value="1주택">1주택 (일시적 2주택 포함)</option>
-        <option value="2주택">2주택</option>
-        <option value="3주택">3주택</option>
-        <option value="4주택이상또는법인">4주택 이상 또는 법인</option>
-      </select>
-    </label>
+    <!-- 주택 전용 옵션 -->
+    <div id="house-options">
+      <label>
+        주택 수 <span class="hint">이번에 취득하는 주택을 포함한 1세대 기준</span>
+        <select id="houseCount">
+          <option value="1주택">1주택 (일시적 2주택 포함)</option>
+          <option value="2주택">2주택</option>
+          <option value="3주택">3주택</option>
+          <option value="4주택이상또는법인">4주택 이상 또는 법인</option>
+        </select>
+      </label>
 
-    <label class="check-row" id="regulated-area-row">
-      <input type="checkbox" id="isRegulatedArea" />
-      <span>조정대상지역 내 주택입니다</span>
-    </label>
+      <label class="check-row" id="regulated-area-row">
+        <input type="checkbox" id="isRegulatedArea" />
+        <span>조정대상지역 내 주택입니다</span>
+      </label>
 
-    <label class="check-row">
-      <input type="checkbox" id="isOver85Sqm" checked />
-      <span>전용면적 85㎡ 초과 (국민주택 규모 초과, 농어촌특별세 과세대상)</span>
-    </label>
+      <label class="check-row">
+        <input type="checkbox" id="isOver85Sqm" checked />
+        <span>전용면적 85㎡ 초과 (국민주택 규모 초과, 농어촌특별세 과세대상)</span>
+      </label>
+    </div>
+
+    <p class="note hidden" id="officetel-note">
+      오피스텔은 주택 수·조정대상지역과 무관하게 취득세율 4%가 고정
+      적용되며, 전용면적과 무관하게 농어촌특별세가 부과됩니다.
+    </p>
 
     <button class="btn" type="submit">계산하기</button>
   </form>
@@ -91,9 +112,11 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
   <div class="disclaimer">
     본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 일시적 2주택
     특례, 생애최초 취득 감면, 고급주택(사치성재산) 추가 중과(+8%p),
-    상속·증여 등 무상취득은 반영하지 않았습니다. 조정대상지역 지정
-    현황은 지역·시점마다 달라지므로 반드시 국토교통부 고시를 확인하고,
-    정확한 세액은 관할 지방자치단체(위택스)를 통해 확인하세요.
+    상속·증여 등 무상취득은 반영하지 않았습니다. 오피스텔이 다른 주택
+    취득 시 주택 수에 산입되는지 여부(2020.8.12. 이후 주거용 오피스텔 등
+    일부 해당)도 반영하지 않았습니다. 조정대상지역 지정 현황은
+    지역·시점마다 달라지므로 반드시 국토교통부 고시를 확인하고, 정확한
+    세액은 관할 지방자치단체(위택스)를 통해 확인하세요.
   </div>
 
   <AdSlot />
@@ -135,6 +158,21 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
     </details>
 
     <details>
+      <summary>오피스텔은 왜 세율이 다른가요?</summary>
+      <p>
+        오피스텔은 건축법·주택법상 "업무시설"로 분류되어 <strong>지방세법상
+        주택이 아닙니다.</strong> 그래서 주택 유상거래 특례세율(1~3%)이나
+        다주택자 중과세율(8%·12%)이 적용되지 않고, 일반 부동산 취득세율인
+        <strong>4%</strong>가 주택 수·조정대상지역과 무관하게 항상
+        적용됩니다. 지방교육세 0.4%와 농어촌특별세 0.2%가 더해져 흔히
+        <strong>4.6%</strong>로 알려져 있습니다. 다만 주거용으로 쓰는
+        오피스텔이 <em>다른 주택을 취득할 때</em> 주택 수에 포함되는지는
+        별도 이슈이며(2020년 8월 12일 이후 취득분부터 일부 해당), 이
+        계산기는 오피스텔 자체의 취득세만 계산합니다.
+      </p>
+    </details>
+
+    <details>
       <summary>일시적 2주택이나 생애최초 감면은 반영되나요?</summary>
       <p>
         반영되지 않습니다. 이사 등으로 일정 기간 내 기존 주택을 처분하는
@@ -149,7 +187,10 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
 
 <script>
   import { calculateAcquisitionTax } from '../../lib/acquisitionTaxCalculator';
-  import type { HouseCountForAcquisition } from '../../lib/acquisitionTaxCalculator';
+  import type {
+    HouseCountForAcquisition,
+    PropertyType,
+  } from '../../lib/acquisitionTaxCalculator';
   import { formatKoreanWon } from '../../lib/formatKoreanWon';
 
   const form = document.getElementById('acquisition-form') as HTMLFormElement;
@@ -162,6 +203,24 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
     const value = Number(priceInput.value);
     pricePreview.textContent = value > 0 ? formatKoreanWon(value) : '';
   });
+
+  const currentPropertyType = (): PropertyType =>
+    (form.querySelector('input[name="propertyType"]:checked') as HTMLInputElement)
+      .value as PropertyType;
+
+  // 오피스텔은 주택수/조정대상지역/전용면적 입력이 전혀 필요하지 않으므로
+  // (항상 4% 고정) 물건 종류에 따라 입력 영역 전체를 전환합니다.
+  const houseOptions = document.getElementById('house-options') as HTMLDivElement;
+  const officetelNote = document.getElementById('officetel-note') as HTMLParagraphElement;
+  const syncPropertyType = () => {
+    const isOfficetel = currentPropertyType() === '오피스텔';
+    houseOptions.classList.toggle('hidden', isOfficetel);
+    officetelNote.classList.toggle('hidden', !isOfficetel);
+  };
+  form.querySelectorAll('input[name="propertyType"]').forEach((radio) => {
+    radio.addEventListener('change', syncPropertyType);
+  });
+  syncPropertyType();
 
   // 1주택은 조정대상지역 여부가 세율에 영향을 주지 않으므로 입력을 숨깁니다.
   const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
@@ -193,6 +252,7 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
       return;
     }
 
+    const propertyType = currentPropertyType();
     const houseCount = houseCountSelect.value as HouseCountForAcquisition;
     const isRegulatedArea = (
       document.getElementById('isRegulatedArea') as HTMLInputElement
@@ -201,10 +261,17 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
       document.getElementById('isOver85Sqm') as HTMLInputElement
     ).checked;
 
-    const r = calculateAcquisitionTax({ price, houseCount, isRegulatedArea, isOver85Sqm });
+    const r = calculateAcquisitionTax({
+      propertyType,
+      price,
+      houseCount,
+      isRegulatedArea,
+      isOver85Sqm,
+    });
 
-    (document.getElementById('row-rate') as HTMLElement).textContent =
-      `${(r.rate * 100).toFixed(r.isHeavyRate ? 0 : 2)}%`;
+    // 소수점 둘째 자리까지 표시하되, .00/.X0 같은 불필요한 끝자리 0은 잘라냅니다.
+    const ratePercent = (r.rate * 100).toFixed(2).replace(/\.?0+$/, '');
+    (document.getElementById('row-rate') as HTMLElement).textContent = `${ratePercent}%`;
     setWon('row-acquisition', r.acquisitionTax);
     setWon('row-education', r.localEducationTax);
 
