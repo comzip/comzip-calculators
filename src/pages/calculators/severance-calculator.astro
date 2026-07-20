@@ -1,0 +1,256 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'severance-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    입사일·퇴사일과 최근 3개월 급여를 입력하면 <strong>평균임금</strong>과
+    <strong>퇴직금</strong>을 추정합니다.
+  </p>
+
+  <form class="calc-form" id="severance-form">
+    <label>
+      입사일
+      <input type="date" id="hireDate" name="hireDate" required />
+    </label>
+    <label>
+      퇴사일
+      <input type="date" id="resignDate" name="resignDate" required />
+    </label>
+    <label>
+      퇴사일 이전 3개월 급여 총액 (세전, 원)
+      <span class="hint">
+        최근 3개월간 지급된 기본급+제수당 합계. 상여금·연차수당은 아래
+        별도 입력란에 넣어주세요. 예: 12000000
+      </span>
+      <input
+        type="number"
+        id="threeMonthWage"
+        name="threeMonthWage"
+        min="0"
+        step="100000"
+        placeholder="예: 12000000"
+        required
+      />
+      <span class="amount-preview" id="threeMonthWage-preview" aria-live="polite"></span>
+    </label>
+    <label>
+      연간 상여금 총액 (원)
+      <span class="hint">선택 입력, 없으면 비워두세요. 3개월분(1/4)만 반영됩니다.</span>
+      <input
+        type="number"
+        id="annualBonus"
+        name="annualBonus"
+        min="0"
+        step="100000"
+        placeholder="예: 4000000"
+      />
+    </label>
+    <label>
+      재직 중 지급받은 연차수당 연간 총액 (원)
+      <span class="hint">
+        선택 입력. 퇴직 정산분(미사용 연차 정산금)이 아닌, 재직 중 실제
+        지급받은 연차수당만 해당됩니다. 3개월분(1/4)만 반영됩니다.
+      </span>
+      <input
+        type="number"
+        id="annualLeaveAllowance"
+        name="annualLeaveAllowance"
+        min="0"
+        step="100000"
+        placeholder="예: 0"
+      />
+    </label>
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="eligibility-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">퇴직금</span>
+        <span class="value"><span id="severance-pay">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">1일 평균임금</span>
+        <span class="value"><span id="average-daily-wage">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>재직일수</td>
+          <td id="row-work-days">-</td>
+        </tr>
+        <tr>
+          <td>평균임금 산정기간 <span class="hint">(퇴사일 이전 3개월 역일수)</span></td>
+          <td id="row-period-days">-</td>
+        </tr>
+        <tr>
+          <td>1일 평균임금</td>
+          <td id="row-average-wage">-</td>
+        </tr>
+        <tr class="total">
+          <td>퇴직금 (평균임금 × 30 × 재직일수/365)</td>
+          <td id="row-severance">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 실제 평균임금
+    산정은 임금 항목의 포함·제외 여부, 통상임금과의 비교(평균임금이
+    통상임금보다 낮으면 통상임금을 적용) 등 세부 규칙이 있어 실제 지급액과
+    차이가 있을 수 있습니다. 정확한 금액은 회사 인사·급여 담당 부서 또는
+    고용노동부 퇴직금 계산기를 통해 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>퇴직금은 누구나 받을 수 있나요?</summary>
+      <p>
+        근로자퇴직급여 보장법에 따라 <strong>계속근로기간 1년 이상</strong
+        >이고 4주 평균 1주 소정근로시간이 15시간 이상인 근로자에게 지급
+        의무가 발생합니다. 재직일수가 365일 미만이면 법정 지급 대상이
+        아닐 수 있어, 이 계산기도 안내 문구로 표시합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>평균임금은 어떻게 계산되나요?</summary>
+      <p>
+        평균임금은 <strong>퇴사일 이전 3개월간 받은 임금 총액을 그 3개월의
+        총일수(역일수)로 나눈 금액</strong>입니다. 상여금과 연차수당은
+        연간 총액의 3개월분(1/4)만 포함되며, 퇴직으로 인해 비로소 발생하는
+        연차수당(퇴직 정산분)은 평균임금 산정에서 제외됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 이 계산기 결과가 실제 지급액과 다를 수 있나요?</summary>
+      <p>
+        실제로는 평균임금이 <strong>통상임금보다 낮으면 통상임금을
+        적용</strong>하는 하한 규정이 있고, 임금 항목별 포함 여부 판단이
+        사례마다 다를 수 있습니다. 이 계산기는 이런 세부 조정을 반영하지
+        않은 기본 산식만 적용한 참고용 추정치입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>연봉 실수령액 계산기와 같이 쓸 수 있나요?</summary>
+      <p>
+        네. <a href="/calculators/salary-calculator">연봉 실수령액
+        계산기</a>로 월 실수령액을 확인하고, 퇴사를 앞두고 있다면 이
+        계산기로 예상 퇴직금까지 함께 가늠해 보실 수 있습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateSeverance } from '../../lib/severanceCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('severance-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // 3개월 급여 입력값의 한글 단위 미리보기를 입력 즉시 갱신합니다.
+  const wageInput = document.getElementById('threeMonthWage') as HTMLInputElement;
+  const wagePreview = document.getElementById('threeMonthWage-preview') as HTMLSpanElement;
+  wageInput.addEventListener('input', () => {
+    const value = Number(wageInput.value);
+    wagePreview.textContent = value > 0 ? formatKoreanWon(value) : '';
+  });
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hireDate = (document.getElementById('hireDate') as HTMLInputElement).value;
+    const resignDate = (document.getElementById('resignDate') as HTMLInputElement).value;
+    const threeMonthWage = Number(wageInput.value);
+    const annualBonus = Number(
+      (document.getElementById('annualBonus') as HTMLInputElement).value,
+    );
+    const annualLeaveAllowance = Number(
+      (document.getElementById('annualLeaveAllowance') as HTMLInputElement).value,
+    );
+
+    if (!hireDate || !resignDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '입사일과 퇴사일을 모두 입력해 주세요.';
+      return;
+    }
+    if (!threeMonthWage || threeMonthWage <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '퇴사일 이전 3개월 급여 총액을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    let r;
+    try {
+      r = calculateSeverance({
+        hireDate,
+        resignDate,
+        threeMonthWage,
+        annualBonus: Number.isFinite(annualBonus) ? annualBonus : undefined,
+        annualLeaveAllowance: Number.isFinite(annualLeaveAllowance)
+          ? annualLeaveAllowance
+          : undefined,
+      });
+    } catch (e) {
+      result.classList.add('hidden');
+      errorMsg.textContent = e instanceof Error ? e.message : '입력값을 확인해 주세요.';
+      return;
+    }
+
+    setWon('severance-pay', r.severancePay);
+    setWon('average-daily-wage', r.averageDailyWage);
+    (document.getElementById('row-work-days') as HTMLElement).textContent = `${r.workDays}일`;
+    (document.getElementById('row-period-days') as HTMLElement).textContent =
+      `${r.periodDays}일`;
+    setWon('row-average-wage', r.averageDailyWage);
+    setWon('row-severance', r.severancePay);
+
+    const eligibilityNote = document.getElementById(
+      'eligibility-note',
+    ) as HTMLParagraphElement;
+    eligibilityNote.textContent = r.eligible
+      ? ''
+      : '※ 재직일수가 365일 미만이라 법정 퇴직금 지급 대상이 아닐 수 있습니다. 아래 금액은 참고용 계산치입니다.';
+
+    result.classList.remove('hidden');
+  });
+</script>

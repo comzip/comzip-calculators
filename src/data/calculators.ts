@@ -39,6 +39,13 @@ export const calculators: Calculator[] = [
       '연봉과 부양가족수를 입력하면 4대보험과 세금을 제외한 월 실수령액과 연 실수령액을 추정합니다.',
   },
   {
+    slug: 'severance-calculator',
+    title: '퇴직금 계산기',
+    category: '급여',
+    description:
+      '입사일·퇴사일과 최근 3개월 급여를 입력하면 평균임금과 예상 퇴직금을 추정합니다.',
+  },
+  {
     slug: 'loan-calculator',
     title: '대출이자 계산기',
     category: '부동산',
