@@ -15,7 +15,8 @@
  *  - 재산세: 지방세법 제110조(과세표준), 제111조·제111조의2(세율),
  *            제112조(도시지역분), 제151조(지방교육세)
  *  - 종합부동산세: 종합부동산세법 제7~9조(주택에 대한 과세표준과 세율),
- *                 제9조제3항(재산세액공제, 근사식으로만 반영)
+ *                 제9조제3항(재산세액공제, 근사식으로만 반영),
+ *                 제9조제5~8항(고령자·장기보유 세액공제, 1세대1주택 한정)
  *  - 농어촌특별세: 농어촌특별세법 제5조(종합부동산세액의 20%)
  * =================================================================
  *
@@ -297,6 +298,24 @@ const DEDUCTION_SINGLE_HOUSE = 1_200_000_000;
 const DEDUCTION_MULTI_HOUSE = 900_000_000;
 /** 농어촌특별세율: 종합부동산세(산출세액)의 20% (농어촌특별세법 제5조). */
 const RURAL_SPECIAL_TAX_RATE = 0.2;
+/** 고령자·장기보유 세액공제 합산 상한 (종합부동산세법 제9조제8항). */
+const SENIOR_LONGTERM_CREDIT_CAP = 0.8;
+
+/** 고령자 세액공제율: 60세 이상 20%, 65세 이상 30%, 70세 이상 40%. */
+function seniorCreditRate(age: number): number {
+  if (age >= 70) return 0.4;
+  if (age >= 65) return 0.3;
+  if (age >= 60) return 0.2;
+  return 0;
+}
+
+/** 장기보유 세액공제율: 5년 이상 20%, 10년 이상 40%, 15년 이상 50%. */
+function longTermCreditRate(holdingYears: number): number {
+  if (holdingYears >= 15) return 0.5;
+  if (holdingYears >= 10) return 0.4;
+  if (holdingYears >= 5) return 0.2;
+  return 0;
+}
 
 /** 2주택 이하 소유(1·2주택) 세율표. */
 const COMPREHENSIVE_LOW_BRACKETS: TaxBracket[] = [
@@ -340,6 +359,17 @@ export interface ComprehensiveTaxInput {
     /** 해당 주택 재산세 계산에 적용된 최고구간 한계세율. */
     topMarginalRate: number;
   };
+  /**
+   * 고령자·장기보유 세액공제(종합부동산세법 제9조제5~8항) 계산용.
+   * 1세대1주택자(`houseCount === '1주택'`)에게만 적용되는 특례이므로,
+   * 그 외에는 값을 주어도 무시된다.
+   */
+  ageAndHolding?: {
+    /** 만 나이. */
+    age: number;
+    /** 보유기간(년). */
+    holdingYears: number;
+  };
 }
 
 export interface ComprehensiveTaxResult {
@@ -360,11 +390,18 @@ export interface ComprehensiveTaxResult {
    * 정확히 일치했다(2026-07-20 기준, 단일 1세대1주택·최고구간 사례).
    */
   propertyTaxCredit: number;
-  /** 종부세 결정세액 = max(0, 산출세액 − 재산세액공제). */
+  /**
+   * 고령자·장기보유 세액공제율(합산, 최대 80%). `ageAndHolding`이
+   * 주어지고 1세대1주택(`houseCount === '1주택'`)인 경우에만 0보다 큼.
+   */
+  seniorLongTermCreditRate: number;
+  /** 고령자·장기보유 세액공제 금액 = (산출세액 − 재산세액공제) × 공제율. */
+  seniorLongTermCredit: number;
+  /** 종부세 결정세액 = max(0, 산출세액 − 재산세액공제 − 고령자·장기보유공제). */
   finalTax: number;
   /**
    * 농어촌특별세(농어촌특별세법 제5조) = 결정세액 × 20%.
-   * `linkedPropertyTax`가 없으면 산출세액 기준(근사치)으로 계산된다.
+   * 반영된 공제가 없으면 산출세액 기준(근사치)으로 계산된다.
    */
   ruralSpecialTax: number;
   /** 종부세 결정세액 + 농어촌특별세. */
@@ -399,8 +436,21 @@ export function calculateComprehensiveTax(
     const rawCredit = taxBase * fairMarketRatio * topMarginalRate;
     propertyTaxCredit = Math.max(0, Math.min(rawCredit, propertyTaxPaid));
   }
+  const afterPropertyCredit = Math.max(0, calculatedTax - propertyTaxCredit);
 
-  const finalTax = Math.max(0, calculatedTax - propertyTaxCredit);
+  // 고령자·장기보유 세액공제는 1세대1주택자에게만 적용되며(종합부동산세법
+  // 제9조제5~8항), 재산세액공제를 먼저 뺀 금액에 곱한다.
+  let seniorLongTermCreditRate = 0;
+  if (input.houseCount === '1주택' && input.ageAndHolding) {
+    const { age, holdingYears } = input.ageAndHolding;
+    seniorLongTermCreditRate = Math.min(
+      SENIOR_LONGTERM_CREDIT_CAP,
+      seniorCreditRate(age) + longTermCreditRate(holdingYears),
+    );
+  }
+  const seniorLongTermCredit = afterPropertyCredit * seniorLongTermCreditRate;
+
+  const finalTax = Math.max(0, afterPropertyCredit - seniorLongTermCredit);
   const ruralSpecialTax = finalTax * RURAL_SPECIAL_TAX_RATE;
   const totalWithSurtax = finalTax + ruralSpecialTax;
 
@@ -409,6 +459,8 @@ export function calculateComprehensiveTax(
     taxBase,
     calculatedTax,
     propertyTaxCredit,
+    seniorLongTermCreditRate,
+    seniorLongTermCredit,
     finalTax,
     ruralSpecialTax,
     totalWithSurtax,

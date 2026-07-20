@@ -169,6 +169,25 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
       </select>
     </label>
 
+    <!-- 1세대1주택자에게만 적용되는 고령자·장기보유 세액공제 입력 -->
+    <div id="senior-longterm-options">
+      <label>
+        만 나이 <span class="hint">(선택, 1세대1주택자 고령자 세액공제용)</span>
+        <input type="number" id="age" name="age" min="0" step="1" placeholder="예: 68" />
+      </label>
+      <label>
+        보유기간 (년) <span class="hint">(선택, 1세대1주택자 장기보유 세액공제용)</span>
+        <input
+          type="number"
+          id="holdingYears"
+          name="holdingYears"
+          min="0"
+          step="1"
+          placeholder="예: 12"
+        />
+      </label>
+    </div>
+
     <button class="btn" type="submit">종합부동산세 계산하기</button>
   </form>
 
@@ -197,6 +216,12 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
           <td>재산세액공제 <span class="hint">(이중과세 조정, 근사치)</span></td>
           <td id="ct-credit">-</td>
         </tr>
+        <tr id="ct-senior-row" class="hidden">
+          <td>
+            고령자·장기보유 세액공제 <span class="hint" id="ct-senior-rate-hint"></span>
+          </td>
+          <td id="ct-senior">-</td>
+        </tr>
         <tr id="ct-final-row" class="hidden">
           <td>종부세 결정세액</td>
           <td id="ct-final">-</td>
@@ -218,9 +243,12 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
       실제 고지세액은 이보다 <strong>낮을 수 있습니다.</strong>
       <ul>
         <li>
-          <strong>고령자·장기보유 세액공제</strong> — 1세대 1주택자에게 적용되며
-          합산 최대 80%까지 감면될 수 있어, 장기보유자의 실제 부담은 훨씬 낮을 수
-          있습니다. (이 계산기는 반영하지 않습니다.)
+          <strong>고령자·장기보유 세액공제</strong> — 1세대 1주택(주택 수를
+          "1주택"으로 선택)이고 만 나이·보유기간을 입력한 경우에만 반영됩니다.
+          60세 이상 20%·65세 이상 30%·70세 이상 40%(고령자)와 5년 이상
+          20%·10년 이상 40%·15년 이상 50%(장기보유)를 더해 최대
+          80%까지 적용하는 근사식이며, 세대 요건 등 세부 조건까지 검증하지는
+          않습니다.
         </li>
         <li>
           <strong>재산세액공제(이중과세 조정)</strong> — 위 "1. 재산세 계산"에서
@@ -232,7 +260,9 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
         </li>
         <li>
           <strong>세부담상한</strong> — 전년 대비 급격한 세액 인상을 제한합니다.
-          (이 계산기는 반영하지 않습니다.)
+          (이 계산기는 반영하지 않습니다. 참고로 종부세는 150%가 확인됐지만,
+          재산세 쪽은 최근 개정으로 주택 적용 여부가 불명확해 근거를 확정하지
+          못했습니다.)
         </li>
       </ul>
       특히 <strong>1세대 1주택 장기보유자</strong>는 이 계산 결과와 실제 고지세액의
@@ -311,11 +341,14 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     <details>
       <summary>왜 이 계산기 결과가 실제 고지서와 다를 수 있나요?</summary>
       <p>
-        이 계산기는 세율표와 공정시장가액비율만으로 기본 산출세액을 계산합니다.
-        실제 고지서에는 <strong>고령자·장기보유 세액공제, 재산세액공제(이중과세
-        조정), 세부담상한</strong> 등이 추가로 반영되어 세액이 낮아지는 경우가
-        많습니다. 또한 공정시장가액비율·세율·공제금액은 시행령 개정으로 매년 바뀔
-        수 있으므로, 정확한 금액은 반드시 지자체·홈택스 고지 내용을 확인하세요.
+        종부세의 <strong>재산세액공제(이중과세 조정)</strong>와
+        <strong>고령자·장기보유 세액공제</strong>는 조건이 맞으면(1세대1주택,
+        관련 정보 입력) 근사치로 반영되지만, <strong>세부담상한</strong>은
+        반영되지 않습니다. 또한 이 계산기는 재산세·종부세 각각 세율표와
+        공정시장가액비율로 계산하는 기본 흐름만 다루므로, 세대원 수 판정 등
+        세부 요건까지 검증하지는 않습니다. 공정시장가액비율·세율·공제금액은
+        시행령 개정으로 매년 바뀔 수 있으므로, 정확한 금액은 반드시
+        지자체·홈택스 고지 내용을 확인하세요.
       </p>
     </details>
 
@@ -438,6 +471,10 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
   .scope-national {
     background: #e0e7ff;
     color: #4338ca;
+  }
+  #senior-longterm-options {
+    display: grid;
+    gap: 16px;
   }
   .btn-link {
     display: inline-block;
@@ -657,6 +694,17 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     linkedPropertyTax = null;
   });
 
+  // 고령자·장기보유 세액공제는 1세대1주택(주택 수 = "1주택")에게만
+  // 적용되므로, 그 외를 선택하면 입력란을 숨긴다.
+  const seniorLongtermOptions = document.getElementById(
+    'senior-longterm-options',
+  ) as HTMLDivElement;
+  const syncHouseCountOptions = () => {
+    seniorLongtermOptions.classList.toggle('hidden', houseCountSelect.value !== '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
   const recalcComprehensive = () => {
     comprehensiveError.textContent = '';
 
@@ -668,13 +716,23 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     }
 
     const houseCount = houseCountSelect.value as HouseCount;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const holdingYears = Number(
+      (document.getElementById('holdingYears') as HTMLInputElement).value,
+    );
+    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+
     const result = calculateComprehensiveTax({
       totalPublicPrice,
       houseCount,
-      // 재산세액공제 근사식은 "물건 1건" 기준이므로, 연결된 값이 있고
-      // 1주택(1세대1주택)을 선택한 경우에만 적용한다.
-      linkedPropertyTax:
-        linkedPropertyTax && houseCount === '1주택' ? linkedPropertyTax : undefined,
+      // 재산세액공제(이중과세 조정)는 1세대1주택 여부와 무관하게 종부세
+      // 납세자 전반에 적용되는 제도라, "1주택" 선택 여부와 상관없이
+      // 연결된 값이 있으면 반영한다(실제 참고 계산기와 대조 검증함).
+      linkedPropertyTax: linkedPropertyTax ?? undefined,
+      // 반면 고령자·장기보유 세액공제는 1세대1주택자 전용이므로,
+      // calculateComprehensiveTax 내부에서 houseCount === '1주택'일
+      // 때만 적용되도록 이미 걸러진다.
+      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
     });
 
     setWon('ct-deduction', result.deduction);
@@ -682,26 +740,43 @@ const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
     setWon('ct-tax', result.calculatedTax);
 
     const creditRow = document.getElementById('ct-credit-row') as HTMLTableRowElement;
+    const seniorRow = document.getElementById('ct-senior-row') as HTMLTableRowElement;
+    const seniorRateHint = document.getElementById(
+      'ct-senior-rate-hint',
+    ) as HTMLSpanElement;
     const finalRow = document.getElementById('ct-final-row') as HTMLTableRowElement;
     const ruralHint = document.getElementById('ct-rural-hint') as HTMLSpanElement;
     const linkedNote = document.getElementById(
       'credit-linked-note',
     ) as HTMLParagraphElement;
 
-    if (result.propertyTaxCredit > 0) {
-      creditRow.classList.remove('hidden');
-      finalRow.classList.remove('hidden');
-      setWon('ct-credit', result.propertyTaxCredit);
-      setWon('ct-final', result.finalTax);
-      ruralHint.textContent = '(종부세 결정세액의 20%)';
-      linkedNote.textContent =
-        '✓ 위 "1. 재산세 계산"에서 넘어온 주택 정보로 재산세액공제(이중과세 조정)를 근사 반영했습니다.';
-    } else {
-      creditRow.classList.add('hidden');
-      finalRow.classList.add('hidden');
-      ruralHint.textContent = '(산출세액의 20%, 재산세액공제 미반영 근사치)';
-      linkedNote.textContent = '';
+    creditRow.classList.toggle('hidden', result.propertyTaxCredit <= 0);
+    if (result.propertyTaxCredit > 0) setWon('ct-credit', result.propertyTaxCredit);
+
+    seniorRow.classList.toggle('hidden', result.seniorLongTermCredit <= 0);
+    if (result.seniorLongTermCredit > 0) {
+      setWon('ct-senior', result.seniorLongTermCredit);
+      seniorRateHint.textContent = `(공제율 ${pct(result.seniorLongTermCreditRate)})`;
     }
+
+    const hasAnyCredit = result.propertyTaxCredit > 0 || result.seniorLongTermCredit > 0;
+    finalRow.classList.toggle('hidden', !hasAnyCredit);
+    if (hasAnyCredit) setWon('ct-final', result.finalTax);
+
+    ruralHint.textContent = hasAnyCredit
+      ? '(종부세 결정세액의 20%)'
+      : '(산출세액의 20%, 공제 미반영 근사치)';
+
+    linkedNote.textContent = [
+      result.propertyTaxCredit > 0
+        ? '✓ 위 "1. 재산세 계산"에서 넘어온 주택 정보로 재산세액공제(이중과세 조정)를 근사 반영했습니다.'
+        : '',
+      result.seniorLongTermCredit > 0
+        ? `✓ 고령자·장기보유 세액공제(${pct(result.seniorLongTermCreditRate)})를 반영했습니다.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     setWon('ct-rural', result.ruralSpecialTax);
     setWon('ct-total', result.totalWithSurtax);
