@@ -13,9 +13,10 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
 >
   <h1>{meta.title}</h1>
   <p class="note">
-    대출원금·연이자율·대출기간을 입력하면 <strong>원리금균등상환</strong>과
-    <strong>원금균등상환</strong> 방식별로 월 상환액, 총 이자, 총 상환금액과
-    회차별 상환 스케줄을 계산합니다.
+    대출원금·연이자율·대출기간을 입력하면 <strong>원리금균등상환</strong>,
+    <strong>원금균등상환</strong>, <strong>만기일시상환</strong>(이자만 납부)
+    방식별로 월 상환액, 총 이자, 총 상환금액과 회차별 상환 스케줄을
+    계산합니다.
   </p>
 
   <form class="calc-form" id="loan-form">
@@ -69,6 +70,10 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
         <input type="radio" name="method" value="원금균등" />
         <span>원금균등상환</span>
       </label>
+      <label class="method-option">
+        <input type="radio" name="method" value="만기일시상환" />
+        <span>만기일시상환 (이자만 납부)</span>
+      </label>
     </fieldset>
 
     <button class="btn" type="submit">계산하기</button>
@@ -91,6 +96,8 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
         <span class="value"><span id="total-payment">-</span></span>
       </div>
     </div>
+
+    <p class="note" id="maturity-note" style="display:none;"></p>
 
     <div class="schedule-scroll">
       <table class="breakdown schedule">
@@ -135,11 +142,24 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
     </details>
 
     <details>
+      <summary>만기일시상환은 무엇인가요?</summary>
+      <p>
+        대출기간 내내 원금은 그대로 두고 <strong>매달 이자만</strong> 내다가,
+        만기가 되는 마지막 달에 원금 전액을 한 번에 갚는 방식입니다. 매달
+        내는 돈이 가장 적어 자금 부담이 낮지만, 원금이 줄어들지 않아 대출기간
+        내내 이자가 똑같이 나가므로 <strong>총 이자는 세 방식 중 가장
+        많습니다.</strong> 마이너스통장이나 일부 신용대출·전세자금대출 등에서
+        쓰이는 방식입니다.
+      </p>
+    </details>
+
+    <details>
       <summary>총 이자는 어느 방식이 더 적나요?</summary>
       <p>
-        일반적으로 <strong>원금균등상환</strong>이 총 이자가 더 적습니다. 초기에 원금을
-        빠르게 갚아 남은 잔액이 더 빨리 줄어들기 때문에, 잔액에 붙는 이자 총액이
-        원리금균등상환보다 작아집니다.
+        총 이자가 적은 순서는 보통 <strong>원금균등상환 &lt; 원리금균등상환 &lt;
+        만기일시상환</strong>입니다. 원금균등상환은 초기에 원금을 빠르게 갚아
+        잔액이 더 빨리 줄어들기 때문에 이자 총액이 가장 적고, 만기일시상환은
+        원금이 마지막 순간까지 전혀 줄지 않아 이자 총액이 가장 많습니다.
       </p>
     </details>
 
@@ -287,9 +307,24 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
 
     const r = calculateLoan({ principal, annualRatePercent, months, method });
 
+    const maturityNote = document.getElementById('maturity-note') as HTMLParagraphElement;
+    maturityNote.style.display = 'none';
+
     if (method === '원리금균등' && r.monthlyPayment !== undefined) {
       monthlyLabel.textContent = '월 상환액';
       setText('monthly-payment', r.monthlyPayment);
+    } else if (method === '만기일시상환' && r.monthlyPayment !== undefined) {
+      // 만기일시상환: 마지막 달을 제외하고 매월 이자만 동일하게 납부합니다.
+      monthlyLabel.textContent = '매월 이자';
+      setText('monthly-payment', r.monthlyPayment);
+
+      const lastRow = r.schedule[r.schedule.length - 1];
+      maturityNote.textContent = `※ 마지막 ${lastRow.month}회차에 원금 ${won.format(
+        Math.round(lastRow.principalPortion),
+      )} + 이자 ${won.format(Math.round(lastRow.interestPortion))} = 총 ${won.format(
+        Math.round(lastRow.payment),
+      )}을 한 번에 상환합니다.`;
+      maturityNote.style.display = '';
     } else {
       // 원금균등: 첫 달이 가장 크고 마지막 달이 가장 작으므로 범위로 표시.
       const first = r.schedule[0].payment;

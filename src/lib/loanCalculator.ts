@@ -1,5 +1,5 @@
 /**
- * 대출이자(원리금균등/원금균등) 상환 계산 모듈.
+ * 대출이자(원리금균등/원금균등/만기일시상환) 상환 계산 모듈.
  *
  * ============================== 주의 ==============================
  * 이 계산은 "단순화된 추정"입니다. 실제 대출 상품은 중도상환수수료,
@@ -15,7 +15,7 @@
  */
 
 /** 상환방식. */
-export type LoanMethod = '원리금균등' | '원금균등';
+export type LoanMethod = '원리금균등' | '원금균등' | '만기일시상환';
 
 /** 상환 스케줄 한 회차(월)의 내역. */
 export interface LoanScheduleRow {
@@ -50,8 +50,9 @@ export interface LoanResult {
   /** 총 이자 (총 상환금액 - 원금). */
   totalInterest: number;
   /**
-   * 매월 고정 상환액. 원리금균등에서만 의미가 있으며,
-   * 원금균등에서는 매월 달라지므로 undefined 입니다.
+   * 매월 고정 상환액. 원리금균등에서는 매월 상환액(원리금),
+   * 만기일시상환에서는 마지막 달을 제외한 매월 이자만 납부하는
+   * 금액을 의미합니다. 원금균등에서는 매월 달라지므로 undefined 입니다.
    */
   monthlyPayment?: number;
 }
@@ -135,6 +136,36 @@ function calculateEqualPrincipal(
 }
 
 /**
+ * 만기일시상환 스케줄을 계산합니다.
+ * 대출기간 내내 원금은 그대로 유지되고 매월 이자만 납부하다가,
+ * 마지막 회차에 원금 전액을 이자와 함께 한 번에 상환합니다.
+ */
+function calculateInterestOnly(
+  principal: number,
+  monthlyRate: number,
+  months: number,
+): LoanResult {
+  const monthlyInterest = principal * monthlyRate;
+
+  const schedule: LoanScheduleRow[] = [];
+  for (let i = 1; i <= months; i++) {
+    const isLastMonth = i === months;
+    schedule.push({
+      month: i,
+      payment: isLastMonth ? principal + monthlyInterest : monthlyInterest,
+      principalPortion: isLastMonth ? principal : 0,
+      interestPortion: monthlyInterest,
+      remainingBalance: isLastMonth ? 0 : principal,
+    });
+  }
+
+  const totalInterest = monthlyInterest * months;
+  const totalPayment = principal + totalInterest;
+
+  return { schedule, totalPayment, totalInterest, monthlyPayment: monthlyInterest };
+}
+
+/**
  * 대출 상환 스케줄과 총 이자/총 상환금액을 계산합니다.
  *
  * r = 연이자율 / 100 / 12 (월 이자율), n = 대출기간(개월),
@@ -149,6 +180,9 @@ export function calculateLoan(input: LoanInput): LoanResult {
 
   if (input.method === '원금균등') {
     return calculateEqualPrincipal(principal, monthlyRate, months);
+  }
+  if (input.method === '만기일시상환') {
+    return calculateInterestOnly(principal, monthlyRate, months);
   }
   return calculateEqualInstallment(principal, monthlyRate, months);
 }

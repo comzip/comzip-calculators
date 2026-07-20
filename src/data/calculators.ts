@@ -43,7 +43,7 @@ export const calculators: Calculator[] = [
     title: '대출이자 계산기',
     category: '부동산',
     description:
-      '대출원금·연이자율·기간을 입력하면 원리금균등/원금균등 방식별 월 상환액, 총 이자, 총 상환금액과 상환 스케줄을 계산합니다.',
+      '대출원금·연이자율·기간을 입력하면 원리금균등/원금균등/만기일시상환 방식별 월 상환액, 총 이자, 총 상환금액과 상환 스케줄을 계산합니다.',
   },
   {
     slug: 'property-tax-calculator',
