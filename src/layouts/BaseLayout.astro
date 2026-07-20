@@ -127,6 +127,7 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
 
       html {
         -webkit-text-size-adjust: 100%;
+        overflow-x: hidden;
       }
 
       body {
@@ -138,6 +139,10 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
         display: flex;
         flex-direction: column;
         min-height: 100vh;
+        /* Safety net: nothing (dropdown panels, wide tables, etc.) should be
+           able to grow the page's horizontal scroll area and leave blank
+           space beside the content. */
+        overflow-x: hidden;
       }
 
       .container {
@@ -233,10 +238,18 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
         margin: 0;
         padding: 6px;
         min-width: 180px;
+        max-width: calc(100vw - 32px);
         background: var(--bg);
         border: 1px solid var(--border);
         border-radius: var(--radius);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      }
+      /* Applied by script below at open-time when the panel would overflow
+         the right edge of the viewport, regardless of which category or how
+         many there are. */
+      .nav-dropdown.flip-left > ul {
+        left: auto;
+        right: 0;
       }
       .nav-dropdown > ul li {
         margin: 0;
@@ -265,12 +278,6 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
         .nav-dropdown > summary {
           padding: 6px 8px;
           font-size: 0.85rem;
-        }
-        /* Anchor panels to the right edge on the last trigger so they
-           don't overflow the viewport on narrow screens. */
-        .nav-dropdown:last-child > ul {
-          left: auto;
-          right: 0;
         }
       }
 
@@ -448,11 +455,21 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
       );
 
       dropdowns.forEach((dropdown) => {
+        const panel = dropdown.querySelector('ul');
         dropdown.addEventListener('toggle', () => {
           if (!dropdown.open) return;
           dropdowns.forEach((other) => {
             if (other !== dropdown) other.open = false;
           });
+
+          // Open leftward instead of rightward if the panel would overflow
+          // the viewport's right edge. Measured at open-time so it works
+          // regardless of category count/order or viewport width, instead
+          // of assuming a fixed trigger is the one near the edge.
+          dropdown.classList.remove('flip-left');
+          if (panel && panel.getBoundingClientRect().right > window.innerWidth) {
+            dropdown.classList.add('flip-left');
+          }
         });
       });
 
