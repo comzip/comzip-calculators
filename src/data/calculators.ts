@@ -53,6 +53,13 @@ export const calculators: Calculator[] = [
       '대출원금·연이자율·기간을 입력하면 원리금균등/원금균등/만기일시상환 방식별 월 상환액, 총 이자, 총 상환금액과 상환 스케줄을 계산합니다.',
   },
   {
+    slug: 'acquisition-tax-calculator',
+    title: '취득세 계산기',
+    category: '부동산',
+    description:
+      '매매가·주택 수·조정대상지역 여부를 입력하면 취득세·지방교육세·농어촌특별세를 함께 추정합니다. 다주택자 중과세율(8%·12%)까지 반영합니다.',
+  },
+  {
     slug: 'property-tax-calculator',
     title: '보유세 계산기 (재산세·종합부동산세)',
     category: '부동산',

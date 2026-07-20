@@ -1,0 +1,230 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    매매가·주택 수·조정대상지역 여부를 입력하면 <strong>취득세, 지방교육세,
+    농어촌특별세</strong>를 함께 추정합니다. (주택 유상거래 기준)
+  </p>
+
+  <form class="calc-form" id="acquisition-form">
+    <label>
+      취득가액 (매매가, 원)
+      <input
+        type="number"
+        id="price"
+        name="price"
+        min="0"
+        step="1000000"
+        placeholder="예: 500000000"
+        required
+      />
+      <span class="amount-preview" id="price-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      주택 수 <span class="hint">이번에 취득하는 주택을 포함한 1세대 기준</span>
+      <select id="houseCount">
+        <option value="1주택">1주택 (일시적 2주택 포함)</option>
+        <option value="2주택">2주택</option>
+        <option value="3주택">3주택</option>
+        <option value="4주택이상또는법인">4주택 이상 또는 법인</option>
+      </select>
+    </label>
+
+    <label class="check-row" id="regulated-area-row">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>조정대상지역 내 주택입니다</span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="isOver85Sqm" checked />
+      <span>전용면적 85㎡ 초과 (국민주택 규모 초과, 농어촌특별세 과세대상)</span>
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="heavy-rate-note" style="margin-top:0;"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>적용 세율</td>
+          <td id="row-rate">-</td>
+        </tr>
+        <tr>
+          <td>취득세</td>
+          <td id="row-acquisition">-</td>
+        </tr>
+        <tr>
+          <td>지방교육세</td>
+          <td id="row-education">-</td>
+        </tr>
+        <tr id="rural-row">
+          <td>농어촌특별세</td>
+          <td id="row-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>총 납부액</td>
+          <td id="row-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 일시적 2주택
+    특례, 생애최초 취득 감면, 고급주택(사치성재산) 추가 중과(+8%p),
+    상속·증여 등 무상취득은 반영하지 않았습니다. 조정대상지역 지정
+    현황은 지역·시점마다 달라지므로 반드시 국토교통부 고시를 확인하고,
+    정확한 세액은 관할 지방자치단체(위택스)를 통해 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>조정대상지역인지 어떻게 확인하나요?</summary>
+      <p>
+        조정대상지역은 국토교통부가 부동산 시장 상황에 따라 수시로
+        지정·해제합니다. <strong>위택스</strong> 또는 <strong>국토교통부
+        부동산정보포털</strong>에서 취득하려는 주택 주소로 조회할 수
+        있습니다. 1주택 취득 시에는 조정대상지역 여부가 세율에 영향을
+        주지 않습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>2주택인데 왜 세율이 다르게 나오나요?</summary>
+      <p>
+        2주택자는 조정대상지역이면 8% 중과세율, 비조정대상지역이면
+        1주택과 같은 일반세율(1~3%)이 적용됩니다. 3주택자는 조정대상지역
+        12%, 비조정대상지역 8%로 한 단계씩 더 중과됩니다. 4주택 이상
+        또는 법인은 지역과 무관하게 12%가 적용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>지방교육세·농어촌특별세는 왜 따로 붙나요?</summary>
+      <p>
+        취득세를 낼 때 지방교육세와 농어촌특별세가 부가세금으로 함께
+        부과됩니다. 일반세율(1~3%) 구간에서는 <strong>세율의
+        10%</strong>가 지방교육세로 붙고, 중과세율(8%·12%) 구간에서는
+        세율과 무관하게 <strong>0.4%가 일괄 적용</strong>됩니다.
+        농어촌특별세는 전용면적 85㎡ 초과 주택에만 부과되며, 일반세율
+        0.2%, 8% 중과 0.6%, 12% 중과 1.0%로 차등 적용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>일시적 2주택이나 생애최초 감면은 반영되나요?</summary>
+      <p>
+        반영되지 않습니다. 이사 등으로 일정 기간 내 기존 주택을 처분하는
+        <strong>일시적 2주택</strong>은 1주택과 같은 일반세율을 적용받을
+        수 있고, <strong>생애최초 주택 구입</strong>은 별도 감면 혜택이
+        있을 수 있습니다. 해당 사항이 있다면 위택스나 세무 전문가를 통해
+        정확한 세액을 확인하세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateAcquisitionTax } from '../../lib/acquisitionTaxCalculator';
+  import type { HouseCountForAcquisition } from '../../lib/acquisitionTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('acquisition-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const priceInput = document.getElementById('price') as HTMLInputElement;
+  const pricePreview = document.getElementById('price-preview') as HTMLSpanElement;
+  priceInput.addEventListener('input', () => {
+    const value = Number(priceInput.value);
+    pricePreview.textContent = value > 0 ? formatKoreanWon(value) : '';
+  });
+
+  // 1주택은 조정대상지역 여부가 세율에 영향을 주지 않으므로 입력을 숨깁니다.
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaRow = document.getElementById('regulated-area-row') as HTMLLabelElement;
+  const syncRegulatedAreaVisibility = () => {
+    regulatedAreaRow.classList.toggle('hidden', houseCountSelect.value === '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncRegulatedAreaVisibility);
+  syncRegulatedAreaVisibility();
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const price = Number(priceInput.value);
+    if (!price || price <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '취득가액을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as HouseCountForAcquisition;
+    const isRegulatedArea = (
+      document.getElementById('isRegulatedArea') as HTMLInputElement
+    ).checked;
+    const isOver85Sqm = (
+      document.getElementById('isOver85Sqm') as HTMLInputElement
+    ).checked;
+
+    const r = calculateAcquisitionTax({ price, houseCount, isRegulatedArea, isOver85Sqm });
+
+    (document.getElementById('row-rate') as HTMLElement).textContent =
+      `${(r.rate * 100).toFixed(r.isHeavyRate ? 0 : 2)}%`;
+    setWon('row-acquisition', r.acquisitionTax);
+    setWon('row-education', r.localEducationTax);
+
+    const ruralRow = document.getElementById('rural-row') as HTMLTableRowElement;
+    if (r.ruralSpecialTax > 0) {
+      ruralRow.classList.remove('hidden');
+      setWon('row-rural', r.ruralSpecialTax);
+    } else {
+      ruralRow.classList.add('hidden');
+    }
+
+    setWon('row-total', r.total);
+
+    const heavyRateNote = document.getElementById(
+      'heavy-rate-note',
+    ) as HTMLParagraphElement;
+    heavyRateNote.textContent = r.isHeavyRate
+      ? '※ 다주택자·법인 중과세율이 적용된 결과입니다.'
+      : '';
+
+    result.classList.remove('hidden');
+  });
+</script>
