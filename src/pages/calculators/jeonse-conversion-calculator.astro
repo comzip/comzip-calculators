@@ -1,0 +1,265 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'jeonse-conversion-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    전세보증금 일부(또는 전부)를 월세로 돌릴 때, 얼마짜리 월세가 되는지와
+    <strong>법정 상한 전환율</strong>을 넘는지 함께 확인합니다.
+  </p>
+
+  <form class="calc-form" id="jeonse-form">
+    <label>
+      전세보증금 (원)
+      <input
+        type="number"
+        id="jeonseDeposit"
+        name="jeonseDeposit"
+        min="0"
+        step="1000000"
+        placeholder="예: 300000000"
+        required
+      />
+      <span class="amount-preview" id="jeonseDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      월세 전환 후 보증금 (원)
+      <span class="hint">월세로 낮춘 뒤 남기는 보증금. 예: 100000000</span>
+      <input
+        type="number"
+        id="monthlyDeposit"
+        name="monthlyDeposit"
+        min="0"
+        step="1000000"
+        placeholder="예: 100000000"
+        required
+      />
+      <span class="amount-preview" id="monthlyDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      적용 전환율 (%)
+      <span class="hint">협의했거나 제안받은 전환율. 예: 5</span>
+      <input
+        type="number"
+        id="appliedRate"
+        name="appliedRate"
+        min="0"
+        step="0.01"
+        placeholder="예: 5"
+        required
+      />
+    </label>
+
+    <label>
+      한국은행 기준금리 (%)
+      <span class="hint">법정 상한 계산용. 2026년 7월 기준 2.75%, 최신값은 한국은행 고시 확인</span>
+      <input
+        type="number"
+        id="baseRate"
+        name="baseRate"
+        min="0"
+        step="0.01"
+        value="2.75"
+      />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note hidden" id="exceeds-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">적용 전환율 기준 월세</span>
+        <span class="value"><span id="monthly-rent">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">법정 상한 전환율</span>
+        <span class="value"><span id="cap-rate">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        상세 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>전환 대상 보증금 차액</td>
+          <td id="row-diff">-</td>
+        </tr>
+        <tr>
+          <td>적용 전환율 기준 월세</td>
+          <td id="row-rent">-</td>
+        </tr>
+        <tr>
+          <td>법정 상한 전환율 <span class="hint">min(10%, 기준금리+2%p)</span></td>
+          <td id="row-cap-rate">-</td>
+        </tr>
+        <tr class="total">
+          <td>법정 상한 기준 월세(참고)</td>
+          <td id="row-cap-rent">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    법정 상한 전환율(주택임대차보호법 제7조의2)은 <strong>임대차 계약이
+    존속하는 중에 보증금을 월세로 전환하거나 계약갱신요구권을 행사하는
+    경우</strong>에만 강제됩니다. 처음 맺는 신규 계약의 조건에는 이
+    상한이 법적으로 적용되지 않습니다. 한국은행 기준금리는 수시로
+    바뀌므로 최신값으로 다시 계산해 보세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>전월세 전환율은 어떻게 계산하나요?</summary>
+      <p>
+        <strong>월세 = (전세보증금 − 월세 전환 후 보증금) × 전환율 ÷
+        12</strong>로 계산합니다. 보증금 차액을 연이율로 환산해 12개월로
+        나눈 것이 매달 내는 월세입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>법정 상한 전환율은 무엇인가요?</summary>
+      <p>
+        주택임대차보호법 제7조의2에 따라, 보증금을 월세로 전환할 때는
+        <strong>연 10%</strong>와 <strong>한국은행 기준금리 + 연
+        2%포인트</strong> 중 <strong>더 낮은 비율</strong>을 넘을 수
+        없습니다. 예를 들어 기준금리가 2.75%라면 2.75%+2%=4.75%가 10%보다
+        낮으므로 4.75%가 상한이 됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>신규 계약에도 법정 상한이 적용되나요?</summary>
+      <p>
+        적용되지 않습니다. 이 상한 규정은 <strong>기존 계약 존속 중의
+        전환</strong>이나 <strong>계약갱신요구권 행사 시</strong>에만
+        강제력을 갖습니다. 처음 계약을 맺을 때는 임대인과 임차인이
+        협의한 조건이 그대로 적용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>적용 전환율이 법정 상한을 넘으면 어떻게 되나요?</summary>
+      <p>
+        갱신 계약이나 계약 존속 중 전환에 해당한다면, 초과분에 대해
+        임차인이 반환을 청구할 수 있습니다. 다만 개별 계약의 성격(신규
+        계약인지 갱신인지)에 따라 결과가 달라지므로, 실제 분쟁이 있다면
+        주택임대차분쟁조정위원회 등 전문기관에 상담하는 것이 좋습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateJeonseConversion } from '../../lib/jeonseConversionCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('jeonse-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('jeonseDeposit', 'jeonseDeposit-preview');
+  bindAmountPreview('monthlyDeposit', 'monthlyDeposit-preview');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const jeonseDeposit = Number(
+      (document.getElementById('jeonseDeposit') as HTMLInputElement).value,
+    );
+    const monthlyDeposit = Number(
+      (document.getElementById('monthlyDeposit') as HTMLInputElement).value,
+    );
+    const appliedRatePercent = Number(
+      (document.getElementById('appliedRate') as HTMLInputElement).value,
+    );
+    const baseRatePercent = Number(
+      (document.getElementById('baseRate') as HTMLInputElement).value,
+    );
+
+    if (!jeonseDeposit || jeonseDeposit <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '전세보증금을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (monthlyDeposit >= jeonseDeposit) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '월세 전환 후 보증금은 전세보증금보다 작아야 합니다.';
+      return;
+    }
+    if (!Number.isFinite(appliedRatePercent) || appliedRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '적용 전환율을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateJeonseConversion({
+      jeonseDeposit,
+      monthlyDeposit,
+      appliedRatePercent,
+      baseRatePercent,
+    });
+
+    setWon('monthly-rent', r.monthlyRent);
+    (document.getElementById('cap-rate') as HTMLElement).textContent = pct(r.regulatedCapRate);
+    setWon('row-diff', r.depositDiff);
+    setWon('row-rent', r.monthlyRent);
+    (document.getElementById('row-cap-rate') as HTMLElement).textContent = pct(
+      r.regulatedCapRate,
+    );
+    setWon('row-cap-rent', r.regulatedCapRent);
+
+    const exceedsNote = document.getElementById('exceeds-note') as HTMLParagraphElement;
+    if (r.exceedsCap) {
+      exceedsNote.textContent =
+        '※ 적용 전환율이 법정 상한을 초과합니다. 계약 존속 중 전환·갱신 시에는 상한이 적용될 수 있습니다.';
+      exceedsNote.classList.remove('hidden');
+    } else {
+      exceedsNote.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

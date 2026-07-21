@@ -1,0 +1,225 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'tdee-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    성별·나이·신장·체중·활동량을 입력하면 <strong>기초대사량(BMR)</strong>과
+    <strong>하루 유지 칼로리(TDEE)</strong>, 감량·증량 목표 칼로리까지
+    계산합니다.
+  </p>
+
+  <form class="calc-form" id="tdee-form">
+    <fieldset class="method-toggle">
+      <legend>성별</legend>
+      <label class="method-option">
+        <input type="radio" name="sex" value="남성" checked />
+        <span>남성</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="sex" value="여성" />
+        <span>여성</span>
+      </label>
+    </fieldset>
+
+    <label>
+      나이 (만 나이)
+      <input type="number" id="age" name="age" min="0" step="1" placeholder="예: 30" required />
+    </label>
+
+    <label>
+      신장 (cm)
+      <input
+        type="number"
+        id="heightCm"
+        name="heightCm"
+        min="0"
+        step="0.1"
+        placeholder="예: 175"
+        required
+      />
+    </label>
+
+    <label>
+      체중 (kg)
+      <input
+        type="number"
+        id="weightKg"
+        name="weightKg"
+        min="0"
+        step="0.1"
+        placeholder="예: 70"
+        required
+      />
+    </label>
+
+    <label>
+      활동량
+      <select id="activityLevel">
+        <option value="거의 안함">거의 안 함 (좌식 생활, 운동 거의 안 함)</option>
+        <option value="가벼운 활동">가벼운 활동 (주 1~3회 가벼운 운동)</option>
+        <option value="보통 활동" selected>보통 활동 (주 3~5회 보통 강도 운동)</option>
+        <option value="활발한 활동">활발한 활동 (주 6~7회 활발한 운동)</option>
+        <option value="매우 활발함">매우 활발함 (매일 고강도 운동/육체노동)</option>
+      </select>
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">기초대사량(BMR)</span>
+        <span class="value"><span id="bmr-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">유지 칼로리(TDEE)</span>
+        <span class="value"><span id="tdee-value">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        목표별 칼로리 (일일 섭취 기준)
+      </caption>
+      <tbody>
+        <tr>
+          <td>감량 목표 <span class="hint">TDEE − 500kcal</span></td>
+          <td id="row-cutting">-</td>
+        </tr>
+        <tr>
+          <td>유지 목표</td>
+          <td id="row-maintain">-</td>
+        </tr>
+        <tr>
+          <td>증량 목표 <span class="hint">TDEE + 500kcal</span></td>
+          <td id="row-bulking">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    이 계산기는 <strong>Mifflin-St Jeor 공식</strong>을 사용한
+    추정치입니다. 체지방률·근육량·건강 상태·유전적 요인 등은 반영하지
+    않으며, 실제 필요 칼로리는 개인마다 다를 수 있습니다. 다이어트나
+    증량 계획은 필요시 의료·영양 전문가와 상담하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>BMR과 TDEE는 무엇이 다른가요?</summary>
+      <p>
+        <strong>BMR(기초대사량)</strong>은 아무 활동도 하지 않고 누워만
+        있어도 생명 유지를 위해 소비되는 칼로리입니다.
+        <strong>TDEE(활동대사량)</strong>는 여기에 일상 활동·운동으로
+        소비하는 칼로리까지 더한, 하루에 실제로 소비하는 총 칼로리입니다.
+        체중을 유지하려면 TDEE만큼 섭취하면 됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 Mifflin-St Jeor 공식을 쓰나요?</summary>
+      <p>
+        기초대사량을 추정하는 공식은 여러 가지(Harris-Benedict, Katch-
+        McArdle 등)가 있는데, Mifflin-St Jeor 공식이 여러 연구에서 실측값과
+        가장 오차가 적다고 평가받아 현재 가장 널리 권장되는 방식입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>감량·증량 목표는 어떻게 정해지나요?</summary>
+      <p>
+        일반적으로 체중 1kg(지방 기준)을 줄이거나 늘리려면 약 7,700kcal의
+        차이가 필요하다고 알려져 있습니다. 하루 500kcal씩 적자·잉여를
+        만들면 대략 일주일에 0.4~0.5kg 정도의 변화가 생기는 셈입니다.
+        이는 통계적인 평균치로, 개인차가 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>활동량은 어떻게 골라야 하나요?</summary>
+      <p>
+        운동 여부뿐 아니라 직업의 활동 강도도 고려하세요. 예를 들어
+        사무직이면서 주 3~4회 헬스장에 다닌다면 "보통 활동"이, 앉아서
+        일하고 운동을 거의 안 한다면 "거의 안 함"이 가깝습니다. 과대평가
+        하면 실제보다 유지 칼로리가 높게 나올 수 있습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateTdee } from '../../lib/tdeeCalculator';
+  import type { ActivityLevel, Sex } from '../../lib/tdeeCalculator';
+
+  const form = document.getElementById('tdee-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const kcal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
+  const setKcal = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${kcal.format(value)} kcal`;
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const sex = (
+      form.querySelector('input[name="sex"]:checked') as HTMLInputElement
+    ).value as Sex;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const heightCm = Number(
+      (document.getElementById('heightCm') as HTMLInputElement).value,
+    );
+    const weightKg = Number(
+      (document.getElementById('weightKg') as HTMLInputElement).value,
+    );
+    const activityLevel = (document.getElementById('activityLevel') as HTMLSelectElement)
+      .value as ActivityLevel;
+
+    if (!age || age <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '나이를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!heightCm || heightCm <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '신장을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!weightKg || weightKg <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '체중을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateTdee({ sex, age, heightCm, weightKg, activityLevel });
+
+    setKcal('bmr-value', r.bmr);
+    setKcal('tdee-value', r.tdee);
+    setKcal('row-cutting', r.cuttingCalories);
+    setKcal('row-maintain', r.tdee);
+    setKcal('row-bulking', r.bulkingCalories);
+
+    result.classList.remove('hidden');
+  });
+</script>

@@ -1,0 +1,176 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'weekly-holiday-pay-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    시급과 1주 소정근로시간을 입력하면 <strong>주휴수당</strong>을
+    계산합니다. 아르바이트·단시간근로자도 조건을 충족하면 받을 수
+    있습니다.
+  </p>
+
+  <form class="calc-form" id="wph-form">
+    <label>
+      시급 (원)
+      <input
+        type="number"
+        id="hourlyWage"
+        name="hourlyWage"
+        min="0"
+        step="10"
+        placeholder="예: 10030"
+        required
+      />
+    </label>
+
+    <label>
+      1주 소정근로시간 (시간)
+      <span class="hint">4주 평균 기준. 예: 주 5일 × 4시간 = 20</span>
+      <input
+        type="number"
+        id="weeklyHours"
+        name="weeklyHours"
+        min="0"
+        step="0.5"
+        placeholder="예: 20"
+        required
+      />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="eligibility-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">주휴수당</span>
+        <span class="value"><span id="weekly-pay">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">산정 시간</span>
+        <span class="value"><span id="payable-hours">-</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>1주 소정근로일을 개근했다고 가정</strong>한
+    금액입니다. 실제로는 결근이 있으면 그 주의 주휴수당이 발생하지
+    않을 수 있고, 지각·조퇴는 원칙적으로 개근 여부에 영향을 주지
+    않습니다. 정확한 지급 여부는 근로계약서와 실제 근무 기록을
+    기준으로 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>주휴수당은 누가 받을 수 있나요?</summary>
+      <p>
+        4주 평균으로 <strong>1주 소정근로시간이 15시간 이상</strong>이고,
+        그 주의 <strong>소정근로일을 개근</strong>한 근로자라면 정규직·
+        아르바이트·계약직 구분 없이 받을 수 있습니다. 15시간 미만이면
+        주휴수당 대상이 아닙니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>주휴수당은 어떻게 계산하나요?</summary>
+      <p>
+        통상근로자(주 40시간, 1일 8시간)는 <strong>8시간 × 시급</strong>이
+        주휴수당입니다. 단시간근로자는 <strong>본인의 1주 소정근로시간을
+        40시간으로 나눈 비율만큼 8시간에 곱해</strong> 계산합니다. 예를
+        들어 주 20시간 근무자는 8시간 × (20÷40) = 4시간분의 시급을
+        받습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>주 40시간을 초과해서 일하면 주휴수당도 더 받나요?</summary>
+      <p>
+        아니요. 주휴수당은 <strong>최대 8시간분(1일치)</strong>으로
+        상한이 있습니다. 주 52시간을 일했더라도 주휴수당은 여전히
+        8시간 × 시급으로 계산됩니다. (연장근로수당 등은 별도로
+        계산됩니다.)
+      </p>
+    </details>
+
+    <details>
+      <summary>결근하면 그 주 주휴수당은 어떻게 되나요?</summary>
+      <p>
+        원칙적으로 그 주의 소정근로일 중 하루라도 결근하면 그 주의
+        주휴수당은 발생하지 않습니다. 다만 지각이나 조퇴는 결근으로
+        보지 않는 것이 일반적입니다. 이 계산기는 개근을 가정한 금액만
+        보여줍니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateWeeklyHolidayPay } from '../../lib/weeklyHolidayPayCalculator';
+
+  const form = document.getElementById('wph-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hourlyWage = Number(
+      (document.getElementById('hourlyWage') as HTMLInputElement).value,
+    );
+    const weeklyHours = Number(
+      (document.getElementById('weeklyHours') as HTMLInputElement).value,
+    );
+
+    if (!hourlyWage || hourlyWage <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '시급을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!Number.isFinite(weeklyHours) || weeklyHours < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '1주 소정근로시간을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateWeeklyHolidayPay({ hourlyWage, weeklyHours });
+
+    (document.getElementById('weekly-pay') as HTMLElement).textContent = won.format(
+      Math.round(r.weeklyHolidayPay),
+    );
+    (document.getElementById('payable-hours') as HTMLElement).textContent =
+      `${r.payableHours.toFixed(1).replace(/\.0$/, '')}시간`;
+
+    const eligibilityNote = document.getElementById(
+      'eligibility-note',
+    ) as HTMLParagraphElement;
+    eligibilityNote.textContent = r.eligible
+      ? ''
+      : '※ 1주 소정근로시간이 15시간 미만이라 주휴수당 지급 대상이 아닙니다.';
+
+    result.classList.remove('hidden');
+  });
+</script>

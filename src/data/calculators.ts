@@ -46,6 +46,13 @@ export const calculators: Calculator[] = [
       '입사일·퇴사일과 최근 3개월 급여를 입력하면 평균임금과 예상 퇴직금을 추정합니다.',
   },
   {
+    slug: 'weekly-holiday-pay-calculator',
+    title: '주휴수당 계산기',
+    category: '급여',
+    description:
+      '시급과 1주 소정근로시간을 입력하면 주휴수당을 계산합니다. 아르바이트·단시간근로자도 지급 조건과 금액을 바로 확인하세요.',
+  },
+  {
     slug: 'loan-calculator',
     title: '대출이자 계산기',
     category: '부동산',
@@ -60,6 +67,13 @@ export const calculators: Calculator[] = [
       '매매가를 입력하면 취득세·지방교육세·농어촌특별세를 함께 추정합니다. 주택(다주택자 중과세율 8%·12% 포함)과 오피스텔을 구분해서 계산합니다.',
   },
   {
+    slug: 'jeonse-conversion-calculator',
+    title: '전월세 전환율 계산기',
+    category: '부동산',
+    description:
+      '전세보증금을 월세로 전환할 때의 월세와 법정 상한 전환율(주택임대차보호법)을 함께 계산합니다.',
+  },
+  {
     slug: 'property-tax-calculator',
     title: '보유세 계산기 (재산세·종합부동산세)',
     category: '부동산',
@@ -72,6 +86,13 @@ export const calculators: Calculator[] = [
     category: '생활',
     description:
       '신장과 체중을 입력하면 체질량지수(BMI)와 대한비만학회 기준 비만도 분류, 표준체중을 계산합니다.',
+  },
+  {
+    slug: 'tdee-calculator',
+    title: 'TDEE·칼로리 계산기',
+    category: '생활',
+    description:
+      '성별·나이·신장·체중·활동량을 입력하면 기초대사량(BMR)과 유지 칼로리(TDEE), 감량·증량 목표 칼로리를 계산합니다.',
   },
   {
     slug: 'dday-calculator',
