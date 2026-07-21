@@ -24,6 +24,9 @@ const year = new Date().getFullYear();
 // Left as a placeholder so no tracking script loads until you set a real ID.
 const GA_MEASUREMENT_ID = 'G-0H2MTD7S3L';
 const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
+
+// AdSense publisher ID (from adsense.google.com → 사이트 연결 코드).
+const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
 ---
 
 <!doctype html>
@@ -50,6 +53,13 @@ const analyticsEnabled = GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX';
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
+
+    <meta name="google-adsense-account" content={ADSENSE_CLIENT_ID} />
+    <script
+      async
+      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+      crossorigin="anonymous"
+    />
 
     {
       analyticsEnabled && (
