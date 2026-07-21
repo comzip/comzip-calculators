@@ -124,6 +124,9 @@ const meta = calculators.find((c) => c.slug === 'age-calculator')!;
 
     const currentYear = today.getFullYear();
 
+    // 📋 법령 현황 추적: 프로젝트 루트 LEGAL_REFERENCES.md → "생활 > 만나이·D-Day
+    // 계산기". 만나이 기준(2023.6.28. 시행)이 바뀌면 그 문서도 함께 갱신하세요.
+
     // 만나이: 올해 - 태어난 해, 생일이 아직 안 지났으면 -1
     let intlAge = currentYear - by;
     const monthDay = today.getMonth() + 1 < bm || (today.getMonth() + 1 === bm && today.getDate() < bd);
