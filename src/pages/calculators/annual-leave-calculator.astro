@@ -1,0 +1,201 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'annual-leave-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    입사일을 입력하면 현재까지 발생한 <strong>연차 개수</strong>를
+    계산합니다. 1일 통상임금을 함께 입력하면 <strong>연차수당</strong>도
+    바로 확인할 수 있습니다.
+  </p>
+
+  <form class="calc-form" id="leave-form">
+    <label>
+      입사일
+      <input type="date" id="hireDate" name="hireDate" required />
+    </label>
+
+    <label>
+      기준일
+      <span class="hint">연차 개수를 확인할 시점. 기본값은 오늘.</span>
+      <input type="date" id="asOfDate" name="asOfDate" required />
+    </label>
+
+    <label>
+      1일 통상임금 (원)
+      <span class="hint">선택 입력. 연차수당 계산용. 예: 100000</span>
+      <input
+        type="number"
+        id="dailyWage"
+        name="dailyWage"
+        min="0"
+        step="1000"
+        placeholder="예: 100000"
+      />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="first-year-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">발생 연차</span>
+        <span class="value"><span id="total-days">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">근속기간</span>
+        <span class="value"><span id="tenure">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown hidden" id="pay-table">
+      <tbody>
+        <tr>
+          <td>연차수당 <span class="hint">(발생 연차 × 1일 통상임금)</span></td>
+          <td id="row-pay">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>매달 개근(1년 미만) 또는 직전 1년간 80%
+    이상 출근(1년 이상)</strong>을 가정한 추정치입니다. 실제로는 결근
+    등에 따라 발생 일수가 달라질 수 있고, 입사일이 아닌 회계연도(매년
+    1월 1일) 기준으로 연차를 부여하는 회사는 계산 방식이 다릅니다.
+    정확한 연차는 회사 인사 규정과 근태 기록을 기준으로 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>연차는 언제부터 며칠씩 생기나요?</summary>
+      <p>
+        입사 후 <strong>1년 미만</strong>인 동안은 한 달을 개근할 때마다
+        1일씩 생겨 최대 11일까지 쌓입니다. <strong>입사 1년 이상</strong>
+        이 되면 직전 1년간 80% 이상 출근했을 때 <strong>15일</strong>이
+        한 번에 부여됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>가산휴가는 어떻게 계산되나요?</summary>
+      <p>
+        <strong>3년 이상</strong> 근속하면 최초 1년을 초과하는 근속연수
+        매 2년마다 1일씩 15일에 가산됩니다. 예를 들어 5년차는 15+2=17일,
+        7년차는 15+3=18일이며, 가산휴가를 포함한 총 연차는
+        <strong>25일</strong>이 한도입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>연차수당은 어떻게 계산하나요?</summary>
+      <p>
+        미사용 연차 일수 × <strong>1일 통상임금</strong>으로 계산합니다.
+        1일 통상임금은 보통 (월 통상임금 ÷ 209시간) × 8시간처럼 근로계약
+        내용에 따라 산정되며, 회사마다 계산 기준이 다를 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>퇴직할 때 남은 연차는 어떻게 되나요?</summary>
+      <p>
+        사용하지 않고 퇴직하는 연차는 <strong>연차수당(미사용 연차
+        수당)</strong>으로 정산해 지급해야 합니다. 이 계산기로 현재
+        발생한 연차 개수를 확인한 뒤, <a href="/calculators/severance-calculator">퇴직금
+        계산기</a>와 함께 활용해 보세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateAnnualLeave } from '../../lib/annualLeaveCalculator';
+
+  const form = document.getElementById('leave-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // 기준일 기본값은 오늘.
+  const asOfDateInput = document.getElementById('asOfDate') as HTMLInputElement;
+  const today = new Date();
+  asOfDateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+    today.getDate(),
+  ).padStart(2, '0')}`;
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hireDate = (document.getElementById('hireDate') as HTMLInputElement).value;
+    const asOfDate = asOfDateInput.value;
+    const dailyWage = Number(
+      (document.getElementById('dailyWage') as HTMLInputElement).value,
+    );
+
+    if (!hireDate || !asOfDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '입사일과 기준일을 모두 입력해 주세요.';
+      return;
+    }
+    if (hireDate > asOfDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '입사일은 기준일보다 늦을 수 없습니다.';
+      return;
+    }
+
+    const r = calculateAnnualLeave({
+      hireDate,
+      asOfDate,
+      dailyWage: Number.isFinite(dailyWage) && dailyWage > 0 ? dailyWage : undefined,
+    });
+
+    (document.getElementById('total-days') as HTMLElement).textContent = `${r.totalDays}일`;
+    (document.getElementById('tenure') as HTMLElement).textContent = r.isFirstYear
+      ? `${r.totalMonths}개월`
+      : `${r.years}년 ${r.totalMonths % 12}개월`;
+
+    const firstYearNote = document.getElementById(
+      'first-year-note',
+    ) as HTMLParagraphElement;
+    firstYearNote.textContent = r.isFirstYear
+      ? '※ 입사 1년 미만이라, 매월 개근을 가정해 1개월당 1일씩 계산했습니다.'
+      : r.bonusDays > 0
+        ? `※ 기본 15일 + 가산휴가 ${r.bonusDays}일이 반영된 값입니다.`
+        : '';
+
+    const payTable = document.getElementById('pay-table') as HTMLTableElement;
+    if (r.annualLeavePay !== undefined) {
+      (document.getElementById('row-pay') as HTMLElement).textContent = won.format(
+        Math.round(r.annualLeavePay),
+      );
+      payTable.classList.remove('hidden');
+    } else {
+      payTable.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

@@ -1,0 +1,243 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    거래금액을 입력하면 <strong>부동산 중개보수(중개수수료) 상한액</strong>을
+    계산합니다. (서울특별시 주택 중개보수 조례 기준)
+  </p>
+
+  <form class="calc-form" id="brokerage-form">
+    <fieldset class="method-toggle">
+      <legend>거래 종류</legend>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="매매" checked />
+        <span>매매</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="전세" />
+        <span>전세</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="월세" />
+        <span>월세</span>
+      </label>
+    </fieldset>
+
+    <div id="sale-lease-input">
+      <label>
+        <span id="amount-label">매매가 (원)</span>
+        <input
+          type="number"
+          id="amount"
+          name="amount"
+          min="0"
+          step="1000000"
+          placeholder="예: 500000000"
+        />
+        <span class="amount-preview" id="amount-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <div id="monthly-rent-input" class="hidden">
+      <label>
+        보증금 (원)
+        <input
+          type="number"
+          id="deposit"
+          name="deposit"
+          min="0"
+          step="1000000"
+          placeholder="예: 10000000"
+        />
+        <span class="amount-preview" id="deposit-preview" aria-live="polite"></span>
+      </label>
+
+      <label>
+        월세 (원)
+        <input
+          type="number"
+          id="monthlyRent"
+          name="monthlyRent"
+          min="0"
+          step="10000"
+          placeholder="예: 500000"
+        />
+      </label>
+    </div>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="converted-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">중개보수 상한액</span>
+        <span class="value"><span id="fee-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">적용 상한요율</span>
+        <span class="value"><span id="rate-value">-</span></span>
+      </div>
+    </div>
+    <p class="note">부가가치세(10%)는 별도이며, 실제 보수는 이 한도 내에서 협의합니다.</p>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>서울특별시 주택 중개보수 등에 관한
+    조례</strong> 기준 상한액입니다. 다른 시·도는 조례에 따라 요율이
+    다를 수 있고, 오피스텔·상가 등 주택 외 부동산은 별도 요율(통상
+    0.9% 이내 협의)이 적용됩니다. 실제 중개보수는 이 상한 이내에서
+    의뢰인과 개업공인중개사가 협의하여 결정합니다.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>중개보수는 어떻게 계산하나요?</summary>
+      <p>
+        거래금액 구간별로 정해진 <strong>상한요율</strong>을 곱한 뒤,
+        구간에 따라 <strong>한도액</strong>이 있으면 둘 중 더 낮은
+        금액이 상한액이 됩니다. 거래금액이 낮을수록 한도액이 함께
+        적용되어 부담이 지나치게 커지지 않도록 되어 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>월세는 거래금액을 어떻게 계산하나요?</summary>
+      <p>
+        월세의 거래금액(환산보증금)은 <strong>보증금 + (월세 ×
+        100)</strong>으로 계산합니다. 다만 이 합산액이 5천만원 미만이면
+        <strong>보증금 + (월세 × 70)</strong>으로 계산해, 소액 월세
+        세입자의 부담을 낮춰줍니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>이 요율이 모든 지역에 똑같이 적용되나요?</summary>
+      <p>
+        아니요. 중개보수 상한요율은 공인중개사법 시행규칙에서 큰 틀을
+        정하고, 구체적인 요율과 한도액은 <strong>시·도 조례</strong>로
+        정합니다. 이 계산기는 <strong>서울특별시 기준</strong>이며, 다른
+        지역은 소폭 다를 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>표시된 금액을 무조건 다 내야 하나요?</summary>
+      <p>
+        아니요, 이 계산 결과는 <strong>법정 상한액</strong>입니다. 실제
+        중개보수는 이 한도 내에서 중개업자와 협의해 정할 수 있으며,
+        상한을 초과해서 받는 것은 불법입니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import {
+    calculateBrokerageFee,
+    calculateMonthlyRentDealAmount,
+  } from '../../lib/brokerageFeeCalculator';
+  import type { DealType } from '../../lib/brokerageFeeCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('brokerage-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('amount', 'amount-preview');
+  bindAmountPreview('deposit', 'deposit-preview');
+
+  const amountLabel = document.getElementById('amount-label') as HTMLSpanElement;
+  const saleLeaseInput = document.getElementById('sale-lease-input') as HTMLDivElement;
+  const monthlyRentInput = document.getElementById('monthly-rent-input') as HTMLDivElement;
+
+  const currentDealKind = (): string =>
+    (form.querySelector('input[name="dealKind"]:checked') as HTMLInputElement).value;
+
+  const syncDealKind = () => {
+    const kind = currentDealKind();
+    const isMonthly = kind === '월세';
+    saleLeaseInput.classList.toggle('hidden', isMonthly);
+    monthlyRentInput.classList.toggle('hidden', !isMonthly);
+    amountLabel.textContent = kind === '매매' ? '매매가 (원)' : '전세보증금 (원)';
+  };
+  form.querySelectorAll('input[name="dealKind"]').forEach((radio) => {
+    radio.addEventListener('change', syncDealKind);
+  });
+  syncDealKind();
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const kind = currentDealKind();
+    const dealType: DealType = kind === '매매' ? '매매' : '임대차';
+
+    let amount: number;
+    const convertedNote = document.getElementById('converted-note') as HTMLParagraphElement;
+    convertedNote.textContent = '';
+
+    if (kind === '월세') {
+      const deposit = Number((document.getElementById('deposit') as HTMLInputElement).value);
+      const monthlyRent = Number(
+        (document.getElementById('monthlyRent') as HTMLInputElement).value,
+      );
+      if (!Number.isFinite(deposit) || deposit < 0 || !monthlyRent || monthlyRent <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = '보증금과 월세를 올바르게 입력해 주세요.';
+        return;
+      }
+      amount = calculateMonthlyRentDealAmount(deposit, monthlyRent);
+      convertedNote.textContent = `환산보증금(거래금액): ${won.format(Math.round(amount))}`;
+    } else {
+      amount = Number((document.getElementById('amount') as HTMLInputElement).value);
+      if (!amount || amount <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = '거래금액을 올바르게 입력해 주세요.';
+        return;
+      }
+    }
+
+    const r = calculateBrokerageFee({ dealType, amount });
+
+    (document.getElementById('fee-value') as HTMLElement).textContent = won.format(
+      Math.round(r.fee),
+    );
+    (document.getElementById('rate-value') as HTMLElement).textContent = pct(r.rate);
+
+    result.classList.remove('hidden');
+  });
+</script>

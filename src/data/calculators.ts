@@ -53,6 +53,20 @@ export const calculators: Calculator[] = [
       '시급과 1주 소정근로시간을 입력하면 주휴수당을 계산합니다. 아르바이트·단시간근로자도 지급 조건과 금액을 바로 확인하세요.',
   },
   {
+    slug: 'unemployment-benefit-calculator',
+    title: '실업급여(구직급여) 계산기',
+    category: '급여',
+    description:
+      '이직일과 이직 전 3개월 급여, 나이·고용보험 가입기간을 입력하면 실업급여 예상 수급액과 소정급여일수를 계산합니다.',
+  },
+  {
+    slug: 'annual-leave-calculator',
+    title: '연차수당·연차개수 계산기',
+    category: '급여',
+    description:
+      '입사일을 입력하면 현재까지 발생한 연차 개수를 계산합니다. 1일 통상임금을 입력하면 연차수당까지 바로 확인할 수 있습니다.',
+  },
+  {
     slug: 'loan-calculator',
     title: '대출이자 계산기',
     category: '부동산',
@@ -65,6 +79,13 @@ export const calculators: Calculator[] = [
     category: '부동산',
     description:
       '매매가를 입력하면 취득세·지방교육세·농어촌특별세를 함께 추정합니다. 주택(다주택자 중과세율 8%·12% 포함)과 오피스텔을 구분해서 계산합니다.',
+  },
+  {
+    slug: 'brokerage-fee-calculator',
+    title: '부동산 중개수수료 계산기',
+    category: '부동산',
+    description:
+      '거래금액을 입력하면 매매·전세·월세별 부동산 중개보수(중개수수료) 상한액을 계산합니다. (서울특별시 조례 기준)',
   },
   {
     slug: 'jeonse-conversion-calculator',
