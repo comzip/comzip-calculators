@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://comzip.com/sitemap-index.xml
