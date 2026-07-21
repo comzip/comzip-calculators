@@ -185,7 +185,15 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
   </section>
 </BaseLayout>
 
-<style>
+<style is:global>
+  /* is:global is required here: the repayment schedule's <td> rows are
+     created at runtime via document.createElement (see the script below),
+     and Astro's scoped-style attribute ([data-astro-cid-*]) is only
+     applied to elements written in this file's static template — never to
+     elements created dynamically in client JS. A scoped `table.schedule
+     td {...}` rule would silently never match those rows and fall back to
+     the global `.breakdown` rule's `text-align: left`, which is exactly
+     the "misaligned schedule table" bug this fixes. */
   .schedule-scroll {
     max-height: 360px;
     overflow-y: auto;
@@ -206,14 +214,18 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
     background: var(--bg-soft);
     z-index: 1;
   }
-  table.schedule td,
-  table.schedule th {
+  /* This table also carries the "breakdown" class for its base width/
+     border/padding styles. Qualifying with both classes keeps this rule
+     more specific than `table.breakdown th/td`, regardless of source
+     order, so alignment doesn't silently flip back to the left. */
+  table.breakdown.schedule td,
+  table.breakdown.schedule th {
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  table.schedule td:first-child,
-  table.schedule th:first-child {
+  table.breakdown.schedule td:first-child,
+  table.breakdown.schedule th:first-child {
     text-align: center;
   }
 </style>
