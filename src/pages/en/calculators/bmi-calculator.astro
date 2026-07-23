@@ -1,0 +1,191 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'bmi-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your height and weight to calculate your <strong>Body Mass Index (BMI)</strong>,
+    obesity classification per Korean Society for the Study of Obesity criteria, and standard
+    body weight.
+  </p>
+
+  <form class="calc-form" id="bmi-form">
+    <label>
+      Height (cm)
+      <input
+        type="number"
+        id="heightCm"
+        name="heightCm"
+        min="0"
+        step="0.1"
+        placeholder="e.g. 170"
+        required
+      />
+    </label>
+    <label>
+      Weight (kg)
+      <input
+        type="number"
+        id="weightKg"
+        name="weightKg"
+        min="0"
+        step="0.1"
+        placeholder="e.g. 65"
+        required
+      />
+    </label>
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">BMI</span>
+        <span class="value"><span id="bmi-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Obesity Classification</span>
+        <span class="value"><span id="bmi-category">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Details
+      </caption>
+      <tbody>
+        <tr>
+          <td>Standard weight <span class="hint">(based on BMI 22)</span></td>
+          <td id="row-standard-weight">-</td>
+        </tr>
+        <tr>
+          <td>Difference from standard weight</td>
+          <td id="row-weight-diff">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    BMI is a <strong>simplified indicator</strong> calculated from height and weight only — it
+    does not account for muscle mass, body fat percentage, or body composition. Athletes and
+    individuals with high muscle mass may show a high BMI without being obese. For a proper
+    health assessment, consult a body composition analysis or a medical professional.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How is BMI calculated?</summary>
+      <p>
+        BMI (Body Mass Index) = weight (kg) ÷ height (m)². For example, a person who is
+        170 cm (1.7 m) tall and weighs 65 kg has a BMI of 65 ÷ 1.7² ≈ 22.5.
+      </p>
+    </details>
+
+    <details>
+      <summary>What are the obesity classification thresholds?</summary>
+      <p>
+        This calculator uses the <strong>Korean Society for the Study of Obesity (2018 Clinical
+        Practice Guidelines)</strong> criteria: Underweight &lt; 18.5, Normal 18.5–22.9,
+        Pre-obese (overweight) 23–24.9, Obesity Class I 25–29.9, Obesity Class II 30–34.9,
+        Obesity Class III (severe obesity) ≥ 35. These ranges differ from the WHO international
+        standard (overweight ≥ 25, obese ≥ 30), so results may differ when compared with
+        international references.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is standard body weight calculated?</summary>
+      <p>
+        Standard body weight is the weight (kg) at which BMI equals exactly 22: weight = 22 ×
+        height (m)². BMI 22 is widely used as the standard because it is statistically
+        associated with the lowest disease risk.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does a high BMI always mean poor health?</summary>
+      <p>
+        Not necessarily. Because BMI cannot distinguish between muscle and fat, people with
+        high muscle mass may have a high BMI without excess body fat. Conversely, "thin-fat"
+        individuals — low muscle, high body fat percentage — can have a normal BMI yet still
+        face health risks. Use BMI as a reference indicator only.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateBmi } from '../../../lib/bmiCalculator';
+
+  const BMI_CATEGORY_EN: Record<string, string> = {
+    '저체중': 'Underweight',
+    '정상': 'Normal',
+    '비만전단계': 'Pre-obese (overweight)',
+    '1단계 비만': 'Obesity Class I',
+    '2단계 비만': 'Obesity Class II',
+    '3단계 비만': 'Obesity Class III (severe obesity)',
+  };
+
+  const form = document.getElementById('bmi-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const heightCm = Number(
+      (document.getElementById('heightCm') as HTMLInputElement).value,
+    );
+    const weightKg = Number(
+      (document.getElementById('weightKg') as HTMLInputElement).value,
+    );
+
+    if (!heightCm || heightCm <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid height.';
+      return;
+    }
+    if (!weightKg || weightKg <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid weight.';
+      return;
+    }
+
+    const r = calculateBmi({ heightCm, weightKg });
+
+    (document.getElementById('bmi-value') as HTMLElement).textContent = r.bmi.toFixed(1);
+    (document.getElementById('bmi-category') as HTMLElement).textContent =
+      BMI_CATEGORY_EN[r.category] ?? r.category;
+    (document.getElementById('row-standard-weight') as HTMLElement).textContent =
+      `${fmt.format(r.standardWeightKg)} kg`;
+
+    const diff = r.weightDiffKg;
+    const diffEl = document.getElementById('row-weight-diff') as HTMLElement;
+    diffEl.textContent =
+      diff === 0
+        ? 'Same as standard weight'
+        : `${diff > 0 ? '+' : ''}${fmt.format(diff)} kg (vs. standard weight)`;
+
+    result.classList.remove('hidden');
+  });
+</script>

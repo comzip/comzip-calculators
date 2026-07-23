@@ -1,0 +1,218 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'salary-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your annual salary and number of dependents to estimate your
+    <strong>monthly take-home pay</strong> and <strong>annual take-home pay</strong>
+    after Korea's 4 major social insurances and income tax.
+  </p>
+
+  <form class="calc-form" id="salary-form">
+    <label>
+      Annual Salary (pre-tax, KRW)
+      <input
+        type="number"
+        id="annualSalary"
+        name="annualSalary"
+        min="0"
+        step="100000"
+        placeholder="e.g. 40000000"
+        required
+      />
+      <span class="amount-preview" id="annualSalary-preview" aria-live="polite"></span>
+    </label>
+    <label>
+      Monthly Non-taxable Amount (KRW)
+      <span class="hint">Non-taxable items such as meal allowance. Default: ₩200,000.</span>
+      <input
+        type="number"
+        id="monthlyNonTaxable"
+        name="monthlyNonTaxable"
+        min="0"
+        step="10000"
+        value="200000"
+      />
+    </label>
+    <label>
+      Number of Dependents (including yourself)
+      <span class="hint">Total number of people eligible for basic deduction, including yourself. Default: 1.</span>
+      <input
+        type="number"
+        id="dependents"
+        name="dependents"
+        min="1"
+        step="1"
+        value="1"
+      />
+    </label>
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Monthly Take-Home Pay</span>
+        <span class="value"><span id="monthly-net">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Annual Take-Home Pay</span>
+        <span class="value"><span id="annual-net">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Monthly deduction breakdown
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Item</th>
+          <th scope="col">Amount (monthly)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>National Pension (4.5%)</td><td id="row-pension">-</td></tr>
+        <tr><td>Health Insurance (3.545%)</td><td id="row-health">-</td></tr>
+        <tr><td>Long-term Care Insurance (12.95% of health insurance premium)</td><td id="row-ltc">-</td></tr>
+        <tr><td>Employment Insurance (0.9%)</td><td id="row-employment">-</td></tr>
+        <tr><td>Income Tax</td><td id="row-income-tax">-</td></tr>
+        <tr><td>Local Income Tax</td><td id="row-local-tax">-</td></tr>
+        <tr class="total"><td>Total Deductions</td><td id="row-deduction-total">-</td></tr>
+        <tr class="total"><td>Monthly Take-Home Pay</td><td id="row-monthly-net">-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    These results are <strong>simplified estimates</strong> and may differ from actual
+    withholding amounts based on the National Tax Service's simplified tax withholding table.
+    Insurance rates and tax rates change annually, so actual take-home pay may vary.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>What are the 4 major social insurances in Korea?</summary>
+      <p>
+        They are National Pension (retirement), Health Insurance (medical costs),
+        Long-term Care Insurance (elderly care, linked to health insurance), and
+        Employment Insurance (unemployment benefits, etc.). Both employees and
+        employers share the cost; this calculator deducts only the employee's share.
+      </p>
+    </details>
+
+    <details>
+      <summary>How does the number of dependents affect take-home pay?</summary>
+      <p>
+        More dependents mean a larger personal deduction (basic deduction), which lowers
+        your taxable income and reduces income tax and local income tax, resulting in higher
+        take-home pay. This calculator reflects only the basic deduction including yourself.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does age affect the calculation?</summary>
+      <p>
+        Age is not directly used in the basic take-home pay calculation. However, for certain
+        age groups — such as those aged 60 or older — National Pension contribution obligations
+        or applicable rates may differ, so actual deductions could vary from this estimate.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the monthly non-taxable amount?</summary>
+      <p>
+        This refers to pay items that are not subject to income tax, such as meal allowances.
+        A larger non-taxable amount reduces taxable income and lowers some taxes and insurance
+        premiums. The default of ₩200,000 is a common example of the meal allowance
+        non-taxable limit — adjust it based on your own pay stub.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateSalary } from '../../../lib/salaryCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('salary-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // Update the amount preview as the user types.
+  const annualSalaryInput = document.getElementById('annualSalary') as HTMLInputElement;
+  const annualSalaryPreview = document.getElementById('annualSalary-preview') as HTMLSpanElement;
+  annualSalaryInput.addEventListener('input', () => {
+    const value = Number(annualSalaryInput.value);
+    annualSalaryPreview.textContent =
+      value > 0 ? formatWonEn(value) : '';
+  });
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setText = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const annualSalary = Number(
+      (document.getElementById('annualSalary') as HTMLInputElement).value,
+    );
+    const monthlyNonTaxable = Number(
+      (document.getElementById('monthlyNonTaxable') as HTMLInputElement).value,
+    );
+    const dependents = Number(
+      (document.getElementById('dependents') as HTMLInputElement).value,
+    );
+
+    if (!annualSalary || annualSalary <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid annual salary.';
+      return;
+    }
+
+    const r = calculateSalary({
+      annualSalary,
+      monthlyNonTaxable: Number.isFinite(monthlyNonTaxable) ? monthlyNonTaxable : undefined,
+      dependents: Number.isFinite(dependents) ? dependents : undefined,
+    });
+
+    setText('monthly-net', r.monthlyNet);
+    setText('annual-net', r.annualNet);
+    setText('row-pension', r.pension);
+    setText('row-health', r.healthIns);
+    setText('row-ltc', r.longTermCare);
+    setText('row-employment', r.employmentIns);
+    setText('row-income-tax', r.monthlyIncomeTax);
+    setText('row-local-tax', r.monthlyLocalTax);
+    setText('row-deduction-total', r.monthlyDeductionTotal);
+    setText('row-monthly-net', r.monthlyNet);
+
+    result.classList.remove('hidden');
+  });
+</script>

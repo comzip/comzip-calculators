@@ -1,0 +1,176 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'weekly-holiday-pay-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your hourly wage and weekly scheduled work hours to calculate your
+    <strong>weekly holiday pay (ju-hyu-su-dang)</strong>. Part-time workers may also
+    be eligible if the conditions are met.
+  </p>
+
+  <form class="calc-form" id="wph-form">
+    <label>
+      Hourly Wage (KRW)
+      <input
+        type="number"
+        id="hourlyWage"
+        name="hourlyWage"
+        min="0"
+        step="10"
+        placeholder="e.g. 10030"
+        required
+      />
+    </label>
+
+    <label>
+      Weekly Scheduled Work Hours
+      <span class="hint">Based on a 4-week average. e.g. 5 days × 4 hours = 20</span>
+      <input
+        type="number"
+        id="weeklyHours"
+        name="weeklyHours"
+        min="0"
+        step="0.5"
+        placeholder="e.g. 20"
+        required
+      />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="eligibility-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Weekly Holiday Pay</span>
+        <span class="value"><span id="weekly-pay">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Payable Hours</span>
+        <span class="value"><span id="payable-hours">-</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result assumes <strong>perfect attendance on all scheduled workdays for the
+    week</strong>. In practice, any absence on a scheduled workday may forfeit that
+    week's holiday pay; tardiness or early departure does not generally count as
+    absence. Verify actual eligibility against your employment contract and attendance
+    records.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Who is eligible for weekly holiday pay?</summary>
+      <p>
+        Any worker — full-time, part-time, or contract — whose <strong>weekly scheduled
+        hours average 15 or more over a 4-week period</strong> and who <strong>attends
+        all scheduled workdays that week</strong> is entitled to weekly holiday pay.
+        Workers with fewer than 15 scheduled hours per week are not eligible.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is weekly holiday pay calculated?</summary>
+      <p>
+        For standard full-time workers (40 hours/week, 8 hours/day), weekly holiday pay
+        is <strong>8 hours × hourly wage</strong>. For part-time workers, the formula is
+        <strong>8 hours × (your weekly scheduled hours ÷ 40)</strong>. For example,
+        a worker with 20 scheduled hours per week receives 8 × (20 ÷ 40) = 4 hours'
+        worth of pay.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does working more than 40 hours per week increase weekly holiday pay?</summary>
+      <p>
+        No. Weekly holiday pay is <strong>capped at 8 hours (one day's pay)</strong>.
+        Even if you worked 52 hours in a week, weekly holiday pay is still calculated as
+        8 hours × hourly wage. (Overtime pay is calculated separately.)
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens to weekly holiday pay if I am absent?</summary>
+      <p>
+        In principle, if you are absent on even one scheduled workday during the week,
+        weekly holiday pay for that week does not accrue. However, tardiness or early
+        departure is generally not treated as an absence. This calculator shows the
+        amount assuming perfect attendance only.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateWeeklyHolidayPay } from '../../../lib/weeklyHolidayPayCalculator';
+
+  const form = document.getElementById('wph-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hourlyWage = Number(
+      (document.getElementById('hourlyWage') as HTMLInputElement).value,
+    );
+    const weeklyHours = Number(
+      (document.getElementById('weeklyHours') as HTMLInputElement).value,
+    );
+
+    if (!hourlyWage || hourlyWage <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid hourly wage.';
+      return;
+    }
+    if (!Number.isFinite(weeklyHours) || weeklyHours < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid number of weekly scheduled work hours.';
+      return;
+    }
+
+    const r = calculateWeeklyHolidayPay({ hourlyWage, weeklyHours });
+
+    (document.getElementById('weekly-pay') as HTMLElement).textContent = won.format(
+      Math.round(r.weeklyHolidayPay),
+    );
+    (document.getElementById('payable-hours') as HTMLElement).textContent =
+      `${r.payableHours.toFixed(1).replace(/\.0$/, '')} hrs`;
+
+    const eligibilityNote = document.getElementById(
+      'eligibility-note',
+    ) as HTMLParagraphElement;
+    eligibilityNote.textContent = r.eligible
+      ? ''
+      : '※ Weekly scheduled hours are fewer than 15 — you are not eligible for weekly holiday pay.';
+
+    result.classList.remove('hidden');
+  });
+</script>

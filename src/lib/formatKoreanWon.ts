@@ -19,3 +19,13 @@ export function formatKoreanWon(amount: number): string {
 
   return parts.join(' ') + '원';
 }
+
+/**
+ * Formats a won amount for the English pages as a plain comma-grouped
+ * number with a "₩" prefix (e.g. "₩520,000,000"). English readers aren't
+ * expected to know the 억/만 unit notation `formatKoreanWon` produces.
+ */
+export function formatWonEn(amount: number): string {
+  const n = Math.round(Math.abs(amount));
+  return `₩${n.toLocaleString('en-US')}`;
+}

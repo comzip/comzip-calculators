@@ -1,16 +1,16 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import CalculatorCard from '../components/CalculatorCard.astro';
-import { categoryOrder, calculatorsByCategory, categoryLabels } from '../data/calculators';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CalculatorCard from '../../components/CalculatorCard.astro';
+import { categoryOrder, calculatorsByCategory, categoryLabels } from '../../data/calculators';
 ---
 
-<BaseLayout title="콤집계산기" path="/" lang="ko">
+<BaseLayout title="Comzip Calculators" path="/" lang="en">
   <section class="intro">
-    <h1>일상에 필요한 계산기 모음</h1>
+    <h1>Everyday Calculators</h1>
     <p>
-      콤집계산기는 만나이, 연봉 실수령액처럼 자주 찾게 되는 생활·급여 계산기를 한곳에
-      모아둔 무료 사이트입니다. 복잡한 설치 없이 브라우저에서 바로 계산하고, 필요한
-      계산기를 계속 추가해 나갑니다.
+      Comzip Calculators brings together the tools you actually reach for —
+      age, salary, loans, taxes, and more — all in one free site. No sign-up,
+      no installation: everything runs in your browser, and we keep adding more.
     </p>
   </section>
 
@@ -20,10 +20,10 @@ import { categoryOrder, calculatorsByCategory, categoryLabels } from '../data/ca
       if (items.length === 0) return null;
       return (
         <section class="category">
-          <h2>{categoryLabels[category].ko}</h2>
+          <h2>{categoryLabels[category].en}</h2>
           <div class="card-grid">
             {items.map((calculator) => (
-              <CalculatorCard calculator={calculator} lang="ko" />
+              <CalculatorCard calculator={calculator} lang="en" />
             ))}
           </div>
         </section>

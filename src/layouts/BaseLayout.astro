@@ -1,23 +1,38 @@
 ---
-import { categoryOrder, calculatorsByCategory } from '../data/calculators';
+import { categoryOrder, calculatorsByCategory, categoryLabels } from '../data/calculators';
+import { ui, type Lang } from '../i18n/ui';
 
 export interface Props {
   title: string;
   description?: string;
-  /** Path of the current page, used to build canonical / OG url. */
+  /**
+   * Locale-neutral path (no `/en` prefix), e.g. `/calculators/bmi-calculator`
+   * or `/` for the home page. Used to build canonical / OG / hreflang URLs
+   * for both locales.
+   */
   path?: string;
+  /** Page locale. Defaults to Korean, the site's default/unprefixed locale. */
+  lang?: Lang;
 }
 
-const {
-  title,
-  description = '만나이, 연봉 실수령액 등 일상에 필요한 계산기를 모아둔 무료 계산기 사이트, 콤집계산기입니다.',
-  path = '/',
-} = Astro.props;
+const { title, description, path = '/', lang = 'ko' } = Astro.props;
 
-const siteName = '콤집계산기';
+const t = ui[lang];
+const resolvedDescription = description ?? t.defaultDescription;
+const siteName = t.siteName;
 const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+
+// English pages live under `/en`; Korean is unprefixed at the site root.
+const localePrefix = lang === 'en' ? '/en' : '';
+const localizedPath = `${localePrefix}${path}`;
+
 // Astro.site comes from `site` in astro.config.mjs.
-const canonicalURL = Astro.site ? new URL(path, Astro.site).href : path;
+const canonicalURL = Astro.site ? new URL(localizedPath, Astro.site).href : localizedPath;
+const koPath = path;
+const enPath = path === '/' ? '/en/' : `/en${path}`;
+const koURL = Astro.site ? new URL(koPath, Astro.site).href : koPath;
+const enURL = Astro.site ? new URL(enPath, Astro.site).href : enPath;
+const langSwitchHref = lang === 'ko' ? enPath : koPath;
 const year = new Date().getFullYear();
 
 // TODO: replace with your real GA4 Measurement ID (from analytics.google.com).
@@ -30,7 +45,7 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
 ---
 
 <!doctype html>
-<html lang="ko">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -39,21 +54,24 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
     <meta name="google-site-verification" content="jbJG45GdqodGRlT0eFGqhDd7m7-Di2ukHq5dE4XAhY0" />
 
     <title>{fullTitle}</title>
-    <meta name="description" content={description} />
+    <meta name="description" content={resolvedDescription} />
     <link rel="canonical" href={canonicalURL} />
+    <link rel="alternate" hreflang="ko" href={koURL} />
+    <link rel="alternate" hreflang="en" href={enURL} />
+    <link rel="alternate" hreflang="x-default" href={koURL} />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={fullTitle} />
-    <meta property="og:description" content={description} />
+    <meta property="og:description" content={resolvedDescription} />
     <meta property="og:url" content={canonicalURL} />
-    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:locale" content={lang === 'ko' ? 'ko_KR' : 'en_US'} />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={fullTitle} />
-    <meta name="twitter:description" content={description} />
+    <meta name="twitter:description" content={resolvedDescription} />
 
     <meta name="google-adsense-account" content={ADSENSE_CLIENT_ID} />
     <script
@@ -84,16 +102,18 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
   <body>
     <header class="site-header">
       <div class="container header-inner">
-        <a href="/" class="brand">콤집계산기</a>
-        <nav class="site-nav" aria-label="주요 계산기">
+        <a href={localePrefix || '/'} class="brand">{siteName}</a>
+        <nav class="site-nav" aria-label={t.navLabel}>
           {
             categoryOrder.map((category) => (
               <details class="nav-dropdown">
-                <summary>{category}</summary>
+                <summary>{categoryLabels[category][lang]}</summary>
                 <ul>
                   {calculatorsByCategory(category).map((c) => (
                     <li>
-                      <a href={`/calculators/${c.slug}`}>{c.title}</a>
+                      <a href={`${localePrefix}/calculators/${c.slug}`}>
+                        {lang === 'en' ? c.titleEn : c.title}
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -101,6 +121,9 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
             ))
           }
         </nav>
+        <a href={langSwitchHref} class="lang-switch" hreflang={lang === 'ko' ? 'en' : 'ko'}>
+          {t.langSwitchLabel}
+        </a>
       </div>
     </header>
 
@@ -110,12 +133,12 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
 
     <footer class="site-footer">
       <div class="container">
-        <nav class="footer-nav" aria-label="정책">
-          <a href="/privacy">개인정보처리방침</a>
+        <nav class="footer-nav" aria-label={t.policyLabel}>
+          <a href={`${localePrefix}/privacy`}>{t.privacy}</a>
           <span aria-hidden="true">·</span>
-          <a href="/terms">이용약관</a>
+          <a href={`${localePrefix}/terms`}>{t.terms}</a>
         </nav>
-        <p class="copyright">&copy; {year} 콤집계산기. All rights reserved.</p>
+        <p class="copyright">&copy; {year} {siteName}. All rights reserved.</p>
       </div>
     </footer>
 
@@ -204,6 +227,20 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         display: flex;
         flex-wrap: wrap;
         gap: 4px 8px;
+      }
+      .lang-switch {
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .lang-switch:hover {
+        color: var(--accent);
+        background: var(--bg-soft);
       }
       .nav-dropdown {
         position: relative;

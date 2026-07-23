@@ -1,0 +1,254 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'unemployment-benefit-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your separation date, total wages for the three months before separation, age
+    group, and insured period to estimate your
+    <strong>unemployment benefit (job-seeking allowance)</strong>.
+  </p>
+
+  <form class="calc-form" id="ui-form">
+    <label>
+      Separation date (last day of employment)
+      <input type="date" id="resignDate" name="resignDate" required />
+    </label>
+
+    <label>
+      Total wages for the 3 months before separation (before tax, KRW)
+      <span class="hint">Base pay + allowances. Example: 9000000</span>
+      <input
+        type="number"
+        id="threeMonthWage"
+        name="threeMonthWage"
+        min="0"
+        step="100000"
+        placeholder="Example: 9000000"
+        required
+      />
+      <span class="amount-preview" id="threeMonthWage-preview" aria-live="polite"></span>
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>Age group</legend>
+      <label class="method-option">
+        <input type="radio" name="ageGroup" value="50세 미만" checked />
+        <span>Under 50</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="ageGroup" value="50세 이상 또는 장애인" />
+        <span>50 or older, or a person with a disability</span>
+      </label>
+    </fieldset>
+
+    <label>
+      Employment insurance insured period
+      <select id="insuredPeriod">
+        <option value="1년 미만">Less than 1 year</option>
+        <option value="1~3년" selected>1–3 years</option>
+        <option value="3~5년">3–5 years</option>
+        <option value="5~10년">5–10 years</option>
+        <option value="10년 이상">10+ years</option>
+      </select>
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="clamp-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Total estimated benefit</span>
+        <span class="value"><span id="total-benefit">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Daily job-seeking allowance</span>
+        <span class="value"><span id="daily-benefit">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calculation breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Average wage calculation period</td>
+          <td id="row-period">-</td>
+        </tr>
+        <tr>
+          <td>Daily average wage</td>
+          <td id="row-avg-wage">-</td>
+        </tr>
+        <tr>
+          <td>Daily allowance (before cap/floor)</td>
+          <td id="row-raw">-</td>
+        </tr>
+        <tr>
+          <td>Daily allowance (after cap/floor)</td>
+          <td id="row-daily">-</td>
+        </tr>
+        <tr>
+          <td>Benefit days</td>
+          <td id="row-days">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total estimated benefit</td>
+          <td id="row-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. Unemployment benefits are in
+    principle available only for involuntary separations (layoffs, contract expiry,
+    dismissal, etc.); voluntary resignations qualify only in exceptional cases where a
+    legitimate reason is recognised. Other eligibility conditions must also be met,
+    including having at least 180 insured days within the 18 months before separation.
+    The daily cap and floor change each year, so verify the exact amount through
+    Work24 (work24.go.kr) or your local Employment Center.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently asked questions</h2>
+
+    <details>
+      <summary>How is the benefit amount determined?</summary>
+      <p>
+        The <strong>daily allowance = daily average wage × 60%</strong>, then a floor and
+        cap are applied (as of 2026: floor ₩66,048, cap ₩68,100 per day). Multiplying this
+        daily amount by the <strong>number of benefit days</strong> gives the total estimated
+        benefit.
+      </p>
+    </details>
+
+    <details>
+      <summary>How are benefit days determined?</summary>
+      <p>
+        Benefit days range from 120 to 270 days depending on your <strong>age</strong> and
+        <strong>insured period</strong> at the time of separation. Older age and longer
+        insured periods result in more benefit days.
+      </p>
+    </details>
+
+    <details>
+      <summary>Can anyone receive unemployment benefits?</summary>
+      <p>
+        No. You must have <strong>separated involuntarily</strong>, have at least
+        <strong>180 insured days in the 18 months before separation</strong>, be willing
+        and able to work but unable to find employment, and be actively seeking work.
+        Voluntary resignations may qualify as an exception when a legitimate reason
+        (e.g. unpaid wages, workplace harassment) is recognised.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why might this calculator's result differ from the actual benefit?</summary>
+      <p>
+        The cap and floor change each year in line with the minimum wage, and the actual
+        average wage calculation has detailed rules around bonuses and annual leave pay.
+        This calculator is a reference estimate based solely on the three-month wage figure
+        you enter.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateUnemploymentBenefit } from '../../../lib/unemploymentBenefitCalculator';
+  import type {
+    AgeGroup,
+    InsuredPeriod,
+  } from '../../../lib/unemploymentBenefitCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('ui-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const wageInput = document.getElementById('threeMonthWage') as HTMLInputElement;
+  const wagePreview = document.getElementById('threeMonthWage-preview') as HTMLSpanElement;
+  wageInput.addEventListener('input', () => {
+    const value = Number(wageInput.value);
+    wagePreview.textContent = value > 0 ? formatWonEn(value) : '';
+  });
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const resignDate = (document.getElementById('resignDate') as HTMLInputElement).value;
+    const threeMonthWage = Number(wageInput.value);
+    const ageGroup = (
+      form.querySelector('input[name="ageGroup"]:checked') as HTMLInputElement
+    ).value as AgeGroup;
+    const insuredPeriod = (
+      document.getElementById('insuredPeriod') as HTMLSelectElement
+    ).value as InsuredPeriod;
+
+    if (!resignDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter your separation date.';
+      return;
+    }
+    if (!threeMonthWage || threeMonthWage <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid total wage for the 3 months before separation.';
+      return;
+    }
+
+    const r = calculateUnemploymentBenefit({
+      threeMonthWage,
+      resignDate,
+      ageGroup,
+      insuredPeriod,
+    });
+
+    setWon('total-benefit', r.totalBenefit);
+    setWon('daily-benefit', r.dailyBenefit);
+    (document.getElementById('row-period') as HTMLElement).textContent = `${r.periodDays} days`;
+    setWon('row-avg-wage', r.averageDailyWage);
+    setWon('row-raw', r.rawDailyBenefit);
+    setWon('row-daily', r.dailyBenefit);
+    (document.getElementById('row-days') as HTMLElement).textContent = `${r.benefitDays} days`;
+    setWon('row-total', r.totalBenefit);
+
+    const clampNote = document.getElementById('clamp-note') as HTMLParagraphElement;
+    if (r.clampedToLower) {
+      clampNote.textContent = '※ The calculated amount was below the floor, so the minimum benefit has been applied.';
+    } else if (r.clampedToUpper) {
+      clampNote.textContent = '※ The calculated amount exceeded the cap, so the maximum benefit has been applied.';
+    } else {
+      clampNote.textContent = '';
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

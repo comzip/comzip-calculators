@@ -1,0 +1,260 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'severance-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your hire date, resignation date, and last 3 months of pay to estimate your
+    <strong>average daily wage</strong> and <strong>severance pay</strong>.
+  </p>
+
+  <form class="calc-form" id="severance-form">
+    <label>
+      Hire Date
+      <input type="date" id="hireDate" name="hireDate" required />
+    </label>
+    <label>
+      Resignation Date
+      <input type="date" id="resignDate" name="resignDate" required />
+    </label>
+    <label>
+      Total Wages in the 3 Months Before Resignation (pre-tax, KRW)
+      <span class="hint">
+        Sum of base pay + allowances paid in the last 3 months. Enter annual bonuses and
+        annual leave allowances in the separate fields below. e.g. 12000000
+      </span>
+      <input
+        type="number"
+        id="threeMonthWage"
+        name="threeMonthWage"
+        min="0"
+        step="100000"
+        placeholder="e.g. 12000000"
+        required
+      />
+      <span class="amount-preview" id="threeMonthWage-preview" aria-live="polite"></span>
+    </label>
+    <label>
+      Annual Bonus Total (KRW)
+      <span class="hint">Optional. Leave blank if none. Only 3 months' worth (1/4) is included.</span>
+      <input
+        type="number"
+        id="annualBonus"
+        name="annualBonus"
+        min="0"
+        step="100000"
+        placeholder="e.g. 4000000"
+      />
+    </label>
+    <label>
+      Annual Leave Allowance Paid During Employment (KRW)
+      <span class="hint">
+        Optional. Include only leave allowances actually paid while employed — not the
+        unused leave payout upon termination. Only 3 months' worth (1/4) is included.
+      </span>
+      <input
+        type="number"
+        id="annualLeaveAllowance"
+        name="annualLeaveAllowance"
+        min="0"
+        step="100000"
+        placeholder="e.g. 0"
+      />
+    </label>
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="eligibility-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Severance Pay</span>
+        <span class="value"><span id="severance-pay">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Average Daily Wage</span>
+        <span class="value"><span id="average-daily-wage">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calculation breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Days of Service</td>
+          <td id="row-work-days">-</td>
+        </tr>
+        <tr>
+          <td>Average Wage Calculation Period <span class="hint">(calendar days in the 3 months before resignation)</span></td>
+          <td id="row-period-days">-</td>
+        </tr>
+        <tr>
+          <td>Average Daily Wage</td>
+          <td id="row-average-wage">-</td>
+        </tr>
+        <tr class="total">
+          <td>Severance Pay (average daily wage × 30 × days of service / 365)</td>
+          <td id="row-severance">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    These results are <strong>simplified estimates</strong>. Actual average wage
+    calculations involve detailed rules — including which pay items are included or
+    excluded, and a floor rule that applies ordinary wage when it exceeds the average
+    wage. Actual severance pay may differ. For an accurate figure, consult your
+    company's HR/payroll department or the Ministry of Employment and Labor's
+    official severance pay calculator.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Who is entitled to severance pay?</summary>
+      <p>
+        Under Korea's Employee Retirement Benefit Security Act, severance pay is required
+        for employees with <strong>at least 1 year of continuous service</strong> who
+        worked an average of 15 or more hours per week over a 4-week period. If your
+        days of service are fewer than 365, you may not qualify for statutory severance
+        pay — this calculator will display a notice in that case.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is average daily wage calculated?</summary>
+      <p>
+        Average daily wage is the <strong>total wages received in the 3 months before
+        the resignation date divided by the total number of calendar days in that
+        3-month period</strong>. Annual bonuses and leave allowances are included at
+        only 3 months' worth (1/4 of the annual total). Unused leave payouts that arise
+        solely upon termination are excluded from the calculation.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why might this calculator's result differ from the actual payout?</summary>
+      <p>
+        In practice, there is a <strong>floor rule: ordinary wage applies if it exceeds
+        the average wage</strong>. Which pay items count toward average wage also varies
+        case by case. This calculator applies only the basic formula without these
+        adjustments and is intended as a reference estimate only.
+      </p>
+    </details>
+
+    <details>
+      <summary>Can I use this together with the salary take-home pay calculator?</summary>
+      <p>
+        Yes. Use the <a href="/en/calculators/salary-calculator">Korea Salary Take-Home
+        Pay Calculator</a> to check your monthly net pay, then use this calculator to
+        estimate your expected severance pay if you are planning to leave your job.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateSeverance } from '../../../lib/severanceCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('severance-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // Update the amount preview as the user types.
+  const wageInput = document.getElementById('threeMonthWage') as HTMLInputElement;
+  const wagePreview = document.getElementById('threeMonthWage-preview') as HTMLSpanElement;
+  wageInput.addEventListener('input', () => {
+    const value = Number(wageInput.value);
+    wagePreview.textContent = value > 0 ? formatWonEn(value) : '';
+  });
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hireDate = (document.getElementById('hireDate') as HTMLInputElement).value;
+    const resignDate = (document.getElementById('resignDate') as HTMLInputElement).value;
+    const threeMonthWage = Number(wageInput.value);
+    const annualBonus = Number(
+      (document.getElementById('annualBonus') as HTMLInputElement).value,
+    );
+    const annualLeaveAllowance = Number(
+      (document.getElementById('annualLeaveAllowance') as HTMLInputElement).value,
+    );
+
+    if (!hireDate || !resignDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter both hire date and resignation date.';
+      return;
+    }
+    if (!threeMonthWage || threeMonthWage <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid total wage for the 3 months before resignation.';
+      return;
+    }
+
+    let r;
+    try {
+      r = calculateSeverance({
+        hireDate,
+        resignDate,
+        threeMonthWage,
+        annualBonus: Number.isFinite(annualBonus) ? annualBonus : undefined,
+        annualLeaveAllowance: Number.isFinite(annualLeaveAllowance)
+          ? annualLeaveAllowance
+          : undefined,
+      });
+    } catch (e) {
+      result.classList.add('hidden');
+      errorMsg.textContent = e instanceof Error ? e.message : 'Please check your inputs.';
+      return;
+    }
+
+    setWon('severance-pay', r.severancePay);
+    setWon('average-daily-wage', r.averageDailyWage);
+    (document.getElementById('row-work-days') as HTMLElement).textContent = `${r.workDays} days`;
+    (document.getElementById('row-period-days') as HTMLElement).textContent =
+      `${r.periodDays} days`;
+    setWon('row-average-wage', r.averageDailyWage);
+    setWon('row-severance', r.severancePay);
+
+    const eligibilityNote = document.getElementById(
+      'eligibility-note',
+    ) as HTMLParagraphElement;
+    eligibilityNote.textContent = r.eligible
+      ? ''
+      : '※ Days of service are fewer than 365 — you may not qualify for statutory severance pay. The amount below is a reference calculation only.';
+
+    result.classList.remove('hidden');
+  });
+</script>

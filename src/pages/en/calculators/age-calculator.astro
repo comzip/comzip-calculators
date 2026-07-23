@@ -1,0 +1,151 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'age-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter a birth date to calculate <strong>international age (man-nai)</strong>,
+    <strong>year age</strong>, and <strong>counting age (Korean traditional age)</strong> all at once.
+  </p>
+
+  <form class="calc-form" id="age-form">
+    <label>
+      Date of Birth
+      <input type="date" id="birthdate" name="birthdate" required />
+    </label>
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">International Age (man-nai)</span>
+        <span class="value"><span id="intl-age">-</span> yrs</span>
+      </div>
+      <div class="result-item">
+        <span class="label">Year Age</span>
+        <span class="value"><span id="year-age">-</span> yrs</span>
+      </div>
+      <div class="result-item">
+        <span class="label">Counting Age (Korean traditional)</span>
+        <span class="value"><span id="korean-age">-</span> yrs</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="disclaimer">
+    As of June 28, 2023, Korea's official age standard was unified to the
+    <strong>international age (man-nai)</strong> system. Unless otherwise specified,
+    ages in Korean laws, contracts, and official documents now refer to international age.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How is international age (man-nai) calculated?</summary>
+      <p>
+        If your birthday has already passed this year: (current year − birth year). If it has
+        not passed yet: subtract 1 from that result. You start at 0 at birth and gain one year
+        on each subsequent birthday.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is year age?</summary>
+      <p>
+        Year age is simply (current year − birth year), regardless of whether your birthday
+        has passed. It is used as the age standard in certain Korean laws such as the Military
+        Service Act and the Youth Protection Act.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is counting age (Korean traditional age)?</summary>
+      <p>
+        In this traditional system, you are 1 year old at birth and gain one year every
+        January 1st. It is calculated as (current year − birth year + 1). Since the
+        international age unification on June 28, 2023, it is no longer a legal standard
+        and is mainly used in everyday conversation.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why do the three age types differ?</summary>
+      <p>
+        They use different reference points. International age uses your birthday;
+        year age and counting age use the calendar year; and counting age treats the
+        birth year itself as age 1. Depending on the method and where you are in the
+        year relative to your birthday, the results can differ by up to two years.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  const form = document.getElementById('age-form') as HTMLFormElement;
+  const birthInput = document.getElementById('birthdate') as HTMLInputElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const intlEl = document.getElementById('intl-age') as HTMLSpanElement;
+  const yearEl = document.getElementById('year-age') as HTMLSpanElement;
+  const koreanEl = document.getElementById('korean-age') as HTMLSpanElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const value = birthInput.value;
+    if (!value) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a date of birth.';
+      return;
+    }
+
+    const [by, bm, bd] = value.split('-').map(Number);
+    const birth = new Date(by, bm - 1, bd);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (Number.isNaN(birth.getTime()) || birth > today) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid date of birth. (Future dates are not allowed)';
+      return;
+    }
+
+    const currentYear = today.getFullYear();
+
+    // 📋 법령 현황 추적: 프로젝트 루트 LEGAL_REFERENCES.md → "생활 > 만나이·D-Day
+    // 계산기". 만나이 기준(2023.6.28. 시행)이 바뀌면 그 문서도 함께 갱신하세요.
+
+    // International age: current year - birth year, minus 1 if birthday hasn't passed yet
+    let intlAge = currentYear - by;
+    const monthDay = today.getMonth() + 1 < bm || (today.getMonth() + 1 === bm && today.getDate() < bd);
+    if (monthDay) intlAge -= 1;
+
+    // Year age: current year - birth year
+    const yearAge = currentYear - by;
+
+    // Counting age: current year - birth year + 1
+    const koreanAge = currentYear - by + 1;
+
+    intlEl.textContent = String(intlAge);
+    yearEl.textContent = String(yearAge);
+    koreanEl.textContent = String(koreanAge);
+    result.classList.remove('hidden');
+  });
+</script>

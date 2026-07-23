@@ -1,0 +1,227 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'tdee-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your sex, age, height, weight, and activity level to calculate your
+    <strong>Basal Metabolic Rate (BMR)</strong> and <strong>daily maintenance calories
+    (TDEE)</strong>, plus target calories for weight loss or gain.
+  </p>
+
+  <form class="calc-form" id="tdee-form">
+    <fieldset class="method-toggle">
+      <legend>Sex</legend>
+      <label class="method-option">
+        <input type="radio" name="sex" value="남성" checked />
+        <span>Male</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="sex" value="여성" />
+        <span>Female</span>
+      </label>
+    </fieldset>
+
+    <label>
+      Age
+      <input type="number" id="age" name="age" min="0" step="1" placeholder="e.g. 30" required />
+    </label>
+
+    <label>
+      Height (cm)
+      <input
+        type="number"
+        id="heightCm"
+        name="heightCm"
+        min="0"
+        step="0.1"
+        placeholder="e.g. 175"
+        required
+      />
+    </label>
+
+    <label>
+      Weight (kg)
+      <input
+        type="number"
+        id="weightKg"
+        name="weightKg"
+        min="0"
+        step="0.1"
+        placeholder="e.g. 70"
+        required
+      />
+    </label>
+
+    <label>
+      Activity Level
+      <select id="activityLevel">
+        <option value="거의 안함">Sedentary (little to no exercise)</option>
+        <option value="가벼운 활동">Light activity (light exercise 1–3 days/week)</option>
+        <option value="보통 활동" selected>Moderate activity (moderate exercise 3–5 days/week)</option>
+        <option value="활발한 활동">Active (hard exercise 6–7 days/week)</option>
+        <option value="매우 활발함">Very active (very hard exercise or physical job)</option>
+      </select>
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Basal Metabolic Rate (BMR)</span>
+        <span class="value"><span id="bmr-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Maintenance Calories (TDEE)</span>
+        <span class="value"><span id="tdee-value">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calories by goal (daily intake)
+      </caption>
+      <tbody>
+        <tr>
+          <td>Weight loss <span class="hint">TDEE − 500 kcal</span></td>
+          <td id="row-cutting">-</td>
+        </tr>
+        <tr>
+          <td>Maintenance</td>
+          <td id="row-maintain">-</td>
+        </tr>
+        <tr>
+          <td>Weight gain <span class="hint">TDEE + 500 kcal</span></td>
+          <td id="row-bulking">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    This calculator uses the <strong>Mifflin-St Jeor formula</strong> to produce an estimate.
+    It does not account for body fat percentage, muscle mass, health conditions, or genetic
+    factors — actual caloric needs vary by individual. For weight loss or gain plans, consult a
+    medical or nutrition professional as needed.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>What is the difference between BMR and TDEE?</summary>
+      <p>
+        <strong>BMR (Basal Metabolic Rate)</strong> is the number of calories your body burns
+        at complete rest just to sustain basic life functions.
+        <strong>TDEE (Total Daily Energy Expenditure)</strong> adds the calories burned through
+        daily activities and exercise, giving you the total calories you actually burn in a day.
+        Eating at your TDEE will maintain your current weight.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does this calculator use the Mifflin-St Jeor formula?</summary>
+      <p>
+        Several formulas exist for estimating BMR (including Harris-Benedict and
+        Katch-McArdle), but the Mifflin-St Jeor formula has been shown across multiple studies
+        to produce the smallest deviation from measured values and is currently the most widely
+        recommended method.
+      </p>
+    </details>
+
+    <details>
+      <summary>How are the weight loss and gain targets determined?</summary>
+      <p>
+        It is generally accepted that gaining or losing 1 kg of body fat requires a caloric
+        surplus or deficit of approximately 7,700 kcal. A daily deficit or surplus of 500 kcal
+        therefore produces roughly 0.4–0.5 kg of change per week. These are statistical
+        averages and individual results will vary.
+      </p>
+    </details>
+
+    <details>
+      <summary>How do I choose the right activity level?</summary>
+      <p>
+        Consider both your exercise habits and the physical demands of your job. For example, a
+        desk worker who goes to the gym 3–4 times a week is typically "Moderate activity,"
+        while someone who sits all day and rarely exercises is closer to "Sedentary." Choosing
+        too high an activity level will overestimate your maintenance calories.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateTdee } from '../../../lib/tdeeCalculator';
+  import type { ActivityLevel, Sex } from '../../../lib/tdeeCalculator';
+
+  const form = document.getElementById('tdee-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const kcal = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+  const setKcal = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${kcal.format(value)} kcal`;
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const sex = (
+      form.querySelector('input[name="sex"]:checked') as HTMLInputElement
+    ).value as Sex;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const heightCm = Number(
+      (document.getElementById('heightCm') as HTMLInputElement).value,
+    );
+    const weightKg = Number(
+      (document.getElementById('weightKg') as HTMLInputElement).value,
+    );
+    const activityLevel = (document.getElementById('activityLevel') as HTMLSelectElement)
+      .value as ActivityLevel;
+
+    if (!age || age <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid age.';
+      return;
+    }
+    if (!heightCm || heightCm <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid height.';
+      return;
+    }
+    if (!weightKg || weightKg <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid weight.';
+      return;
+    }
+
+    const r = calculateTdee({ sex, age, heightCm, weightKg, activityLevel });
+
+    setKcal('bmr-value', r.bmr);
+    setKcal('tdee-value', r.tdee);
+    setKcal('row-cutting', r.cuttingCalories);
+    setKcal('row-maintain', r.tdee);
+    setKcal('row-bulking', r.bulkingCalories);
+
+    result.classList.remove('hidden');
+  });
+</script>

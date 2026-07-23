@@ -1,0 +1,386 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the loan principal, annual interest rate, and term to calculate monthly
+    payments, total interest, and total repayment amount — along with a full payment
+    schedule — for <strong>equal payments (principal + interest)</strong>,
+    <strong>equal principal</strong>, and
+    <strong>bullet repayment (interest-only until maturity)</strong> methods.
+  </p>
+
+  <form class="calc-form" id="loan-form">
+    <label>
+      Loan principal (KRW)
+      <input
+        type="number"
+        id="principal"
+        name="principal"
+        min="0"
+        step="1000000"
+        placeholder="Example: 100000000"
+        required
+      />
+      <span class="amount-preview" id="principal-preview" aria-live="polite"></span>
+    </label>
+    <label>
+      Annual interest rate (%)
+      <span class="hint">Up to two decimal places. Example: 4.55</span>
+      <input
+        type="number"
+        id="annualRate"
+        name="annualRate"
+        min="0"
+        step="0.01"
+        placeholder="Example: 4.55"
+        required
+      />
+    </label>
+    <label>
+      Loan term (months)
+      <span class="hint">Enter in months. Example: 5 years = 60 months</span>
+      <input
+        type="number"
+        id="months"
+        name="months"
+        min="1"
+        step="1"
+        placeholder="Example: 60"
+        required
+      />
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>Repayment method</legend>
+      <label class="method-option">
+        <input type="radio" name="method" value="원리금균등" checked />
+        <span>Equal payments (principal + interest)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="method" value="원금균등" />
+        <span>Equal principal</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="method" value="만기일시상환" />
+        <span>Bullet repayment (interest-only until maturity)</span>
+      </label>
+    </fieldset>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label" id="monthly-label">Monthly payment</span>
+        <span class="value"><span id="monthly-payment">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Total interest</span>
+        <span class="value"><span id="total-interest">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Total repayment</span>
+        <span class="value"><span id="total-payment">-</span></span>
+      </div>
+    </div>
+
+    <p class="note" id="maturity-note" style="display:none;"></p>
+
+    <div class="schedule-scroll">
+      <table class="breakdown schedule">
+        <caption class="note" style="text-align:left;margin-bottom:6px;">
+          Payment schedule by installment
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Month</th>
+            <th scope="col">Principal</th>
+            <th scope="col">Interest</th>
+            <th scope="col">Payment</th>
+            <th scope="col">Balance</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-body">
+          <!-- rows injected by client script -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. Actual loan products may differ
+    in fee structure (e.g. prepayment penalties), variable interest rates, interest
+    calculation methods, and rounding rules, so actual repayment amounts may vary.
+    Confirm the exact terms with your financial institution.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently asked questions</h2>
+
+    <details>
+      <summary>What is the difference between equal payments and equal principal?</summary>
+      <p>
+        With equal payments, the total monthly amount (principal + interest) stays the same
+        throughout the loan. With equal principal, the <strong>principal portion</strong>
+        paid each month is fixed, while the interest decreases as the remaining balance
+        falls — so the monthly payment gradually decreases.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is bullet repayment?</summary>
+      <p>
+        You pay <strong>interest only</strong> every month throughout the loan term, then
+        repay the full principal in a lump sum at maturity. Monthly payments are the lowest
+        of the three methods, but since the principal never decreases, interest accrues at
+        the same rate throughout — making the <strong>total interest the highest</strong>
+        of the three. This method is common for overdraft accounts and some personal or
+        lease-deposit loans.
+      </p>
+    </details>
+
+    <details>
+      <summary>Which method results in the least total interest?</summary>
+      <p>
+        Total interest from lowest to highest is generally:
+        <strong>equal principal &lt; equal payments &lt; bullet repayment</strong>. Equal
+        principal pays down the balance fastest, so interest accumulates the least. Bullet
+        repayment keeps the full principal outstanding until the very end, so interest
+        accumulates the most.
+      </p>
+    </details>
+
+    <details>
+      <summary>How does the initial repayment burden compare across methods?</summary>
+      <p>
+        Equal principal has the largest first-month payment, which then decreases
+        gradually — making the initial burden relatively heavy. Equal payments keep the
+        monthly amount constant, easing cash-flow planning. If you have strong early cash
+        flow, equal principal may be advantageous; if you prefer a predictable fixed
+        amount, equal payments are easier to manage.
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens to interest if I repay early?</summary>
+      <p>
+        Interest accrues on the outstanding balance, so reducing it through early repayment
+        lowers future interest costs. However, some products charge a
+        <strong>prepayment penalty</strong>, so the actual savings depend on the contract
+        terms. This calculator does not account for early repayment.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  /* is:global is required here: the repayment schedule's <td> rows are
+     created at runtime via document.createElement (see the script below),
+     and Astro's scoped-style attribute ([data-astro-cid-*]) is only
+     applied to elements written in this file's static template — never to
+     elements created dynamically in client JS. A scoped `table.schedule
+     td {...}` rule would silently never match those rows and fall back to
+     the global `.breakdown` rule's `text-align: left`, which is exactly
+     the "misaligned schedule table" bug this fixes. */
+  .schedule-scroll {
+    max-height: 360px;
+    overflow-y: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table.schedule {
+    margin-top: 0;
+    font-size: 0.9rem;
+  }
+  table.schedule caption {
+    padding: 8px 8px 0;
+  }
+  table.schedule th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-soft);
+    z-index: 1;
+  }
+  /* This table also carries the "breakdown" class for its base width/
+     border/padding styles. Qualifying with both classes keeps this rule
+     more specific than `table.breakdown th/td`, regardless of source
+     order, so alignment doesn't silently flip back to the left. */
+  table.breakdown.schedule td,
+  table.breakdown.schedule th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  table.breakdown.schedule td:first-child,
+  table.breakdown.schedule th:first-child {
+    text-align: center;
+  }
+</style>
+
+<script>
+  import { calculateLoan } from '../../../lib/loanCalculator';
+  import type { LoanMethod } from '../../../lib/loanCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('loan-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const monthlyLabel = document.getElementById('monthly-label') as HTMLSpanElement;
+
+  // Update the principal preview as the user types.
+  const principalInput = document.getElementById('principal') as HTMLInputElement;
+  const principalPreview = document.getElementById('principal-preview') as HTMLSpanElement;
+  principalInput.addEventListener('input', () => {
+    const value = Number(principalInput.value);
+    principalPreview.textContent = value > 0 ? formatWonEn(value) : '';
+  });
+
+  // Annual interest rate is limited to two decimal places.
+  const annualRateInput = document.getElementById('annualRate') as HTMLInputElement;
+  const validateAnnualRate = () => {
+    const decimals = annualRateInput.value.split('.')[1]?.length ?? 0;
+    annualRateInput.setCustomValidity(
+      decimals > 2 ? 'Annual interest rate may have at most two decimal places.' : '',
+    );
+  };
+  annualRateInput.addEventListener('input', validateAnnualRate);
+
+  const scheduleBody = document.getElementById('schedule-body') as HTMLTableSectionElement;
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  const setText = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  const recalculate = () => {
+    errorMsg.textContent = '';
+
+    const principal = Number(
+      (document.getElementById('principal') as HTMLInputElement).value,
+    );
+    const annualRatePercent = Number(
+      (document.getElementById('annualRate') as HTMLInputElement).value,
+    );
+    const months = Number(
+      (document.getElementById('months') as HTMLInputElement).value,
+    );
+    const method = (
+      form.querySelector('input[name="method"]:checked') as HTMLInputElement
+    ).value as LoanMethod;
+
+    if (!principal || principal <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid loan principal.';
+      return;
+    }
+    if (!Number.isFinite(annualRatePercent) || annualRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid annual interest rate.';
+      return;
+    }
+    if (!annualRateInput.checkValidity()) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Annual interest rate may have at most two decimal places.';
+      return;
+    }
+    if (!months || months < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid loan term in months.';
+      return;
+    }
+
+    const r = calculateLoan({ principal, annualRatePercent, months, method });
+
+    const maturityNote = document.getElementById('maturity-note') as HTMLParagraphElement;
+    maturityNote.style.display = 'none';
+
+    if (method === '원리금균등' && r.monthlyPayment !== undefined) {
+      monthlyLabel.textContent = 'Monthly payment';
+      setText('monthly-payment', r.monthlyPayment);
+    } else if (method === '만기일시상환' && r.monthlyPayment !== undefined) {
+      // Bullet repayment: interest only each month, then principal in the final month.
+      monthlyLabel.textContent = 'Monthly interest';
+      setText('monthly-payment', r.monthlyPayment);
+
+      const lastRow = r.schedule[r.schedule.length - 1];
+      maturityNote.textContent = `※ In the final installment (month ${lastRow.month}), you repay principal ${won.format(
+        Math.round(lastRow.principalPortion),
+      )} + interest ${won.format(Math.round(lastRow.interestPortion))} = total ${won.format(
+        Math.round(lastRow.payment),
+      )} in a lump sum.`;
+      maturityNote.style.display = '';
+    } else {
+      // Equal principal: largest in the first month, smallest in the last — show as a range.
+      const first = r.schedule[0].payment;
+      const last = r.schedule[r.schedule.length - 1].payment;
+      monthlyLabel.textContent = 'Payment (first – last month)';
+      const el = document.getElementById('monthly-payment');
+      if (el) {
+        el.textContent = `${won.format(Math.round(first))} – ${won.format(
+          Math.round(last),
+        )}`;
+      }
+    }
+
+    setText('total-interest', r.totalInterest);
+    setText('total-payment', r.totalPayment);
+
+    scheduleBody.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (const row of r.schedule) {
+      const tr = document.createElement('tr');
+      const cells = [
+        String(row.month),
+        won.format(Math.round(row.principalPortion)),
+        won.format(Math.round(row.interestPortion)),
+        won.format(Math.round(row.payment)),
+        won.format(Math.round(row.remainingBalance)),
+      ];
+      for (const text of cells) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        tr.appendChild(td);
+      }
+      fragment.appendChild(tr);
+    }
+    scheduleBody.appendChild(fragment);
+
+    result.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalculate();
+  });
+
+  // Recalculate immediately when the repayment method changes (if results are already shown).
+  form.querySelectorAll('input[name="method"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!result.classList.contains('hidden')) recalculate();
+    });
+  });
+</script>

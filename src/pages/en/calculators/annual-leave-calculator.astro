@@ -1,0 +1,202 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'annual-leave-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your hire date to calculate the number of <strong>annual leave days</strong>
+    accrued to date. Add your daily ordinary wage to also estimate your
+    <strong>annual leave pay</strong>.
+  </p>
+
+  <form class="calc-form" id="leave-form">
+    <label>
+      Hire date
+      <input type="date" id="hireDate" name="hireDate" required />
+    </label>
+
+    <label>
+      Reference date
+      <span class="hint">The date to check leave accrual as of. Defaults to today.</span>
+      <input type="date" id="asOfDate" name="asOfDate" required />
+    </label>
+
+    <label>
+      Daily ordinary wage (KRW)
+      <span class="hint">Optional. Used to calculate annual leave pay. Example: 100000</span>
+      <input
+        type="number"
+        id="dailyWage"
+        name="dailyWage"
+        min="0"
+        step="1000"
+        placeholder="Example: 100000"
+      />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="first-year-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Accrued leave</span>
+        <span class="value"><span id="total-days">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Tenure</span>
+        <span class="value"><span id="tenure">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown hidden" id="pay-table">
+      <tbody>
+        <tr>
+          <td>Annual leave pay <span class="hint">(accrued days × daily ordinary wage)</span></td>
+          <td id="row-pay">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    This result assumes <strong>full attendance each month (under 1 year) or at least
+    80% attendance in the prior year (1 year or more)</strong>. Actual accrued days may
+    differ due to absences. Companies that grant annual leave on a fiscal-year basis
+    (1 January each year) rather than by hire date use a different calculation method.
+    Confirm your exact entitlement against your company's HR policy and attendance records.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently asked questions</h2>
+
+    <details>
+      <summary>When does annual leave accrue, and how many days at a time?</summary>
+      <p>
+        During the <strong>first year</strong> of employment, 1 day accrues for each month
+        of full attendance, up to a maximum of 11 days. Once you have completed
+        <strong>1 full year</strong>, you receive <strong>15 days</strong> at once,
+        provided you attended at least 80% of working days in the prior year.
+      </p>
+    </details>
+
+    <details>
+      <summary>How are bonus leave days calculated?</summary>
+      <p>
+        After <strong>3 years</strong> of continuous service, 1 extra day is added to the
+        15-day base for every 2 additional years beyond the first. For example: 5 years =
+        15 + 2 = 17 days; 7 years = 15 + 3 = 18 days. Total annual leave including bonus
+        days is capped at <strong>25 days</strong>.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is annual leave pay calculated?</summary>
+      <p>
+        Unused leave days × <strong>daily ordinary wage</strong>. The daily ordinary wage
+        is typically calculated as (monthly ordinary wage ÷ 209 hours) × 8 hours, based on
+        the terms of the employment contract, and may vary between companies.
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens to unused leave when I resign?</summary>
+      <p>
+        Any unused annual leave at the time of resignation must be paid out as
+        <strong>annual leave pay (unused leave compensation)</strong>. Use this calculator
+        to check your current accrued days, then combine it with the
+        <a href="/en/calculators/severance-calculator">severance pay calculator</a>.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateAnnualLeave } from '../../../lib/annualLeaveCalculator';
+
+  const form = document.getElementById('leave-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  // Default reference date is today.
+  const asOfDateInput = document.getElementById('asOfDate') as HTMLInputElement;
+  const today = new Date();
+  asOfDateInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+    today.getDate(),
+  ).padStart(2, '0')}`;
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const hireDate = (document.getElementById('hireDate') as HTMLInputElement).value;
+    const asOfDate = asOfDateInput.value;
+    const dailyWage = Number(
+      (document.getElementById('dailyWage') as HTMLInputElement).value,
+    );
+
+    if (!hireDate || !asOfDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter both hire date and reference date.';
+      return;
+    }
+    if (hireDate > asOfDate) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Hire date cannot be later than the reference date.';
+      return;
+    }
+
+    const r = calculateAnnualLeave({
+      hireDate,
+      asOfDate,
+      dailyWage: Number.isFinite(dailyWage) && dailyWage > 0 ? dailyWage : undefined,
+    });
+
+    (document.getElementById('total-days') as HTMLElement).textContent = `${r.totalDays} days`;
+    (document.getElementById('tenure') as HTMLElement).textContent = r.isFirstYear
+      ? `${r.totalMonths} months`
+      : `${r.years} years ${r.totalMonths % 12} months`;
+
+    const firstYearNote = document.getElementById(
+      'first-year-note',
+    ) as HTMLParagraphElement;
+    firstYearNote.textContent = r.isFirstYear
+      ? '※ Less than 1 year of tenure — calculated at 1 day per month, assuming full attendance each month.'
+      : r.bonusDays > 0
+        ? `※ Includes the base 15 days + ${r.bonusDays} bonus day${r.bonusDays !== 1 ? 's' : ''}.`
+        : '';
+
+    const payTable = document.getElementById('pay-table') as HTMLTableElement;
+    if (r.annualLeavePay !== undefined) {
+      (document.getElementById('row-pay') as HTMLElement).textContent = won.format(
+        Math.round(r.annualLeavePay),
+      );
+      payTable.classList.remove('hidden');
+    } else {
+      payTable.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

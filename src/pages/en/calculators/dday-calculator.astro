@@ -1,0 +1,190 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'dday-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter a target date to calculate the <strong>D-day</strong> (days remaining or days elapsed)
+    from today. Find out how many days are left until an exam, anniversary, or any date that
+    matters to you.
+  </p>
+
+  <form class="calc-form" id="dday-form">
+    <label>
+      Target date
+      <input type="date" id="target-date" name="target-date" required />
+    </label>
+    <label>
+      Label / title (optional)
+      <span class="hint">e.g. Exam day, Wedding anniversary. Shown in the result sentence.</span>
+      <input
+        type="text"
+        id="dday-label"
+        name="dday-label"
+        maxlength="40"
+        placeholder="e.g. Exam day"
+      />
+    </label>
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">D-day</span>
+        <span class="value" id="dday-value">-</span>
+      </div>
+      <div class="result-item">
+        <span class="label">Target date</span>
+        <span class="value" id="target-formatted">-</span>
+      </div>
+    </div>
+    <p class="dday-sentence" id="dday-sentence"></p>
+  </div>
+
+  <div class="note">
+    This calculation uses your browser's <strong>local date (midnight boundary)</strong>.
+    Results may shift by one day around midnight or when viewed from a different time zone.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why is the target day itself shown as D-DAY instead of D-0?</summary>
+      <p>
+        In Korean D-day notation, the target date itself is not treated as a zero point but
+        as the day that has "arrived" — hence <strong>D-DAY</strong>. The day before is D-1,
+        two days before is D-2, and so on. When the remaining count reaches zero, the target
+        day is written as D-DAY rather than D-0 by convention.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the difference between D-1 and D+1?</summary>
+      <p>
+        <strong>D-1</strong> means the target date is <strong>tomorrow</strong> — one day
+        <em>remaining</em>. Conversely, <strong>D+1</strong> means the target date was
+        <strong>yesterday</strong> — one day has <em>passed</em>. The minus sign (−) indicates
+        days remaining; the plus sign (+) indicates days elapsed.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is D-day used in Korea?</summary>
+      <p>
+        It is widely used to count down to significant events such as the CSAT (College
+        Scholastic Ability Test), other exams, weddings, military enlistment or discharge, and
+        birthdays or anniversaries. "CSAT D-100" marks a countdown to the target; after the
+        event passes, it switches to elapsed notation like "Wedding D+365."
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens if I enter a past date?</summary>
+      <p>
+        If the target date has already passed, the result is shown in <strong>D+</strong> form
+        reflecting the number of days elapsed. For example, entering a date 50 days ago gives
+        D+50. This is useful for checking how many days have passed since an anniversary or
+        milestone.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateDday } from '../../../lib/ddayCalculator';
+
+  const WEEKDAYS_EN: Record<string, string> = {
+    '일': 'Sunday',
+    '월': 'Monday',
+    '화': 'Tuesday',
+    '수': 'Wednesday',
+    '목': 'Thursday',
+    '금': 'Friday',
+    '토': 'Saturday',
+  };
+
+  const MONTHS_EN = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  const form = document.getElementById('dday-form') as HTMLFormElement;
+  const targetInput = document.getElementById('target-date') as HTMLInputElement;
+  const labelInput = document.getElementById('dday-label') as HTMLInputElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const ddayValue = document.getElementById('dday-value') as HTMLSpanElement;
+  const targetFormatted = document.getElementById('target-formatted') as HTMLSpanElement;
+  const sentence = document.getElementById('dday-sentence') as HTMLParagraphElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const value = targetInput.value;
+    if (!value) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a target date.';
+      return;
+    }
+
+    let r;
+    try {
+      r = calculateDday(value);
+    } catch {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid date.';
+      return;
+    }
+
+    const [ty, tm, td] = value.split('-').map(Number);
+    const dayName = WEEKDAYS_EN[r.weekday] ?? r.weekday;
+    const formatted = `${MONTHS_EN[tm - 1]} ${td}, ${ty} (${dayName})`;
+
+    ddayValue.textContent = r.label;
+    targetFormatted.textContent = formatted;
+
+    const label = labelInput.value.trim();
+    if (r.diffDays > 0) {
+      sentence.textContent = label
+        ? `${r.label} until ${label}`
+        : `${r.label} until the target date`;
+    } else if (r.diffDays === 0) {
+      sentence.textContent = label
+        ? `Today is ${label} — ${r.label}!`
+        : `Today is ${r.label}!`;
+    } else {
+      sentence.textContent = label
+        ? `${r.label} since ${label}`
+        : `${r.label} since the target date`;
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>
+
+<style>
+  .dday-sentence {
+    margin-top: 16px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text);
+  }
+</style>

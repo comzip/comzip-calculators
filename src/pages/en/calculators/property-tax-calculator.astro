@@ -1,0 +1,761 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'property-tax-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Homeowners pay <strong>property tax (local tax)</strong> every year, and when the total
+    announced value of all homes held by an individual exceeds a certain threshold, a
+    <strong>Comprehensive Real Estate Holding Tax (national tax)</strong> is also levied.
+    Enter the announced value below to estimate both taxes.
+  </p>
+
+  <!-- ============================================================
+       Part A — Property Tax (principal + local education tax + urban area surcharge)
+       ============================================================ -->
+  <section class="tax-part tax-part-local">
+  <h2>1. Property Tax Calculation <span class="scope-tag scope-local">Local Tax · Per Property</span></h2>
+  <p class="note">
+    Calculates property tax for a single property. Select the tax subject type to see the
+    relevant input fields.
+  </p>
+
+  <form class="calc-form" id="property-form">
+    <fieldset class="method-toggle">
+      <legend>Tax Subject</legend>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="주택" checked />
+        <span>House</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="토지" />
+        <span>Land</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="assetType" value="건축물" />
+        <span>Building</span>
+      </label>
+    </fieldset>
+
+    <label>
+      <span id="base-value-label">Announced Value (KRW)</span>
+      <span class="hint" id="base-value-hint">
+        For houses: official announced value. For land/buildings: standard market value. e.g. 500000000
+      </span>
+      <input
+        type="number"
+        id="baseValue"
+        name="baseValue"
+        min="0"
+        step="1000000"
+        placeholder="e.g. 500000000"
+        required
+      />
+      <span class="amount-preview" id="baseValue-preview" aria-live="polite"></span>
+    </label>
+
+    <!-- House-only options -->
+    <label class="check-row" id="house-options">
+      <input type="checkbox" id="singleHouseholdSpecial" />
+      <span>This is a one-household, one-home property (special tax rate applies for standard market value ≤ ₩900,000,000)</span>
+    </label>
+
+    <!-- Land-only options -->
+    <label id="land-options" class="hidden">
+      Land Classification
+      <select id="landType">
+        <option value="종합합산">General aggregate taxation</option>
+        <option value="별도합산">Separate aggregate taxation</option>
+        <option value="분리과세">Separately taxed (farmland, forest, etc.)</option>
+      </select>
+    </label>
+
+    <!-- Building-only options -->
+    <label id="building-options" class="hidden">
+      Building Use
+      <select id="buildingType">
+        <option value="기타">Other (general buildings — most cases)</option>
+        <option value="골프장·고급오락장">Golf course / luxury entertainment facility</option>
+        <option value="특정지역공장">Factory in a designated area</option>
+      </select>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="urbanArea" />
+      <span>Located in an urban area (urban area surcharge applies)</span>
+    </label>
+
+    <button class="btn" type="submit">Calculate Property Tax</button>
+  </form>
+
+  <p class="note" id="property-error" role="alert"></p>
+
+  <div class="result-box hidden" id="property-result" aria-live="polite">
+    <p class="note" id="special-fallback-note" style="margin-top:0;"></p>
+    <button class="btn-link hidden" id="copy-to-comprehensive" type="button">
+      ↓ Calculate Comprehensive Real Estate Holding Tax below using this value
+    </button>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Property Tax Breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Tax Base <span class="hint" id="fmv-detail"></span></td>
+          <td id="pt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>Property Tax (principal)</td>
+          <td id="pt-property">-</td>
+        </tr>
+        <tr>
+          <td>Local Education Tax (20% of principal)</td>
+          <td id="pt-education">-</td>
+        </tr>
+        <tr id="pt-urban-row">
+          <td>Urban Area Surcharge (0.14% of tax base)</td>
+          <td id="pt-urban">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total</td>
+          <td id="pt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  </section>
+
+  <!-- ============================================================
+       Part B — Comprehensive Real Estate Holding Tax (housing)
+       ============================================================ -->
+  <section class="tax-part tax-part-national">
+  <h2>2. Comprehensive Real Estate Holding Tax Calculation (Housing) <span class="scope-tag scope-national">National Tax · Aggregate Housing</span></h2>
+  <p class="note">
+    A national tax levied on the portion exceeding the deduction amount when the <strong>total
+    announced value of all homes held by an individual</strong> surpasses the threshold.
+    Calculated separately from the property tax above.
+  </p>
+
+  <form class="calc-form" id="comprehensive-form">
+    <label>
+      Total Announced Value of All Homes Held (KRW)
+      <span class="hint">Sum of announced values for all homes you own. e.g. 1500000000</span>
+      <input
+        type="number"
+        id="totalPublicPrice"
+        name="totalPublicPrice"
+        min="0"
+        step="1000000"
+        placeholder="e.g. 1500000000"
+        required
+      />
+      <span class="amount-preview" id="totalPublicPrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Number of Homes
+      <select id="houseCount">
+        <option value="1주택">1 home (1 household, 1 home)</option>
+        <option value="2주택">2 homes</option>
+        <option value="3주택이상">3+ homes</option>
+      </select>
+    </label>
+
+    <!-- Age/holding-period credit inputs — only for 1-household 1-home owners -->
+    <div id="senior-longterm-options">
+      <label>
+        Age (years) <span class="hint">(optional, for elderly tax credit — 1 household, 1 home only)</span>
+        <input type="number" id="age" name="age" min="0" step="1" placeholder="e.g. 68" />
+      </label>
+      <label>
+        Holding Period (years) <span class="hint">(optional, for long-term holding credit — 1 household, 1 home only)</span>
+        <input
+          type="number"
+          id="holdingYears"
+          name="holdingYears"
+          min="0"
+          step="1"
+          placeholder="e.g. 12"
+        />
+      </label>
+    </div>
+
+    <button class="btn" type="submit">Calculate Comprehensive Real Estate Holding Tax</button>
+  </form>
+
+  <p class="note" id="comprehensive-error" role="alert"></p>
+
+  <div class="result-box hidden" id="comprehensive-result" aria-live="polite">
+    <p class="note" id="credit-linked-note" style="margin-top:0;"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Comprehensive Real Estate Holding Tax Breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Deduction</td>
+          <td id="ct-deduction">-</td>
+        </tr>
+        <tr>
+          <td>Tax Base <span class="hint">(total announced value − deduction) × 60%</span></td>
+          <td id="ct-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>Calculated Comprehensive Real Estate Holding Tax</td>
+          <td id="ct-tax">-</td>
+        </tr>
+        <tr id="ct-credit-row" class="hidden">
+          <td>Property Tax Credit <span class="hint">(double taxation adjustment, approximate)</span></td>
+          <td id="ct-credit">-</td>
+        </tr>
+        <tr id="ct-senior-row" class="hidden">
+          <td>
+            Elderly / Long-term Holding Tax Credit <span class="hint" id="ct-senior-rate-hint"></span>
+          </td>
+          <td id="ct-senior">-</td>
+        </tr>
+        <tr id="ct-final-row" class="hidden">
+          <td>Final Comprehensive Real Estate Holding Tax</td>
+          <td id="ct-final">-</td>
+        </tr>
+        <tr>
+          <td>Special Rural Development Tax <span class="hint" id="ct-rural-hint">(20% of calculated tax)</span></td>
+          <td id="ct-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>Comprehensive Tax + Special Rural Tax Total</td>
+          <td id="ct-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>The following items are not reflected in this calculator or are approximations.</strong>
+      The actual assessed tax may be <strong>lower than this estimate.</strong>
+      <ul>
+        <li>
+          <strong>Elderly / long-term holding tax credit</strong> — reflected only when
+          "Number of Homes" is set to "1 home" and age and holding period are entered.
+          The approximation adds: 20% (age 60+), 30% (age 65+), 40% (age 70+) for the
+          elderly credit, and 20% (5+ years), 40% (10+ years), 50% (15+ years) for the
+          long-term holding credit, up to a combined maximum of 80%. Detailed eligibility
+          conditions such as household composition are not verified.
+        </li>
+        <li>
+          <strong>Property tax credit (double taxation adjustment)</strong> — reflected
+          approximately only when the same home was calculated in Section 1 above and
+          the "Calculate Comprehensive Real Estate Holding Tax below" button was used to carry
+          the value over (the relevant row will appear in the table above). If the value
+          was entered manually, or if multiple homes were aggregated, it is not reflected
+          — because the actual statutory calculation involves a multi-step apportionment
+          per property that is difficult to reproduce accurately for multi-home cases.
+        </li>
+        <li>
+          <strong>Tax burden ceiling</strong> — limits sharp year-on-year tax increases.
+          (This calculator does not reflect it. For reference, the comprehensive real estate
+          tax ceiling of 150% has been confirmed, but the property tax ceiling for housing
+          is unclear following recent amendments and could not be definitively established.)
+        </li>
+      </ul>
+      In particular, <strong>long-term owners of a single household home</strong> may find
+      a very large difference between this estimate and the actual assessed amount.
+    </div>
+  </div>
+  </section>
+
+  <div class="disclaimer">
+    This calculation is a <strong>simplified estimate</strong>. Actual property tax and
+    comprehensive real estate tax amounts vary based on enforcement ordinances, various
+    tax credits, tax burden ceilings, and other factors. The fair market value ratio, tax
+    rates, and deduction amounts are subject to change through legislative amendments.
+    For the actual tax amount, refer to the guidance from the relevant local government
+    (property tax) and the National Tax Service's Hometax system (comprehensive real
+    estate tax).
+  </div>
+
+  <section class="law-refs">
+    <h2>Statutory References</h2>
+    <ul>
+      <li>
+        Basis: <strong>Korea's Local Tax Act</strong>, Articles 110 (tax base), 111 &amp; 111-2
+        (tax rates), 112 (urban area surcharge), 151 (local education tax) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Comprehensive Real Estate Holding Tax Act</strong>, Articles 7–9
+        (tax base and rates for housing) —
+        <a
+          href="https://www.law.go.kr/법령/종합부동산세법"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Special Rural Development Tax Act</strong>, Article 5 (20% of
+        comprehensive real estate tax) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EB%86%8D%EC%96%B4%EC%B4%8C%ED%8A%B9%EB%B3%84%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>What is the announced value and where can I check it?</summary>
+      <p>
+        The announced value (공시가격) is the reference price the government surveys,
+        calculates, and publishes annually for each property. It serves as the basis for
+        property tax and comprehensive real estate tax. It differs from the actual market
+        transaction price and is typically lower than market value. You can look up the
+        announced value of your property by address on the <strong>Real Estate Announced
+        Price Notification System (부동산공시가격 알리미)</strong>.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the difference between property tax and comprehensive real estate tax?</summary>
+      <p>
+        <strong>Property tax</strong> is a <strong>local tax</strong> levied by the local
+        government on anyone who owns real estate, assessed annually. For housing, it is
+        typically billed in two halves — in July and September. <strong>Comprehensive real
+        estate tax</strong> is a <strong>national tax</strong> levied on the portion of an
+        individual's total housing announced value that exceeds the deduction threshold
+        (₩1.2 billion for a one-household, one-home owner; ₩900 million otherwise). It is
+        assessed annually in December by the National Tax Service. In short, property tax
+        applies to all real estate owners, while comprehensive real estate tax is an
+        additional levy on those holding high-value or multiple properties.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why might this calculator's result differ from my actual tax bill?</summary>
+      <p>
+        The comprehensive real estate tax <strong>property tax credit (double taxation
+        adjustment)</strong> and <strong>elderly / long-term holding credit</strong> are
+        reflected approximately when conditions are met (one-household one-home, relevant
+        data entered), but the <strong>tax burden ceiling</strong> is not reflected.
+        This calculator also covers only the basic calculation flow using rate schedules and
+        the fair market value ratio, without verifying detailed eligibility conditions such
+        as household member count. The fair market value ratio, tax rates, and deduction
+        amounts can change annually through amendments to enforcement decrees — always
+        confirm the exact amount through your local government or Hometax notice.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the one-household, one-home special treatment?</summary>
+      <p>
+        This is a scheme that reduces the tax burden for a household owning only one home
+        in Korea. For property tax, a lower <strong>fair market value ratio (43–45%)</strong>
+        applies regardless of the property's value, and for properties with a standard market
+        value of ₩900 million or less, a further reduced <strong>special tax rate
+        (0.05–0.35%)</strong> also applies (the portion above ₩900 million is calculated
+        at the standard rate). For comprehensive real estate tax, the deduction threshold
+        rises from ₩900 million to <strong>₩1.2 billion</strong>, and the elderly /
+        long-term holding credit is also available only in this case.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+
+  /* Visually distinguish the two tax sections with a left border and badge. */
+  .tax-part {
+    padding-left: 16px;
+    margin: 8px 0;
+  }
+  .tax-part-local {
+    border-left: 4px solid var(--accent);
+  }
+  .tax-part-national {
+    border-left: 4px solid #4f46e5;
+    margin-top: 36px;
+  }
+  .tax-part h2 {
+    margin-top: 0;
+  }
+  .scope-tag {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .scope-local {
+    background: #ccfbf1;
+    color: var(--accent-dark);
+  }
+  .scope-national {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
+  #senior-longterm-options {
+    display: grid;
+    gap: 16px;
+  }
+  .btn-link {
+    display: inline-block;
+    margin-top: 12px;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-dark);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .btn-link:hover {
+    color: var(--accent);
+  }
+</style>
+
+<script>
+  import {
+    calculatePropertyTax,
+    calculateComprehensiveTax,
+  } from '../../../lib/propertyTaxCalculator';
+  import type {
+    PropertyAssetType,
+    LandType,
+    BuildingType,
+    HouseCount,
+    PropertyTaxResult,
+  } from '../../../lib/propertyTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  // Stores data from a single home calculated in Section 1 that was carried
+  // over via the button, used for the property tax credit approximation.
+  // Cleared if the user manually edits the comprehensive tax inputs.
+  let linkedPropertyTax: {
+    propertyTaxPaid: number;
+    fairMarketRatio: number;
+    topMarginalRate: number;
+  } | null = null;
+  // Most recent Section 1 result (housing only). Used to populate
+  // linkedPropertyTax when the carry-over button is clicked.
+  let lastPropertyResult: PropertyTaxResult | null = null;
+
+  // Live preview of large monetary inputs in plain KRW notation.
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('baseValue', 'baseValue-preview');
+  bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  // -------------------- Part A: Property Tax --------------------
+  const propertyForm = document.getElementById('property-form') as HTMLFormElement;
+  const propertyResult = document.getElementById('property-result') as HTMLDivElement;
+  const propertyError = document.getElementById('property-error') as HTMLParagraphElement;
+
+  const baseValueLabel = document.getElementById('base-value-label') as HTMLSpanElement;
+  const houseOptions = document.getElementById('house-options') as HTMLLabelElement;
+  const landOptions = document.getElementById('land-options') as HTMLLabelElement;
+  const buildingOptions = document.getElementById('building-options') as HTMLLabelElement;
+
+  const currentAssetType = (): PropertyAssetType =>
+    (propertyForm.querySelector('input[name="assetType"]:checked') as HTMLInputElement)
+      .value as PropertyAssetType;
+
+  // Show only the inputs relevant to the selected tax subject type.
+  const syncAssetType = () => {
+    const type = currentAssetType();
+    houseOptions.classList.toggle('hidden', type !== '주택');
+    landOptions.classList.toggle('hidden', type !== '토지');
+    buildingOptions.classList.toggle('hidden', type !== '건축물');
+    baseValueLabel.textContent =
+      type === '주택' ? 'Announced Value (KRW)' : 'Standard Market Value (KRW)';
+  };
+
+  propertyForm.querySelectorAll('input[name="assetType"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      syncAssetType();
+      if (!propertyResult.classList.contains('hidden')) recalcProperty();
+    });
+  });
+  syncAssetType();
+
+  const recalcProperty = () => {
+    propertyError.textContent = '';
+
+    const baseValue = Number(
+      (document.getElementById('baseValue') as HTMLInputElement).value,
+    );
+    if (!baseValue || baseValue <= 0) {
+      propertyResult.classList.add('hidden');
+      propertyError.textContent = 'Please enter a valid announced value (or standard market value).';
+      return;
+    }
+
+    const assetType = currentAssetType();
+    const result = calculatePropertyTax({
+      assetType,
+      baseValue,
+      singleHouseholdSpecial: (
+        document.getElementById('singleHouseholdSpecial') as HTMLInputElement
+      ).checked,
+      landType: (document.getElementById('landType') as HTMLSelectElement)
+        .value as LandType,
+      buildingType: (document.getElementById('buildingType') as HTMLSelectElement)
+        .value as BuildingType,
+      urbanArea: (document.getElementById('urbanArea') as HTMLInputElement).checked,
+    });
+
+    (document.getElementById('fmv-detail') as HTMLSpanElement).textContent =
+      `(Fair Market Value Ratio: ${pct(result.fairMarketRatio)})`;
+    setWon('pt-taxbase', result.taxBase);
+    setWon('pt-property', result.propertyTax);
+    setWon('pt-education', result.localEducationTax);
+    setWon('pt-total', result.total);
+
+    // Show the urban area surcharge row only when it applies.
+    const urbanRow = document.getElementById('pt-urban-row') as HTMLTableRowElement;
+    if (result.urbanAreaTax > 0) {
+      urbanRow.classList.remove('hidden');
+      setWon('pt-urban', result.urbanAreaTax);
+    } else {
+      urbanRow.classList.add('hidden');
+    }
+
+    const fallbackNote = document.getElementById(
+      'special-fallback-note',
+    ) as HTMLParagraphElement;
+    fallbackNote.textContent = result.specialRateNotApplied
+      ? '※ The announced value exceeds ₩900,000,000, so the one-household one-home special tax rate does not apply; the standard rate is used instead. (The fair market value ratio special allowance of 43–45% still applies regardless of price.)'
+      : '';
+
+    // Show the carry-over button only when the calculation is for a house.
+    copyToComprehensiveBtn.classList.toggle('hidden', assetType !== '주택');
+    lastPropertyResult = assetType === '주택' ? result : null;
+
+    propertyResult.classList.remove('hidden');
+  };
+
+  propertyForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalcProperty();
+  });
+
+  // Carry the announced value from Section 1 to the comprehensive tax form
+  // and immediately run the comprehensive tax calculation.
+  const copyToComprehensiveBtn = document.getElementById(
+    'copy-to-comprehensive',
+  ) as HTMLButtonElement;
+  copyToComprehensiveBtn.addEventListener('click', () => {
+    const baseValueInput = document.getElementById('baseValue') as HTMLInputElement;
+    const totalPublicPriceInput = document.getElementById(
+      'totalPublicPrice',
+    ) as HTMLInputElement;
+    totalPublicPriceInput.value = baseValueInput.value;
+    // The input event fires the "unlink on manual edit" listener first,
+    // so linkedPropertyTax must be set AFTER this dispatch.
+    totalPublicPriceInput.dispatchEvent(new Event('input'));
+
+    const isSingleHousehold = (
+      document.getElementById('singleHouseholdSpecial') as HTMLInputElement
+    ).checked;
+    const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+    houseCountSelect.value = isSingleHousehold ? '1주택' : houseCountSelect.value;
+
+    linkedPropertyTax = lastPropertyResult
+      ? {
+          propertyTaxPaid: lastPropertyResult.propertyTax,
+          fairMarketRatio: lastPropertyResult.fairMarketRatio,
+          topMarginalRate: lastPropertyResult.topMarginalRate,
+        }
+      : null;
+
+    recalcComprehensive();
+    document
+      .getElementById('comprehensive-form')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // -------------------- Part B: Comprehensive Real Estate Holding Tax --------------------
+  const comprehensiveForm = document.getElementById(
+    'comprehensive-form',
+  ) as HTMLFormElement;
+  const comprehensiveResult = document.getElementById(
+    'comprehensive-result',
+  ) as HTMLDivElement;
+  const comprehensiveError = document.getElementById(
+    'comprehensive-error',
+  ) as HTMLParagraphElement;
+
+  // Unlink the property tax credit if the user manually edits the inputs
+  // (they may no longer match the carried-over value).
+  const totalPublicPriceInput = document.getElementById(
+    'totalPublicPrice',
+  ) as HTMLInputElement;
+  totalPublicPriceInput.addEventListener('input', () => {
+    linkedPropertyTax = null;
+  });
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  houseCountSelect.addEventListener('change', () => {
+    linkedPropertyTax = null;
+  });
+
+  // The elderly/long-term holding credit applies only to 1-household 1-home
+  // owners, so hide those inputs for other selections.
+  const seniorLongtermOptions = document.getElementById(
+    'senior-longterm-options',
+  ) as HTMLDivElement;
+  const syncHouseCountOptions = () => {
+    seniorLongtermOptions.classList.toggle('hidden', houseCountSelect.value !== '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  const recalcComprehensive = () => {
+    comprehensiveError.textContent = '';
+
+    const totalPublicPrice = Number(totalPublicPriceInput.value);
+    if (!totalPublicPrice || totalPublicPrice <= 0) {
+      comprehensiveResult.classList.add('hidden');
+      comprehensiveError.textContent = 'Please enter a valid total announced value for your homes.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as HouseCount;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const holdingYears = Number(
+      (document.getElementById('holdingYears') as HTMLInputElement).value,
+    );
+    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+
+    const result = calculateComprehensiveTax({
+      totalPublicPrice,
+      houseCount,
+      // The property tax credit applies to all comprehensive tax payers
+      // regardless of household count, so reflect it whenever linked data
+      // is available (verified against a reference calculator).
+      linkedPropertyTax: linkedPropertyTax ?? undefined,
+      // The elderly/long-term credit is exclusive to 1-household 1-home owners;
+      // calculateComprehensiveTax already gates it on houseCount === '1주택'.
+      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
+    });
+
+    setWon('ct-deduction', result.deduction);
+    setWon('ct-taxbase', result.taxBase);
+    setWon('ct-tax', result.calculatedTax);
+
+    const creditRow = document.getElementById('ct-credit-row') as HTMLTableRowElement;
+    const seniorRow = document.getElementById('ct-senior-row') as HTMLTableRowElement;
+    const seniorRateHint = document.getElementById(
+      'ct-senior-rate-hint',
+    ) as HTMLSpanElement;
+    const finalRow = document.getElementById('ct-final-row') as HTMLTableRowElement;
+    const ruralHint = document.getElementById('ct-rural-hint') as HTMLSpanElement;
+    const linkedNote = document.getElementById(
+      'credit-linked-note',
+    ) as HTMLParagraphElement;
+
+    creditRow.classList.toggle('hidden', result.propertyTaxCredit <= 0);
+    if (result.propertyTaxCredit > 0) setWon('ct-credit', result.propertyTaxCredit);
+
+    seniorRow.classList.toggle('hidden', result.seniorLongTermCredit <= 0);
+    if (result.seniorLongTermCredit > 0) {
+      setWon('ct-senior', result.seniorLongTermCredit);
+      seniorRateHint.textContent = `(credit rate: ${pct(result.seniorLongTermCreditRate)})`;
+    }
+
+    const hasAnyCredit = result.propertyTaxCredit > 0 || result.seniorLongTermCredit > 0;
+    finalRow.classList.toggle('hidden', !hasAnyCredit);
+    if (hasAnyCredit) setWon('ct-final', result.finalTax);
+
+    ruralHint.textContent = hasAnyCredit
+      ? '(20% of final comprehensive real estate tax)'
+      : '(20% of calculated tax, approximate — credits not reflected)';
+
+    linkedNote.textContent = [
+      result.propertyTaxCredit > 0
+        ? '✓ Property tax credit (double taxation adjustment) was applied approximately using the home data from Section 1 above.'
+        : '',
+      result.seniorLongTermCredit > 0
+        ? `✓ Elderly/long-term holding tax credit (${pct(result.seniorLongTermCreditRate)}) has been applied.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    setWon('ct-rural', result.ruralSpecialTax);
+    setWon('ct-total', result.totalWithSurtax);
+
+    comprehensiveResult.classList.remove('hidden');
+  };
+
+  comprehensiveForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalcComprehensive();
+  });
+</script>

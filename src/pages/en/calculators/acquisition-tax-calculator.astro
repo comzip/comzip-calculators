@@ -1,0 +1,318 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the purchase price and property type to estimate
+    <strong>acquisition tax, local education tax, and Special Rural Development Tax</strong>.
+    Officetel units are not classified as &ldquo;housing&rdquo; under Korea's Local Tax Act
+    and follow a different rate structure, so they are calculated separately.
+  </p>
+
+  <form class="calc-form" id="acquisition-form">
+    <fieldset class="method-toggle" id="property-type-toggle">
+      <legend>Property type</legend>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="주택" checked />
+        <span>House (apartment, townhouse, detached house, etc.)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="오피스텔" />
+        <span>Officetel</span>
+      </label>
+    </fieldset>
+
+    <label>
+      Acquisition price (purchase price, KRW)
+      <input
+        type="number"
+        id="price"
+        name="price"
+        min="0"
+        step="1000000"
+        placeholder="Example: 500000000"
+        required
+      />
+      <span class="amount-preview" id="price-preview" aria-live="polite"></span>
+    </label>
+
+    <!-- House-only options -->
+    <div id="house-options">
+      <label>
+        Number of homes <span class="hint">For one household, including the home being acquired</span>
+        <select id="houseCount">
+          <option value="1주택">1 home (including temporary 2nd home)</option>
+          <option value="2주택">2 homes</option>
+          <option value="3주택">3 homes</option>
+          <option value="4주택이상또는법인">4+ homes or a corporation</option>
+        </select>
+      </label>
+
+      <label class="check-row" id="regulated-area-row">
+        <input type="checkbox" id="isRegulatedArea" />
+        <span>This property is in a regulated area</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="isOver85Sqm" checked />
+        <span>Exclusive area exceeds 85㎡ (above national housing standard; subject to Special Rural Development Tax)</span>
+      </label>
+    </div>
+
+    <p class="note hidden" id="officetel-note">
+      Officetel units are subject to a fixed acquisition tax rate of 4% regardless of the
+      number of homes owned or regulated area status, and Special Rural Development Tax applies
+      regardless of floor area.
+    </p>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="heavy-rate-note" style="margin-top:0;"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calculation breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Applied rate</td>
+          <td id="row-rate">-</td>
+        </tr>
+        <tr>
+          <td>Acquisition tax</td>
+          <td id="row-acquisition">-</td>
+        </tr>
+        <tr>
+          <td>Local education tax</td>
+          <td id="row-education">-</td>
+        </tr>
+        <tr id="rural-row">
+          <td>Special Rural Development Tax</td>
+          <td id="row-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total tax payable</td>
+          <td id="row-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. The following have not been
+    reflected: the temporary two-home exemption, the first-time buyer reduction, the
+    luxury property surcharge (+8 percentage points), and gratuitous acquisitions such as
+    inheritance or gift. Whether a residential officetel counts toward the home count when
+    acquiring other housing (applicable to some cases acquired on or after 12 August 2020)
+    has also not been reflected. Regulated area designations change by location and date —
+    always verify against the Ministry of Land, Infrastructure and Transport notice, and
+    confirm the exact tax amount through the relevant local government (Wetax).
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently asked questions</h2>
+
+    <details>
+      <summary>How do I check whether a property is in a regulated area?</summary>
+      <p>
+        Regulated areas are designated and lifted by the Ministry of Land, Infrastructure
+        and Transport based on real estate market conditions. You can look up the address
+        of the property you intend to acquire on <strong>Wetax</strong> or the
+        <strong>Ministry's Real Estate Information Portal</strong>. For a 1-home purchase,
+        regulated area status does not affect the tax rate.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does the rate differ for 2-home owners?</summary>
+      <p>
+        A 2-home owner pays 8% (surcharge rate) for a property in a regulated area, or
+        the standard rate (1–3%) as if buying a first home in a non-regulated area. A
+        3-home owner pays 12% in a regulated area and 8% outside. Four or more homes or
+        a corporation is taxed at 12% regardless of location.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why are local education tax and Special Rural Development Tax charged separately?</summary>
+      <p>
+        Local education tax and Special Rural Development Tax are levied as surcharges on top of
+        acquisition tax. At the standard rate (1–3%), local education tax equals
+        <strong>10% of the acquisition tax rate</strong>; at the surcharge rate (8% or
+        12%), a flat <strong>0.4%</strong> applies instead. Special Rural Development Tax is charged
+        only on homes exceeding 85㎡ in exclusive area: 0.2% at the standard rate, 0.6%
+        at the 8% surcharge, and 1.0% at the 12% surcharge.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is the rate different for officetel units?</summary>
+      <p>
+        Officetel units are classified as "business facilities" under the Building Act and
+        Housing Act, meaning they are <strong>not "housing" under Korea's Local Tax Act</strong>.
+        The preferential rates for residential property transactions (1–3%) and the
+        multi-home surcharge rates (8% or 12%) therefore do not apply; instead, the general
+        real estate acquisition tax rate of <strong>4%</strong> always applies, regardless
+        of how many homes are owned or whether the area is regulated. Adding local education
+        tax (0.4%) and Special Rural Development Tax (0.2%) gives the commonly cited total of
+        <strong>4.6%</strong>. Note that whether a residential officetel counts toward the
+        home count when <em>other housing</em> is acquired is a separate issue (applicable
+        to some cases acquired on or after 12 August 2020); this calculator covers only the
+        acquisition tax on the officetel itself.
+      </p>
+    </details>
+
+    <details>
+      <summary>Are the temporary 2-home exemption or first-time buyer reduction reflected?</summary>
+      <p>
+        No. A <strong>temporary 2-home</strong> situation — where an existing home is sold
+        within a specified period as part of a move — may qualify for the standard
+        single-home rate. A <strong>first-time home purchase</strong> may also be eligible
+        for a separate reduction. If either applies to you, verify the exact tax amount
+        through Wetax or a tax professional.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  /* Option labels are long (e.g. "House (apartment, townhouse, detached house, etc.)")
+     and look awkward side by side, so stack them vertically for this calculator. */
+  #property-type-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* #house-options holds a select and two checkboxes as a single .calc-form item,
+     so .calc-form's 16px row gap doesn't apply inside it — elements were touching.
+     Apply the same rhythm explicitly. */
+  #house-options {
+    display: grid;
+    gap: 16px;
+  }
+</style>
+
+<script>
+  import { calculateAcquisitionTax } from '../../../lib/acquisitionTaxCalculator';
+  import type {
+    HouseCountForAcquisition,
+    PropertyType,
+  } from '../../../lib/acquisitionTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('acquisition-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const priceInput = document.getElementById('price') as HTMLInputElement;
+  const pricePreview = document.getElementById('price-preview') as HTMLSpanElement;
+  priceInput.addEventListener('input', () => {
+    const value = Number(priceInput.value);
+    pricePreview.textContent = value > 0 ? formatWonEn(value) : '';
+  });
+
+  const currentPropertyType = (): PropertyType =>
+    (form.querySelector('input[name="propertyType"]:checked') as HTMLInputElement)
+      .value as PropertyType;
+
+  // Officetel always uses a flat 4% rate — no house count, regulated area, or floor area needed.
+  const houseOptions = document.getElementById('house-options') as HTMLDivElement;
+  const officetelNote = document.getElementById('officetel-note') as HTMLParagraphElement;
+  const syncPropertyType = () => {
+    const isOfficetel = currentPropertyType() === '오피스텔';
+    houseOptions.classList.toggle('hidden', isOfficetel);
+    officetelNote.classList.toggle('hidden', !isOfficetel);
+  };
+  form.querySelectorAll('input[name="propertyType"]').forEach((radio) => {
+    radio.addEventListener('change', syncPropertyType);
+  });
+  syncPropertyType();
+
+  // For 1 home, the regulated-area status doesn't affect the rate, so hide that input.
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaRow = document.getElementById('regulated-area-row') as HTMLLabelElement;
+  const syncRegulatedAreaVisibility = () => {
+    regulatedAreaRow.classList.toggle('hidden', houseCountSelect.value === '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncRegulatedAreaVisibility);
+  syncRegulatedAreaVisibility();
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const price = Number(priceInput.value);
+    if (!price || price <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid acquisition price.';
+      return;
+    }
+
+    const propertyType = currentPropertyType();
+    const houseCount = houseCountSelect.value as HouseCountForAcquisition;
+    const isRegulatedArea = (
+      document.getElementById('isRegulatedArea') as HTMLInputElement
+    ).checked;
+    const isOver85Sqm = (
+      document.getElementById('isOver85Sqm') as HTMLInputElement
+    ).checked;
+
+    const r = calculateAcquisitionTax({
+      propertyType,
+      price,
+      houseCount,
+      isRegulatedArea,
+      isOver85Sqm,
+    });
+
+    // Show up to two decimal places, trimming trailing zeros.
+    const ratePercent = (r.rate * 100).toFixed(2).replace(/\.?0+$/, '');
+    (document.getElementById('row-rate') as HTMLElement).textContent = `${ratePercent}%`;
+    setWon('row-acquisition', r.acquisitionTax);
+    setWon('row-education', r.localEducationTax);
+
+    const ruralRow = document.getElementById('rural-row') as HTMLTableRowElement;
+    if (r.ruralSpecialTax > 0) {
+      ruralRow.classList.remove('hidden');
+      setWon('row-rural', r.ruralSpecialTax);
+    } else {
+      ruralRow.classList.add('hidden');
+    }
+
+    setWon('row-total', r.total);
+
+    const heavyRateNote = document.getElementById(
+      'heavy-rate-note',
+    ) as HTMLParagraphElement;
+    heavyRateNote.textContent = r.isHeavyRate
+      ? '※ A surcharge rate for multiple homeowners or corporations has been applied.'
+      : '';
+
+    result.classList.remove('hidden');
+  });
+</script>

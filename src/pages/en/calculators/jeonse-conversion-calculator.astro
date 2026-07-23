@@ -1,0 +1,268 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'jeonse-conversion-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    When converting part (or all) of a Jeonse deposit to monthly rent, this calculator shows
+    the resulting monthly rent amount and whether it exceeds the
+    <strong>statutory maximum conversion rate</strong>.
+  </p>
+
+  <form class="calc-form" id="jeonse-form">
+    <label>
+      Jeonse Deposit (KRW)
+      <input
+        type="number"
+        id="jeonseDeposit"
+        name="jeonseDeposit"
+        min="0"
+        step="1000000"
+        placeholder="e.g. 300000000"
+        required
+      />
+      <span class="amount-preview" id="jeonseDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Remaining Deposit After Conversion (KRW)
+      <span class="hint">Deposit kept after switching part to monthly rent. e.g. 100000000</span>
+      <input
+        type="number"
+        id="monthlyDeposit"
+        name="monthlyDeposit"
+        min="0"
+        step="1000000"
+        placeholder="e.g. 100000000"
+        required
+      />
+      <span class="amount-preview" id="monthlyDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Applied Conversion Rate (%)
+      <span class="hint">Rate agreed upon or proposed. e.g. 5</span>
+      <input
+        type="number"
+        id="appliedRate"
+        name="appliedRate"
+        min="0"
+        step="0.01"
+        placeholder="e.g. 5"
+        required
+      />
+    </label>
+
+    <label>
+      Bank of Korea Base Rate (%)
+      <span class="hint">Used for the statutory cap calculation. As of July 2026: 2.75%. Check the Bank of Korea website for the latest rate.</span>
+      <input
+        type="number"
+        id="baseRate"
+        name="baseRate"
+        min="0"
+        step="0.01"
+        value="2.75"
+      />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note hidden" id="exceeds-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Monthly Rent at Applied Rate</span>
+        <span class="value"><span id="monthly-rent">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Statutory Maximum Conversion Rate</span>
+        <span class="value"><span id="cap-rate">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Details
+      </caption>
+      <tbody>
+        <tr>
+          <td>Deposit Difference to Convert</td>
+          <td id="row-diff">-</td>
+        </tr>
+        <tr>
+          <td>Monthly Rent at Applied Rate</td>
+          <td id="row-rent">-</td>
+        </tr>
+        <tr>
+          <td>Statutory Cap Rate <span class="hint">min(10%, base rate + 2pp)</span></td>
+          <td id="row-cap-rate">-</td>
+        </tr>
+        <tr class="total">
+          <td>Monthly Rent at Statutory Cap (reference)</td>
+          <td id="row-cap-rent">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    The statutory maximum conversion rate (Article 7-2 of Korea's Housing Lease Protection Act)
+    is <strong>mandatory only when converting a deposit to monthly rent during an ongoing
+    lease, or when exercising the right to request lease renewal</strong>. It does not legally
+    apply to the terms of a new initial contract. The Bank of Korea base rate changes periodically
+    — recalculate with the latest figure.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How is the Jeonse-to-monthly-rent conversion calculated?</summary>
+      <p>
+        <strong>Monthly Rent = (Jeonse Deposit − Remaining Deposit) × Conversion Rate ÷ 12</strong>.
+        The deposit difference is converted to an annual rate, then divided by 12 to give
+        the monthly payment.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the statutory maximum conversion rate?</summary>
+      <p>
+        Under Article 7-2 of Korea's Housing Lease Protection Act, when converting a deposit
+        to monthly rent, the rate may not exceed the lower of <strong>10% per annum</strong>
+        or <strong>the Bank of Korea base rate + 2 percentage points</strong>. For example,
+        if the base rate is 2.75%, then 2.75% + 2% = 4.75%, which is lower than 10%, so
+        4.75% becomes the cap.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does the statutory cap apply to new contracts?</summary>
+      <p>
+        No. This cap is only legally binding for <strong>conversions during an existing
+        lease</strong> or when <strong>exercising the right to request renewal</strong>.
+        For an initial new contract, the terms agreed between landlord and tenant apply
+        as-is.
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens if the applied rate exceeds the statutory cap?</summary>
+      <p>
+        If the situation qualifies as a renewal or mid-lease conversion, the tenant may
+        demand a refund of the excess. However, the outcome depends on the nature of the
+        individual contract (whether it is a new or renewed lease), so if there is an
+        actual dispute it is advisable to consult a specialist such as the Housing Lease
+        Dispute Mediation Committee.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import { calculateJeonseConversion } from '../../../lib/jeonseConversionCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('jeonse-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('jeonseDeposit', 'jeonseDeposit-preview');
+  bindAmountPreview('monthlyDeposit', 'monthlyDeposit-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const jeonseDeposit = Number(
+      (document.getElementById('jeonseDeposit') as HTMLInputElement).value,
+    );
+    const monthlyDeposit = Number(
+      (document.getElementById('monthlyDeposit') as HTMLInputElement).value,
+    );
+    const appliedRatePercent = Number(
+      (document.getElementById('appliedRate') as HTMLInputElement).value,
+    );
+    const baseRatePercent = Number(
+      (document.getElementById('baseRate') as HTMLInputElement).value,
+    );
+
+    if (!jeonseDeposit || jeonseDeposit <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid Jeonse deposit amount.';
+      return;
+    }
+    if (monthlyDeposit >= jeonseDeposit) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'The remaining deposit after conversion must be less than the Jeonse deposit.';
+      return;
+    }
+    if (!Number.isFinite(appliedRatePercent) || appliedRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid conversion rate.';
+      return;
+    }
+
+    const r = calculateJeonseConversion({
+      jeonseDeposit,
+      monthlyDeposit,
+      appliedRatePercent,
+      baseRatePercent,
+    });
+
+    setWon('monthly-rent', r.monthlyRent);
+    (document.getElementById('cap-rate') as HTMLElement).textContent = pct(r.regulatedCapRate);
+    setWon('row-diff', r.depositDiff);
+    setWon('row-rent', r.monthlyRent);
+    (document.getElementById('row-cap-rate') as HTMLElement).textContent = pct(
+      r.regulatedCapRate,
+    );
+    setWon('row-cap-rent', r.regulatedCapRent);
+
+    const exceedsNote = document.getElementById('exceeds-note') as HTMLParagraphElement;
+    if (r.exceedsCap) {
+      exceedsNote.textContent =
+        '※ The applied conversion rate exceeds the statutory maximum. If this is a mid-lease conversion or renewal, the cap may apply.';
+      exceedsNote.classList.remove('hidden');
+    } else {
+      exceedsNote.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

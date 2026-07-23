@@ -2,12 +2,20 @@
 // Placeholder for a future ad unit (AdSense, etc.).
 // Positioned where an ad would appear on calculator pages, e.g. below the
 // result and above the FAQ section. No real ad code is included yet.
+import type { Lang } from '../i18n/ui';
+
+export interface Props {
+  lang?: Lang;
+}
+
+const { lang = 'ko' } = Astro.props;
+const label = lang === 'en' ? 'Ad space (coming soon)' : '광고 영역 (준비 중)';
 ---
 
 <div class="ad-slot" aria-hidden="true">
   <!-- TODO: AdSense slot -->
   <!-- Replace this placeholder with the real ad unit markup once AdSense is approved. -->
-  <span>광고 영역 (준비 중)</span>
+  <span>{label}</span>
 </div>
 
 <style>

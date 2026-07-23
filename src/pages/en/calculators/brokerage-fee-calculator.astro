@@ -1,0 +1,244 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the transaction amount to calculate the <strong>maximum real estate brokerage commission</strong>.
+    (Based on Seoul Metropolitan City's Housing Brokerage Fee Ordinance)
+  </p>
+
+  <form class="calc-form" id="brokerage-form">
+    <fieldset class="method-toggle">
+      <legend>Transaction Type</legend>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="매매" checked />
+        <span>Sale</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="전세" />
+        <span>Jeonse (Long-term Lease Deposit)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="dealKind" value="월세" />
+        <span>Monthly Rent</span>
+      </label>
+    </fieldset>
+
+    <div id="sale-lease-input">
+      <label>
+        <span id="amount-label">Sale Price (KRW)</span>
+        <input
+          type="number"
+          id="amount"
+          name="amount"
+          min="0"
+          step="1000000"
+          placeholder="e.g. 500000000"
+        />
+        <span class="amount-preview" id="amount-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <div id="monthly-rent-input" class="hidden">
+      <label>
+        Deposit (KRW)
+        <input
+          type="number"
+          id="deposit"
+          name="deposit"
+          min="0"
+          step="1000000"
+          placeholder="e.g. 10000000"
+        />
+        <span class="amount-preview" id="deposit-preview" aria-live="polite"></span>
+      </label>
+
+      <label>
+        Monthly Rent (KRW)
+        <input
+          type="number"
+          id="monthlyRent"
+          name="monthlyRent"
+          min="0"
+          step="10000"
+          placeholder="e.g. 500000"
+        />
+      </label>
+    </div>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <p class="note" id="converted-note" style="margin-top:0;"></p>
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Maximum Brokerage Fee</span>
+        <span class="value"><span id="fee-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Applied Maximum Rate</span>
+        <span class="value"><span id="rate-value">-</span></span>
+      </div>
+    </div>
+    <p class="note">VAT (10%) is not included. The actual commission is negotiated within this limit.</p>
+  </div>
+
+  <div class="disclaimer">
+    This calculation result represents the maximum fee under the <strong>Seoul Metropolitan City
+    Housing Brokerage Fee Ordinance</strong>. Other cities and provinces may have different rates
+    under their own ordinances. Non-residential properties such as officetels and commercial
+    spaces are subject to separate rates (typically negotiated within 0.9%). The actual brokerage
+    fee is negotiated between the client and the licensed real estate agent within this ceiling.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How is the brokerage fee calculated?</summary>
+      <p>
+        The <strong>maximum rate</strong> for each transaction amount bracket is applied to
+        the deal amount. Where a bracket also has a <strong>fee cap</strong>, the lower of
+        the two figures becomes the ceiling. Lower transaction amounts are subject to the
+        fee cap so that the burden does not become disproportionately large.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is the transaction amount calculated for monthly rent?</summary>
+      <p>
+        The transaction amount (converted deposit) for monthly rent is calculated as
+        <strong>deposit + (monthly rent × 100)</strong>. However, if the combined figure
+        is less than ₩50,000,000, the formula <strong>deposit + (monthly rent × 70)</strong>
+        is used instead, reducing the burden on lower-rent tenants.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does this rate apply equally in all regions?</summary>
+      <p>
+        No. The Enforcement Rules of the Licensed Real Estate Agents Act set the broad
+        framework, while the specific rates and caps are determined by each <strong>city
+        or province ordinance</strong>. This calculator is based on <strong>Seoul</strong>
+        standards; rates in other regions may differ slightly.
+      </p>
+    </details>
+
+    <details>
+      <summary>Is the displayed amount mandatory?</summary>
+      <p>
+        No. This result is the <strong>statutory maximum</strong>. The actual brokerage
+        fee can be negotiated with the agent within this limit. Charging above the ceiling
+        is illegal.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<script>
+  import {
+    calculateBrokerageFee,
+    calculateMonthlyRentDealAmount,
+  } from '../../../lib/brokerageFeeCalculator';
+  import type { DealType } from '../../../lib/brokerageFeeCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('brokerage-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('amount', 'amount-preview');
+  bindAmountPreview('deposit', 'deposit-preview');
+
+  const amountLabel = document.getElementById('amount-label') as HTMLSpanElement;
+  const saleLeaseInput = document.getElementById('sale-lease-input') as HTMLDivElement;
+  const monthlyRentInput = document.getElementById('monthly-rent-input') as HTMLDivElement;
+
+  const currentDealKind = (): string =>
+    (form.querySelector('input[name="dealKind"]:checked') as HTMLInputElement).value;
+
+  const syncDealKind = () => {
+    const kind = currentDealKind();
+    const isMonthly = kind === '월세';
+    saleLeaseInput.classList.toggle('hidden', isMonthly);
+    monthlyRentInput.classList.toggle('hidden', !isMonthly);
+    amountLabel.textContent = kind === '매매' ? 'Sale Price (KRW)' : 'Jeonse Deposit (KRW)';
+  };
+  form.querySelectorAll('input[name="dealKind"]').forEach((radio) => {
+    radio.addEventListener('change', syncDealKind);
+  });
+  syncDealKind();
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const kind = currentDealKind();
+    const dealType: DealType = kind === '매매' ? '매매' : '임대차';
+
+    let amount: number;
+    const convertedNote = document.getElementById('converted-note') as HTMLParagraphElement;
+    convertedNote.textContent = '';
+
+    if (kind === '월세') {
+      const deposit = Number((document.getElementById('deposit') as HTMLInputElement).value);
+      const monthlyRent = Number(
+        (document.getElementById('monthlyRent') as HTMLInputElement).value,
+      );
+      if (!Number.isFinite(deposit) || deposit < 0 || !monthlyRent || monthlyRent <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = 'Please enter valid deposit and monthly rent amounts.';
+        return;
+      }
+      amount = calculateMonthlyRentDealAmount(deposit, monthlyRent);
+      convertedNote.textContent = `Converted deposit amount: ${won.format(Math.round(amount))}`;
+    } else {
+      amount = Number((document.getElementById('amount') as HTMLInputElement).value);
+      if (!amount || amount <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = 'Please enter a valid transaction amount.';
+        return;
+      }
+    }
+
+    const r = calculateBrokerageFee({ dealType, amount });
+
+    (document.getElementById('fee-value') as HTMLElement).textContent = won.format(
+      Math.round(r.fee),
+    );
+    (document.getElementById('rate-value') as HTMLElement).textContent = pct(r.rate);
+
+    result.classList.remove('hidden');
+  });
+</script>

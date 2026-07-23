@@ -1,16 +1,21 @@
 ---
 import type { Calculator } from '../data/calculators';
+import type { Lang } from '../i18n/ui';
 
 export interface Props {
   calculator: Calculator;
+  lang?: Lang;
 }
 
-const { calculator } = Astro.props;
+const { calculator, lang = 'ko' } = Astro.props;
+const href = lang === 'en' ? `/en/calculators/${calculator.slug}` : `/calculators/${calculator.slug}`;
+const title = lang === 'en' ? calculator.titleEn : calculator.title;
+const description = lang === 'en' ? calculator.descriptionEn : calculator.description;
 ---
 
-<a class="calc-card" href={`/calculators/${calculator.slug}`}>
-  <h3>{calculator.title}</h3>
-  <p>{calculator.description}</p>
+<a class="calc-card" href={href}>
+  <h3>{title}</h3>
+  <p>{description}</p>
 </a>
 
 <style>
