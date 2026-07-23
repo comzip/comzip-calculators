@@ -42,7 +42,7 @@ const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
           id="amount"
           name="amount"
           min="0"
-          step="1000000"
+          step="any"
           placeholder="예: 500000000"
         />
         <span class="amount-preview" id="amount-preview" aria-live="polite"></span>
@@ -57,7 +57,7 @@ const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
           id="deposit"
           name="deposit"
           min="0"
-          step="1000000"
+          step="any"
           placeholder="예: 10000000"
         />
         <span class="amount-preview" id="deposit-preview" aria-live="polite"></span>
@@ -70,7 +70,7 @@ const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
           id="monthlyRent"
           name="monthlyRent"
           min="0"
-          step="10000"
+          step="any"
           placeholder="예: 500000"
         />
       </label>
