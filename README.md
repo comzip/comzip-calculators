@@ -1,4 +1,4 @@
-# 계산기 허브 (Calculator Hub)
+# 콤집계산기 (comzip Calculator)
 
 일상에 필요한 계산기(만나이, 연봉 실수령액 등)를 한곳에 모은 한국어 정적 사이트입니다.
 [Astro](https://astro.build)로 만든 완전 정적 사이트이며, GitHub Pages + 커스텀 도메인
