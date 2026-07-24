@@ -112,7 +112,7 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
                   {calculatorsByCategory(category).map((c) => (
                     <li>
                       <a href={`${localePrefix}/calculators/${c.slug}`}>
-                        {lang === 'en' ? c.titleEn : c.title}
+                        {lang === 'en' ? c.navLabelEn : c.navLabel}
                       </a>
                     </li>
                   ))}
@@ -309,7 +309,11 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         color: var(--text);
         text-decoration: none;
         font-size: 0.9rem;
-        white-space: nowrap;
+        /* Labels are kept short (see `navLabel`/`navLabelEn` in
+           data/calculators.ts) so this rarely wraps, but allowing it to wrap
+           instead of overflowing the panel is a safety net for any label
+           that's still too wide for a narrow mobile viewport. */
+        white-space: normal;
       }
       .nav-dropdown > ul a:hover {
         color: var(--accent);
