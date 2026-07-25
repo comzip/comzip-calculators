@@ -37,13 +37,16 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     <label>
       품목
       <select id="category">
-        <option value="의류·신발">의류·신발·가방 등 (간이세율 18%)</option>
-        <option value="모피">모피의류·모피제품 (간이세율 19%)</option>
-        <option value="IT기기">스마트폰·노트북·태블릿 등 IT기기 (관세 0%)</option>
-        <option value="일반품목" selected
-          >그 외 일반품목 — 이어폰·소형가전·화장품(일반) 등 (간이세율 15%)</option
-        >
-        <option value="사치품">보석·귀금속·고급시계·고급가방 (간이세율 20%)</option>
+        <option value="의류·신발·가방" selected>의류·신발·가방 (관세율 13%)</option>
+        <option value="전자제품">전자제품 (관세율 0%)</option>
+        <option value="화장품">화장품·스킨케어 (관세율 6.5%)</option>
+        <option value="향수">향수·디퓨저 (관세율 7%)</option>
+        <option value="식품·간식">식품·간식 (관세율 8%)</option>
+        <option value="완구·취미">완구·피규어·취미 (관세율 8%)</option>
+        <option value="서적">서적·교재 (관세율 0%)</option>
+        <option value="스포츠·아웃도어">스포츠·아웃도어 (관세율 8%)</option>
+        <option value="주얼리·액세서리">주얼리·액세서리 (관세율 8%)</option>
+        <option value="기타">기타 (관세율 8%)</option>
         <option value="맥주">맥주</option>
         <option value="탁주">탁주(막걸리)</option>
         <option value="기능성화장품">기능성화장품 (미백·주름개선·자외선차단 표기)</option>
@@ -51,6 +54,10 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
         <option value="기타주류">그 외 주류 (위스키·와인 등)</option>
         <option value="담배">담배</option>
       </select>
+      <span class="hint"
+        >관세율은 각 카테고리의 대표 HS 코드 기준 근사치이며, 정확한 세율은 실제
+        품목의 HS 품목분류에 따라 다를 수 있습니다.</span
+      >
     </label>
 
     <label>
@@ -122,12 +129,8 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
           <td>과세가격</td>
           <td id="cell-taxable">-</td>
         </tr>
-        <tr id="row-simplified" class="hidden">
-          <td>간이세액 <span class="hint" id="simplified-rate-hint"></span></td>
-          <td id="cell-simplified">-</td>
-        </tr>
         <tr id="row-tariff" class="hidden">
-          <td>관세</td>
+          <td>관세 <span class="hint" id="tariff-rate-hint"></span></td>
           <td id="cell-tariff">-</td>
         </tr>
         <tr id="row-liquor" class="hidden">
@@ -190,14 +193,14 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     </details>
 
     <details>
-      <summary>간이세율은 무엇인가요?</summary>
+      <summary>관세·부가세는 어떻게 계산되나요?</summary>
       <p>
-        여행자휴대품·우편물·특송물품에 대해 관세·부가세 등을 합산해 하나의
-        세율로 간편하게 계산하는 방식입니다(관세법 제81조, 시행령
-        제96조·별표2). 이 계산기는 모피 19%, 가죽제 의류·신발류 등 섬유제품
-        18%, 그 외 일반품목 15%, 보석·귀금속·고급시계·고급가방 등 20%
-        구간을 사용합니다. 스마트폰·노트북 등 IT기기는 WTO 정보기술협정에
-        따라 관세가 0%이고 부가세 10%만 부과됩니다.
+        관세는 <strong>과세가격 × 품목별 관세율</strong>로 계산되고, 부가세는
+        <strong>(과세가격 + 관세) × 10%</strong>로 관세를 더한 금액에 순차
+        적용됩니다. 품목별 관세율은 대표 HS 코드 기준 근사치로, 의류·신발·가방
+        13%, 화장품 6.5%, 향수 7%, 식품·완구·스포츠용품·주얼리 등 8%,
+        전자제품·서적은 0%를 사용합니다. 전자제품처럼 관세가 0%여도 면세기준을
+        초과하면 부가세 10%는 그대로 부과됩니다.
       </p>
     </details>
 
@@ -323,23 +326,21 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     // "면세" 안내는 관세·부가세만 없는 일반 품목일 때만 보여준다.
     exemptNotice.classList.toggle('hidden', !(r.isExempt && !isAlcohol));
 
-    showRow('row-taxable', !r.isExempt || isAlcohol);
+    const showTariffVat = !r.isExempt || isAlcohol;
+
+    showRow('row-taxable', showTariffVat);
     if (!r.isExempt) setWon('cell-taxable', r.taxablePriceKrw);
     else if (isAlcohol) {
       const cell = document.getElementById('cell-taxable');
       if (cell) cell.textContent = '0원 (면세)';
     }
 
-    showRow('row-simplified', r.simplifiedTax !== undefined);
-    if (r.simplifiedTax !== undefined) {
-      setWon('cell-simplified', r.simplifiedTax);
-      const rateHint = document.getElementById('simplified-rate-hint') as HTMLSpanElement;
-      const rate = r.taxablePriceKrw > 0 ? (r.simplifiedTax / r.taxablePriceKrw) * 100 : 0;
-      rateHint.textContent = `(${rate.toFixed(0)}%)`;
+    showRow('row-tariff', showTariffVat);
+    if (showTariffVat) {
+      setWon('cell-tariff', r.tariff);
+      const rateHint = document.getElementById('tariff-rate-hint') as HTMLSpanElement;
+      rateHint.textContent = `(관세율 ${(r.tariffRate * 100).toFixed(1)}%)`;
     }
-
-    showRow('row-tariff', category === 'IT기기' || isAlcohol);
-    if (category === 'IT기기' || isAlcohol) setWon('cell-tariff', r.tariff);
 
     showRow('row-liquor', r.liquorTax !== undefined);
     if (r.liquorTax !== undefined) setWon('cell-liquor', r.liquorTax);
@@ -347,8 +348,8 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     showRow('row-education', r.educationTax !== undefined && r.educationTax > 0);
     if (r.educationTax) setWon('cell-education', r.educationTax);
 
-    showRow('row-vat', category === 'IT기기' || isAlcohol);
-    if (category === 'IT기기' || isAlcohol) setWon('cell-vat', r.vat);
+    showRow('row-vat', showTariffVat);
+    if (showTariffVat) setWon('cell-vat', r.vat);
 
     setWon('cell-total', r.totalTax);
     setWon('total-tax', r.totalTax);

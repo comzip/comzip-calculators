@@ -39,13 +39,16 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     <label>
       Item category
       <select id="category">
-        <option value="의류·신발">Clothing, shoes, bags, etc. (simplified rate 18%)</option>
-        <option value="모피">Fur clothing/products (simplified rate 19%)</option>
-        <option value="IT기기">Smartphones, laptops, tablets, etc. (0% tariff)</option>
-        <option value="일반품목" selected
-          >Other general items — earphones, small appliances, general cosmetics, etc. (simplified rate 15%)</option
-        >
-        <option value="사치품">Jewelry, precious metals, luxury watches/bags (simplified rate 20%)</option>
+        <option value="의류·신발·가방" selected>Clothing, shoes, bags (tariff 13%)</option>
+        <option value="전자제품">Electronics (tariff 0%)</option>
+        <option value="화장품">Cosmetics/skincare (tariff 6.5%)</option>
+        <option value="향수">Perfume/diffusers (tariff 7%)</option>
+        <option value="식품·간식">Food/snacks (tariff 8%)</option>
+        <option value="완구·취미">Toys/figures/hobby items (tariff 8%)</option>
+        <option value="서적">Books/textbooks (tariff 0%)</option>
+        <option value="스포츠·아웃도어">Sports/outdoor gear (tariff 8%)</option>
+        <option value="주얼리·액세서리">Jewelry/accessories (tariff 8%)</option>
+        <option value="기타">Other (tariff 8%)</option>
         <option value="맥주">Beer</option>
         <option value="탁주">Takju (Korean rice wine)</option>
         <option value="기능성화장품">Functional cosmetics (whitening/anti-wrinkle/UV protection claims)</option>
@@ -53,6 +56,11 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
         <option value="기타주류">Other alcohol (whisky, wine, etc.)</option>
         <option value="담배">Tobacco</option>
       </select>
+      <span class="hint"
+        >Tariff rates are approximations based on each category's representative
+        HS code — the exact rate depends on the item's actual HS
+        classification.</span
+      >
     </label>
 
     <label>
@@ -125,12 +133,8 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
           <td>Taxable price</td>
           <td id="cell-taxable">-</td>
         </tr>
-        <tr id="row-simplified" class="hidden">
-          <td>Simplified tax <span class="hint" id="simplified-rate-hint"></span></td>
-          <td id="cell-simplified">-</td>
-        </tr>
         <tr id="row-tariff" class="hidden">
-          <td>Customs duty</td>
+          <td>Customs duty <span class="hint" id="tariff-rate-hint"></span></td>
           <td id="cell-tariff">-</td>
         </tr>
         <tr id="row-liquor" class="hidden">
@@ -197,17 +201,16 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     </details>
 
     <details>
-      <summary>What is the simplified tariff rate?</summary>
+      <summary>How are customs duty and VAT calculated?</summary>
       <p>
-        A combined rate covering customs duty and VAT (and other charges)
-        applied to travelers' baggage, mail, and courier shipments, under a
-        single percentage (Customs Act Article 81, Enforcement Decree Article
-        96 and Annex 2). This calculator uses 19% for fur clothing/products,
-        18% for leather clothing/footwear/textile products, 15% for other
-        general items, and 20% for jewelry/precious metals/luxury
-        watches/bags. Under the WTO Information Technology Agreement,
-        smartphones, laptops, and similar IT devices have 0% customs duty and
-        only 10% VAT.
+        Customs duty is <strong>taxable price × the item's tariff rate</strong>,
+        and VAT is <strong>(taxable price + customs duty) × 10%</strong>,
+        applied on top of the duty-inclusive amount. Tariff rates are
+        approximations based on representative HS codes: 13% for clothing,
+        shoes, and bags; 6.5% for cosmetics; 7% for perfume; 8% for food,
+        toys, sports gear, and jewelry; and 0% for electronics and books.
+        Even when the tariff rate is 0% (electronics, books), the 10% VAT
+        still applies once the duty-free threshold is exceeded.
       </p>
     </details>
 
@@ -335,23 +338,21 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     // items where customs duty and VAT are the only thing being waived.
     exemptNotice.classList.toggle('hidden', !(r.isExempt && !isAlcohol));
 
-    showRow('row-taxable', !r.isExempt || isAlcohol);
+    const showTariffVat = !r.isExempt || isAlcohol;
+
+    showRow('row-taxable', showTariffVat);
     if (!r.isExempt) setWon('cell-taxable', r.taxablePriceKrw);
     else if (isAlcohol) {
       const cell = document.getElementById('cell-taxable');
       if (cell) cell.textContent = '₩0 (exempt)';
     }
 
-    showRow('row-simplified', r.simplifiedTax !== undefined);
-    if (r.simplifiedTax !== undefined) {
-      setWon('cell-simplified', r.simplifiedTax);
-      const rateHint = document.getElementById('simplified-rate-hint') as HTMLSpanElement;
-      const rate = r.taxablePriceKrw > 0 ? (r.simplifiedTax / r.taxablePriceKrw) * 100 : 0;
-      rateHint.textContent = `(${rate.toFixed(0)}%)`;
+    showRow('row-tariff', showTariffVat);
+    if (showTariffVat) {
+      setWon('cell-tariff', r.tariff);
+      const rateHint = document.getElementById('tariff-rate-hint') as HTMLSpanElement;
+      rateHint.textContent = `(tariff rate ${(r.tariffRate * 100).toFixed(1)}%)`;
     }
-
-    showRow('row-tariff', category === 'IT기기' || isAlcohol);
-    if (category === 'IT기기' || isAlcohol) setWon('cell-tariff', r.tariff);
 
     showRow('row-liquor', r.liquorTax !== undefined);
     if (r.liquorTax !== undefined) setWon('cell-liquor', r.liquorTax);
@@ -359,8 +360,8 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     showRow('row-education', r.educationTax !== undefined && r.educationTax > 0);
     if (r.educationTax) setWon('cell-education', r.educationTax);
 
-    showRow('row-vat', category === 'IT기기' || isAlcohol);
-    if (category === 'IT기기' || isAlcohol) setWon('cell-vat', r.vat);
+    showRow('row-vat', showTariffVat);
+    if (showTariffVat) setWon('cell-vat', r.vat);
 
     setWon('cell-total', r.totalTax);
     setWon('total-tax', r.totalTax);
