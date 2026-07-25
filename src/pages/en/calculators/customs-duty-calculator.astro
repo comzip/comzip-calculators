@@ -1,0 +1,370 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your overseas purchase price, origin country, and item category to
+    check <strong>duty-free eligibility</strong> and estimate
+    <strong>customs duty and VAT</strong>. Beer and takju (Korean rice wine)
+    also include liquor tax and education tax.
+  </p>
+
+  <form class="calc-form" id="customs-form">
+    <fieldset class="method-toggle">
+      <legend>Origin country</legend>
+      <label class="method-option">
+        <input type="radio" name="origin" value="US" checked />
+        <span>United States</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="origin" value="OTHER" />
+        <span>Other country</span>
+      </label>
+    </fieldset>
+    <p class="note" id="origin-hint">
+      Duty-free threshold: $200 for express shipments from the US / $150 for other countries
+    </p>
+
+    <label>
+      Item category
+      <select id="category">
+        <option value="의류·신발">Clothing, shoes, bags, etc. (simplified rate 18%)</option>
+        <option value="모피">Fur clothing/products (simplified rate 19%)</option>
+        <option value="IT기기">Smartphones, laptops, tablets, etc. (0% tariff)</option>
+        <option value="일반품목" selected
+          >Other general items — earphones, small appliances, general cosmetics, etc. (simplified rate 15%)</option
+        >
+        <option value="사치품">Jewelry, precious metals, luxury watches/bags (simplified rate 20%)</option>
+        <option value="맥주">Beer</option>
+        <option value="탁주">Takju (Korean rice wine)</option>
+        <option value="기능성화장품">Functional cosmetics (whitening/anti-wrinkle/UV protection claims)</option>
+        <option value="건강기능식품">Health supplements / vitamins</option>
+        <option value="기타주류">Other alcohol (whisky, wine, etc.)</option>
+        <option value="담배">Tobacco</option>
+      </select>
+    </label>
+
+    <label>
+      Item price (US$)
+      <span class="hint">Item price only, excluding international shipping/insurance. e.g. 220</span>
+      <input
+        type="number"
+        id="priceUsd"
+        name="priceUsd"
+        min="0"
+        step="any"
+        placeholder="e.g. 220"
+        required
+      />
+    </label>
+
+    <label>
+      International shipping (US$, optional)
+      <span class="hint">Included in the taxable price if the duty-free threshold is exceeded.</span>
+      <input type="number" id="shippingUsd" name="shippingUsd" min="0" step="any" placeholder="e.g. 20" />
+    </label>
+
+    <label>
+      Exchange rate (KRW per US$)
+      <span class="hint">Use the Korea Customs Service's notified exchange rate. e.g. 1400</span>
+      <input
+        type="number"
+        id="exchangeRate"
+        name="exchangeRate"
+        min="0"
+        step="any"
+        placeholder="e.g. 1400"
+        required
+      />
+    </label>
+
+    <label id="volume-field">
+      Volume (liters)
+      <span class="hint">Beer and takju liquor tax is a flat amount per liter, so volume is required.</span>
+      <input type="number" id="volumeLiters" name="volumeLiters" min="0" step="any" placeholder="e.g. 1.5" />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div id="excluded-notice" class="disclaimer strong-disclaimer hidden">
+      <strong>This item is excluded from simplified (list) customs clearance.</strong>
+      The $150 threshold applies regardless of origin country, and a formal
+      import declaration is required if exceeded. Confirm the exact tax with
+      Korea Customs (call 125 within Korea) or a licensed customs broker.
+    </div>
+
+    <div id="exempt-notice" class="disclaimer hidden">
+      <strong>Below the duty-free threshold — customs duty and VAT are exempt.</strong>
+    </div>
+
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Estimated total tax</span>
+        <span class="value"><span id="total-tax">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown" id="breakdown-table">
+      <tbody>
+        <tr id="row-taxable">
+          <td>Taxable price</td>
+          <td id="cell-taxable">-</td>
+        </tr>
+        <tr id="row-simplified" class="hidden">
+          <td>Simplified tax <span class="hint" id="simplified-rate-hint"></span></td>
+          <td id="cell-simplified">-</td>
+        </tr>
+        <tr id="row-tariff" class="hidden">
+          <td>Customs duty</td>
+          <td id="cell-tariff">-</td>
+        </tr>
+        <tr id="row-liquor" class="hidden">
+          <td>Liquor tax</td>
+          <td id="cell-liquor">-</td>
+        </tr>
+        <tr id="row-education" class="hidden">
+          <td>Education tax <span class="hint">(30% of liquor tax)</span></td>
+          <td id="cell-education">-</td>
+        </tr>
+        <tr id="row-vat" class="hidden">
+          <td>VAT</td>
+          <td id="cell-vat">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total</td>
+          <td id="cell-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div id="luxury-notice" class="disclaimer hidden">
+      The taxable price exceeds 2,000,000 KRW, so an additional
+      <strong>individual consumption tax (20%) + education tax</strong> may
+      apply. This calculator does not compute it automatically — confirm with
+      a customs broker or Korea Customs.
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. Actual tax depends
+    on the exact HS classification of the item, the customs-notified exchange
+    rate on the day of clearance, and whether personal-use quantity limits are
+    exceeded. Always confirm the actual amount payable with Korea Customs
+    (call 125 within Korea) or a licensed customs broker.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How do the $150 and $200 duty-free thresholds differ?</summary>
+      <p>
+        Personal-use overseas purchases are duty-free without a formal import
+        declaration if the price is $150 or under. Express shipments sent
+        from the United States get a higher $200 threshold under the
+        Korea-US FTA. Exceeding the threshold by even <strong>$1 taxes the
+        entire amount</strong>, not just the excess.
+      </p>
+    </details>
+
+    <details>
+      <summary>What are items excluded from simplified customs clearance?</summary>
+      <p>
+        Medicine, health supplements, functional cosmetics, alcohol, tobacco,
+        and agricultural/livestock/fishery products are excluded from
+        simplified (list) clearance — the $150 threshold applies regardless
+        of origin country, and a formal import declaration is generally
+        required. This calculator shows an advisory notice for these items
+        instead of computing a tax estimate.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the simplified tariff rate?</summary>
+      <p>
+        A combined rate covering customs duty and VAT (and other charges)
+        applied to travelers' baggage, mail, and courier shipments, under a
+        single percentage (Customs Act Article 81, Enforcement Decree Article
+        96 and Annex 2). This calculator uses 19% for fur clothing/products,
+        18% for leather clothing/footwear/textile products, 15% for other
+        general items, and 20% for jewelry/precious metals/luxury
+        watches/bags. Under the WTO Information Technology Agreement,
+        smartphones, laptops, and similar IT devices have 0% customs duty and
+        only 10% VAT.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is beer/takju calculated differently?</summary>
+      <p>
+        Beer and takju are excluded from simplified clearance, so customs
+        duty and VAT are exempt at $150 or under — but <strong>liquor tax and
+        education tax always apply regardless of price</strong>. Liquor tax is
+        a flat amount per liter (885.7 KRW/L for beer, 44.4 KRW/L for takju,
+        as of 2024), and beer additionally carries an education tax equal to
+        30% of the liquor tax (takju is exempt from education tax). If the
+        price exceeds $150, customs duty (0%) and VAT are also added.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+  }
+  #origin-hint {
+    margin-top: -8px;
+  }
+</style>
+
+<script>
+  import { calculateCustomsDuty } from '../../../lib/customsDutyCalculator';
+  import type { CustomsCategory } from '../../../lib/customsDutyCalculator';
+
+  const form = document.getElementById('customs-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+  const categorySelect = document.getElementById('category') as HTMLSelectElement;
+  const volumeField = document.getElementById('volume-field') as HTMLLabelElement;
+  const volumeInput = document.getElementById('volumeLiters') as HTMLInputElement;
+
+  const ALCOHOL_CATEGORIES: CustomsCategory[] = ['맥주', '탁주'];
+
+  const syncVolumeField = () => {
+    const isAlcohol = ALCOHOL_CATEGORIES.includes(categorySelect.value as CustomsCategory);
+    volumeField.classList.toggle('hidden', !isAlcohol);
+    volumeInput.required = isAlcohol;
+  };
+  categorySelect.addEventListener('change', syncVolumeField);
+  syncVolumeField();
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const showRow = (id: string, show: boolean) => {
+    document.getElementById(id)?.classList.toggle('hidden', !show);
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const category = categorySelect.value as CustomsCategory;
+    const isFromUS =
+      (form.querySelector('input[name="origin"]:checked') as HTMLInputElement).value === 'US';
+    const priceUsd = Number((document.getElementById('priceUsd') as HTMLInputElement).value);
+    const shippingUsd = Number(
+      (document.getElementById('shippingUsd') as HTMLInputElement).value,
+    );
+    const exchangeRate = Number(
+      (document.getElementById('exchangeRate') as HTMLInputElement).value,
+    );
+    const volumeLiters = Number(volumeInput.value);
+
+    if (!priceUsd || priceUsd <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid item price.';
+      return;
+    }
+    if (!exchangeRate || exchangeRate <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid exchange rate.';
+      return;
+    }
+    if (ALCOHOL_CATEGORIES.includes(category) && (!volumeLiters || volumeLiters <= 0)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid volume (liters) for beer/takju.';
+      return;
+    }
+
+    const r = calculateCustomsDuty({
+      category,
+      isFromUS,
+      priceUsd,
+      shippingUsd,
+      exchangeRate,
+      volumeLiters,
+    });
+
+    const excludedNotice = document.getElementById('excluded-notice') as HTMLDivElement;
+    const exemptNotice = document.getElementById('exempt-notice') as HTMLDivElement;
+    const breakdownTable = document.getElementById('breakdown-table') as HTMLTableElement;
+    const luxuryNotice = document.getElementById('luxury-notice') as HTMLDivElement;
+
+    excludedNotice.classList.toggle('hidden', !r.isExcludedCategory);
+    luxuryNotice.classList.toggle('hidden', !r.luxuryExciseAdvisory);
+
+    if (r.isExcludedCategory) {
+      breakdownTable.classList.add('hidden');
+      exemptNotice.classList.add('hidden');
+      setWon('total-tax', 0);
+      result.classList.remove('hidden');
+      return;
+    }
+
+    breakdownTable.classList.remove('hidden');
+
+    const isAlcohol = ALCOHOL_CATEGORIES.includes(category);
+    // Beer/takju still owe liquor tax + education tax even under the
+    // duty-free threshold, so only show the "exempt" banner for non-alcohol
+    // items where customs duty and VAT are the only thing being waived.
+    exemptNotice.classList.toggle('hidden', !(r.isExempt && !isAlcohol));
+
+    showRow('row-taxable', !r.isExempt || isAlcohol);
+    if (!r.isExempt) setWon('cell-taxable', r.taxablePriceKrw);
+    else if (isAlcohol) {
+      const cell = document.getElementById('cell-taxable');
+      if (cell) cell.textContent = '₩0 (exempt)';
+    }
+
+    showRow('row-simplified', r.simplifiedTax !== undefined);
+    if (r.simplifiedTax !== undefined) {
+      setWon('cell-simplified', r.simplifiedTax);
+      const rateHint = document.getElementById('simplified-rate-hint') as HTMLSpanElement;
+      const rate = r.taxablePriceKrw > 0 ? (r.simplifiedTax / r.taxablePriceKrw) * 100 : 0;
+      rateHint.textContent = `(${rate.toFixed(0)}%)`;
+    }
+
+    showRow('row-tariff', category === 'IT기기' || isAlcohol);
+    if (category === 'IT기기' || isAlcohol) setWon('cell-tariff', r.tariff);
+
+    showRow('row-liquor', r.liquorTax !== undefined);
+    if (r.liquorTax !== undefined) setWon('cell-liquor', r.liquorTax);
+
+    showRow('row-education', r.educationTax !== undefined && r.educationTax > 0);
+    if (r.educationTax) setWon('cell-education', r.educationTax);
+
+    showRow('row-vat', category === 'IT기기' || isAlcohol);
+    if (category === 'IT기기' || isAlcohol) setWon('cell-vat', r.vat);
+
+    setWon('cell-total', r.totalTax);
+    setWon('total-tax', r.totalTax);
+
+    result.classList.remove('hidden');
+  });
+</script>

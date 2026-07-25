@@ -543,6 +543,16 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       .hidden {
         display: none;
       }
+      /* `.calc-form label` sets `display: grid` at specificity (0,1,1),
+         which silently beats a bare `.hidden` (0,1,0) on any conditionally
+         shown/hidden <label> inside a form (e.g. property-tax-calculator's
+         #land-options, customs-duty-calculator's #volume-field) — the
+         element stays visible even after `.hidden` is toggled on. This
+         qualifies with `.calc-form` to win at (0,2,1) regardless of source
+         order. */
+      .calc-form label.hidden {
+        display: none;
+      }
     </style>
 
     <script>

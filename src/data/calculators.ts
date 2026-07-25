@@ -212,6 +212,18 @@ export const calculators: Calculator[] = [
     descriptionEn:
       'Set a target date to see how many days remain (D-100) or have passed (D+50) from today. Count down to exams, anniversaries, or any date that matters to you.',
   },
+  {
+    slug: 'customs-duty-calculator',
+    title: '관부가세 계산기',
+    titleEn: 'Korea Customs Duty & VAT Calculator',
+    navLabel: '관부가세 계산기',
+    navLabelEn: 'Customs Duty & VAT',
+    category: '생활',
+    description:
+      '해외직구 물품가격·구입국가·품목을 입력하면 목록통관 면세 여부와 예상 관세·부가세(맥주·탁주는 주세·교육세 포함)를 계산합니다.',
+    descriptionEn:
+      'Enter your overseas purchase price, origin country, and item category to check duty-free eligibility and estimate customs duty and VAT for Korean imports (including liquor and education tax for beer/takju).',
+  },
 ];
 
 /** Returns the calculators belonging to a given category. */
