@@ -16,11 +16,12 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
   <p class="note">
     Compares <strong>buying</strong> a home versus renting under
     <strong>jeonse</strong> (Korea's lump-sum deposit lease) with the same
-    budget, over a chosen holding period. Buying factors in acquisition tax,
-    loan interest, property tax, comprehensive real estate tax, and expected
-    appreciation; jeonse factors in the brokerage fee and the opportunity
-    cost of the deposit — and the opportunity cost of money tied up is
-    applied on the same basis to both scenarios.
+    starting cash, over a chosen holding period — how much you'd actually
+    gain or lose under each. Buying is "appreciation − (acquisition tax +
+    brokerage fee + loan interest + property tax + comprehensive real estate
+    tax)"; jeonse is "surplus-cash investment return − brokerage fee." Every
+    line item in the results below shows the exact formula used, so you can
+    see how each figure was derived.
   </p>
 
   <form class="calc-form" id="compare-form">
@@ -133,11 +134,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         />
       </label>
       <label>
-        Annual return assumption for tied-up capital (equity / deposit / surplus cash) (%)
+        Annual return assumption for surplus cash (%)
         <span class="hint"
-          >Applied to both the buyer's equity and the jeonse deposit/surplus
-          cash. Setting this much higher than the home price growth
-          assumption favors jeonse; setting it lower favors buying.</span
+          >Whatever cash is left over after buying or the jeonse deposit is
+          assumed to be invested at this rate. Use a safe-asset level such as
+          a term deposit.</span
         >
         <input
           type="number"
@@ -190,9 +191,10 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
 
     <p class="note">
       The "net cost" below adds up what you actually pay in each scenario
-      (acquisition tax, interest, and property tax — or brokerage fee and
-      opportunity cost), then subtracts what you gain in return
-      (appreciation, or investment return). A smaller number is better.
+      (buying: acquisition tax, brokerage fee, interest, property tax,
+      comprehensive real estate tax; jeonse: brokerage fee), then subtracts
+      what you gain in return (appreciation, or surplus-cash investment
+      return). A smaller number is better — negative means a net gain.
     </p>
 
     <table class="breakdown">
@@ -201,48 +203,74 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td>Loan amount</td>
+          <td>Loan amount <span class="hint">= purchase price − cash on hand</span></td>
           <td id="buy-loan-amount">-</td>
         </tr>
         <tr>
-          <td>Acquisition tax etc. (one-time)</td>
+          <td
+            >Acquisition tax etc. (one-time) <span class="hint"
+              >= purchase price × acquisition tax rate (1–3%) + local education tax
+              (+ rural development tax)</span
+            ></td
+          >
           <td id="buy-acquisition-tax">-</td>
         </tr>
         <tr>
-          <td>Loan interest paid over the period</td>
+          <td
+            >Brokerage fee (one-time) <span class="hint"
+              >= purchase price × brokerage rate (bracketed, capped)</span
+            ></td
+          >
+          <td id="buy-brokerage-fee">-</td>
+        </tr>
+        <tr>
+          <td
+            >Loan interest paid over the period <span class="hint"
+              >= sum of the interest portions in the equal-payment amortization
+              schedule over the comparison period</span
+            ></td
+          >
           <td id="buy-total-interest">-</td>
         </tr>
         <tr>
-          <td>Property tax <span class="hint">(annual <span id="buy-annual-tax-hint"></span>)</span></td>
+          <td
+            >Property tax <span class="hint"
+              >= announced value × fair market ratio × tax rate (annual
+              <span id="buy-annual-tax-hint"></span>)</span
+            ></td
+          >
           <td id="buy-total-property-tax">-</td>
         </tr>
         <tr id="buy-comprehensive-row" class="hidden">
           <td
             >Comprehensive real estate tax <span class="hint"
-              >(annual <span id="buy-annual-comprehensive-hint"></span>, on the amount
-              exceeding the 1.2 billion KRW single-home deduction)</span
+              >= (announced value − 1.2B) × fair market ratio × tax rate −
+              property tax credit (annual <span id="buy-annual-comprehensive-hint"></span>, on
+              the amount exceeding the 1.2 billion KRW single-home
+              deduction)</span
             ></td
           >
           <td id="buy-total-comprehensive-tax">-</td>
         </tr>
-        <tr>
+        <tr id="buy-surplus-row" class="hidden">
           <td
-            >Equity opportunity cost <span class="hint"
-              >(what the buyer's equity would have earned if invested)</span
+            >Surplus cash investment return <span class="hint"
+              >= surplus cash × ((1+return rate)^years − 1) (when cash on hand
+              exceeds the purchase price, deducted)</span
             ></td
           >
-          <td id="buy-equity-opportunity-cost">-</td>
-        </tr>
-        <tr id="buy-surplus-row" class="hidden">
-          <td>Surplus cash investment return <span class="hint">(when cash on hand exceeds the purchase price, deducted)</span></td>
           <td id="buy-surplus-return">-</td>
         </tr>
         <tr>
-          <td>Expected capital gain (appreciation) <span class="hint">(deducted)</span></td>
+          <td
+            >Expected capital gain (appreciation) <span class="hint"
+              >= purchase price × ((1+growth rate)^years − 1) (deducted)</span
+            ></td
+          >
           <td id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of buying <span class="hint">= acquisition tax + interest + property tax + comprehensive real estate tax + equity opportunity cost − capital gain</span></td>
+          <td>Net cost of buying <span class="hint">= acquisition tax + brokerage fee + interest + property tax + comprehensive real estate tax − capital gain − surplus cash return</span></td>
           <td id="buy-net-cost">-</td>
         </tr>
       </tbody>
@@ -254,23 +282,33 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td>Brokerage fee (one-time)</td>
+          <td
+            >Brokerage fee (one-time) <span class="hint"
+              >= deposit × brokerage rate (bracketed, capped)</span
+            ></td
+          >
           <td id="jeonse-brokerage-fee">-</td>
         </tr>
         <tr>
-          <td>Surplus cash investment return <span class="hint">(deducted)</span></td>
+          <td>Surplus cash <span class="hint">= cash on hand − deposit − brokerage fee</span></td>
+          <td id="jeonse-surplus-cash">-</td>
+        </tr>
+        <tr>
+          <td>Surplus cash investment return <span class="hint">= surplus cash × ((1+return rate)^years − 1) (deducted)</span></td>
           <td id="jeonse-surplus-return">-</td>
         </tr>
         <tr>
-          <td>Deposit opportunity cost</td>
-          <td id="jeonse-opportunity-cost">-</td>
-        </tr>
-        <tr>
-          <td>Expected deposit at period end <span class="hint">(reference only, not part of net cost)</span></td>
+          <td
+            >Expected deposit at period end <span class="hint"
+              >= deposit × (1+renewal increase rate)^renewal cycles (reference
+              only — the deposit is returned at face value, so it isn't part of
+              net cost)</span
+            ></td
+          >
           <td id="jeonse-final-deposit">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of jeonse <span class="hint">= brokerage fee + deposit opportunity cost − surplus cash return</span></td>
+          <td>Net cost of jeonse <span class="hint">= brokerage fee − surplus cash return</span></td>
           <td id="jeonse-net-cost">-</td>
         </tr>
       </tbody>
@@ -285,8 +323,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     senior/long-term-holding credits and tax burden cap, negotiated brokerage
     rates, actual loan limits (e.g. DSR), and capital gains tax on resale are
     not included. A jeonse deposit larger than the cash on hand (which would
-    require a jeonse loan) is also not modeled. Always consult a professional
-    and confirm actual rates and market prices before making a real decision.
+    require a jeonse loan), and the loan's principal repayment (only
+    interest is counted as a cost, since principal converts cash into home
+    equity and is treated as net-worth-neutral), are also not modeled.
+    Always consult a professional and confirm actual rates and market prices
+    before making a real decision.
   </div>
 
   <AdSlot lang="en" />
@@ -304,25 +345,30 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </p>
       <p><strong>Buying scenario</strong></p>
       <ul>
-        <li>Loan amount = 500M − 400M (equity) = <strong>100M KRW</strong></li>
-        <li>Acquisition tax etc. (one-time) = <strong>5.5M KRW</strong></li>
+        <li>Loan amount = purchase price − cash on hand = 500M − 400M = <strong>100M KRW</strong></li>
+        <li>Acquisition tax etc. (one-time) = 500M × tax rate ≈ <strong>5.5M KRW</strong></li>
+        <li>Brokerage fee (one-time) = 500M × brokerage rate (bracketed) ≈ <strong>2M KRW</strong></li>
         <li>Interest over 3 years (first 36 months of a 100M/4%/20yr equal-payment schedule) ≈ <strong>11.4M KRW</strong></li>
         <li>Announced value = 500M × 70% = 350M → property tax ≈ 1.536M/yr × 3yr ≈ <strong>4.6M KRW</strong> (comprehensive tax is 0 since 350M &lt; 1.2B)</li>
-        <li>Equity opportunity cost = 400M × ((1.03)³ − 1) = 400M × 9.27% ≈ <strong>37.1M KRW</strong></li>
+        <li>Surplus cash = 0 (cash on hand 400M is less than the 500M purchase price, so nothing is left over)</li>
         <li>Expected capital gain (deducted) = 500M × ((1.02)³ − 1) = 500M × 6.12% ≈ <strong>30.6M KRW</strong></li>
-        <li>Net cost of buying = 5.5 + 11.4 + 4.6 + 37.1 − 30.6 ≈ <strong>23.9M KRW</strong></li>
+        <li>Net cost of buying = 5.5 + 2 + 11.4 + 4.6 + 0 − 30.6 ≈ <strong>−11.2M KRW</strong> (negative means a net gain)</li>
       </ul>
       <p><strong>Jeonse scenario</strong></p>
       <ul>
-        <li>Brokerage fee (one-time) = <strong>0.9M KRW</strong></li>
-        <li>Surplus cash = 400M (equity) − 300M (deposit) − 0.9M ≈ <strong>99.1M KRW</strong></li>
-        <li>Deposit opportunity cost = 300M × 9.27% ≈ <strong>27.8M KRW</strong></li>
-        <li>Surplus cash investment return (deducted) = 99.1M × 9.27% ≈ <strong>9.2M KRW</strong></li>
-        <li>Net cost of jeonse = 0.9 + 27.8 − 9.2 ≈ <strong>19.5M KRW</strong></li>
+        <li>Brokerage fee (one-time) = 300M × brokerage rate (bracketed) ≈ <strong>0.9M KRW</strong></li>
+        <li>Surplus cash = 400M (cash on hand) − 300M (deposit) − 0.9M ≈ <strong>99.1M KRW</strong></li>
+        <li>Surplus cash investment return (deducted) = 99.1M × ((1.03)³ − 1) = 99.1M × 9.27% ≈ <strong>9.2M KRW</strong></li>
+        <li>Net cost of jeonse = 0.9 − 9.2 ≈ <strong>−8.3M KRW</strong></li>
       </ul>
       <p>
-        Buying's net cost (23.9M) is higher than jeonse's (19.5M), so
-        <strong>under these conditions jeonse is about 4.3M KRW cheaper</strong>.
+        Buying's net cost (−11.2M) is lower than jeonse's (−8.3M) — both are
+        net gains, but buying's is bigger — so <strong>under these
+        conditions buying is about 2.9M KRW better</strong>. All 400M KRW of
+        the buyer's cash works toward appreciation on the full 500M home
+        (leverage), while the renter only actually invests 99.1M KRW (the
+        rest sits in the deposit, earning nothing). Buying's brokerage fee
+        (2M) is also larger than jeonse's (0.9M), which narrows the gap.
         Enter these same inputs above and you'll see these exact figures in
         the results.
       </p>
@@ -345,33 +391,46 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     </details>
 
     <details>
-      <summary>What are "equity opportunity cost" and "deposit opportunity cost"?</summary>
+      <summary>Why doesn't the jeonse deposit itself appear in the calculation?</summary>
       <p>
-        A jeonse deposit and a buyer's equity (cash minus loan) are both
-        principal you get back — at lease end, or when you sell — so neither
-        is a loss by itself. But money tied up instead of invested foregoes
-        whatever return it could have earned, so <strong>both scenarios
-        apply the same return assumption</strong> to that tied-up capital.
-        Buying additionally earns a "capital gain" on the full purchase
-        price (including the loan-financed portion) — that's leverage: you
-        only put in the equity, but you capture appreciation on the whole
-        home.
+        A jeonse deposit is returned in full, with no interest, when the
+        lease ends — so the deposit itself neither grows nor shrinks over
+        the period. When comparing how much each scenario actually gains or
+        loses, all that matters is <strong>how much the leftover surplus
+        cash (after setting aside the deposit) actually grew</strong>. The
+        buyer's cash on hand works the same way — its performance already
+        shows up fully in the capital gain, so it isn't counted a second
+        time.
       </p>
     </details>
 
     <details>
-      <summary>The result flipped dramatically when I raised the return assumption — is that a bug?</summary>
+      <summary>Why does buying capture the full purchase price's appreciation instead of just the equity's? (Leverage)</summary>
       <p>
-        No, that's expected. If your return assumption is far above the home
-        price growth assumption (e.g. 20% vs 3%), tying money up in a home
-        becomes relatively costly in both scenarios, so both net costs rise.
-        But jeonse actually invests its surplus cash and nets that return
-        back out, while buying's equity is mostly locked in the home and
-        barely benefits from that higher return — so a higher return
-        assumption should make jeonse look relatively better. That matches
-        standard financial advice: if you're confident you can earn a much
-        higher return elsewhere, renting and investing the difference tends
-        to beat buying.
+        Even with a loan, you own the entire home — so when its value rises,
+        you capture the appreciation on the <strong>full purchase
+        price</strong>, regardless of how much was financed. In exchange,
+        you bear the loan interest as a real cost. That means a smaller
+        equity share (more leverage) amplifies both the potential gain and
+        the interest burden. This calculator doesn't count loan principal
+        repayment as a cost or a gain either way — it converts cash directly
+        into home equity, so it's treated as net-worth-neutral.
+      </p>
+    </details>
+
+    <details>
+      <summary>Changing the return assumption swings the result a lot — why?</summary>
+      <p>
+        The return assumption only affects <strong>surplus cash</strong> —
+        whatever's left over after buying or after the jeonse deposit. When
+        there's little or no surplus in either scenario (cash on hand close
+        to the purchase price or deposit), changing this assumption barely
+        moves the result. But when cash on hand is large relative to the
+        purchase price or deposit, a lot of surplus cash is left in play,
+        and where that surplus does better (buying's leftover cash vs.
+        jeonse's leftover cash) can swing the comparison substantially. The
+        same rate is always applied to both scenarios' surplus cash, so
+        neither side is unfairly favored.
       </p>
     </details>
 
@@ -389,10 +448,13 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     <details>
       <summary>When does buying win, and when does jeonse win?</summary>
       <p>
-        If your assumed price growth rate is comfortably above the loan rate
-        and investment return rate, buying tends to win. If home prices are
-        expected to stagnate or decline (or the loan rate is high), jeonse's
-        relatively smaller opportunity cost can make it the better choice.
+        If your assumed price growth rate is comfortably above the loan
+        rate, buying tends to win thanks to leverage. If home prices are
+        expected to stagnate or decline, or the loan rate is high, the
+        interest burden dominates and jeonse tends to win. When cash on hand
+        is large enough to leave significant surplus cash, a higher return
+        assumption tends to favor jeonse — since buying generally requires
+        more upfront cash, jeonse usually leaves more surplus cash to invest.
         Try adjusting the assumptions to compare different scenarios.
       </p>
     </details>
@@ -535,6 +597,7 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
 
     setWon('buy-loan-amount', r.buy.loanAmount);
     setWon('buy-acquisition-tax', r.buy.acquisitionTax);
+    setWon('buy-brokerage-fee', r.buy.brokerageFee);
     setWon('buy-total-interest', r.buy.totalLoanInterest);
     setWon('buy-total-property-tax', r.buy.totalPropertyTax);
     (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
@@ -551,8 +614,6 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         won.format(Math.round(r.buy.annualComprehensiveTax));
     }
 
-    setWon('buy-equity-opportunity-cost', r.buy.equityOpportunityCost);
-
     const buySurplusRow = document.getElementById('buy-surplus-row') as HTMLTableRowElement;
     buySurplusRow.classList.toggle('hidden', r.buy.surplusCash <= 0);
     if (r.buy.surplusCash > 0) setWon('buy-surplus-return', r.buy.surplusInvestReturn);
@@ -561,8 +622,8 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     setWon('buy-net-cost', r.buy.netCost);
 
     setWon('jeonse-brokerage-fee', r.jeonse.brokerageFee);
+    setWon('jeonse-surplus-cash', r.jeonse.surplusCash);
     setWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn);
-    setWon('jeonse-opportunity-cost', r.jeonse.depositOpportunityCost);
     setWon('jeonse-final-deposit', r.jeonse.expectedFinalDeposit);
     setWon('jeonse-net-cost', r.jeonse.netCost);
 

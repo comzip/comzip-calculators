@@ -7,24 +7,34 @@
  * 실제 투자수익률, 지역별 집값·전세가 변동성 등)을 반영해야 합니다.
  * 이 계산기는 다음과 같이 단순화합니다.
  *
- *  - 매매: 자기자본을 매매가에 우선 투입하고, 부족분(매매가−자기자본,
- *    음수면 0)을 대출로 조달한다고 가정합니다. 자기자본이 매매가를
- *    초과하는 경우 남는 돈(잉여자금)은 전세의 여유자금과 동일하게
- *    투자수익률 가정으로 운용된다고 가정합니다.
+ *  - 두 시나리오 모두 같은 보유현금(cashOnHand)에서 출발한다고 보고,
+ *    "실제로 무엇을 얻었는지"만 직접 비교합니다:
+ *      매매 순비용 = 취득세 + 중개수수료 + 대출이자 + 재산세 + 종부세
+ *                    − 집값 상승분 − 잉여자금 운용수익
+ *      전세 순비용 = 중개수수료 − 여유자금 운용수익
+ *    매매·전세 모두 중개수수료가 발생합니다(공인중개사법 시행규칙상
+ *    매매는 '매매' 요율표, 전세는 '임대차' 요율표를 적용).
+ *    전세보증금은 계약 종료 시 원금 그대로 돌려받으므로(이자가 붙지
+ *    않음) 그 자체는 계산에 들어가지 않고, 보증금을 뺀 나머지 여유자금만
+ *    투자수익률 가정으로 굴린 수익을 반영합니다. 매매도 마찬가지로
+ *    자기자본 중 매매가를 넘는 잉여자금만 투자수익률로 굴립니다.
+ *
+ *    (이전 버전은 "자기자본"과 "보증금"에 각각 별도로 기회비용을
+ *    매겼는데, 두 금액이 다르면 서로 다른 기준선을 쓰는 셈이 되어
+ *    오차가 생깁니다 — 두 시나리오가 같은 보유현금에서 출발하는 이상
+ *    "투자했다면 벌었을 돈"이라는 기준선은 양쪽에서 정확히 상쇄되어,
+ *    남는 건 실제로 발생한 손익만 비교하면 됩니다. 2026-07-26 재검토로
+ *    발견해 단순화했습니다.)
+ *  - 대출 원금 상환분은 비용으로도 이득으로도 계산하지 않습니다(대출
+ *    이자만 비용으로 집계) — 원금 상환은 현금이 그대로 주택 지분으로
+ *    바뀌는 것이라 순자산에 중립적이라고 가정하는, 이런 종류의 계산기의
+ *    일반적인 단순화입니다. 정확히 하려면 원금 상환에 쓰인 현금이 어느
+ *    소득에서 나왔는지까지 추적해야 하는데, 이는 이 계산기의 범위를
+ *    벗어납니다.
  *  - 재산세·종합부동산세는 비교기간 내내 최초 공시가격 기준으로 동일하다고
  *    가정합니다(공시가격 상승분 미반영). 종합부동산세는 1세대1주택 공제금액
  *    (12억원)을 초과하는 공시가격에서만 발생하며, 재산세액공제(이중과세
  *    조정)까지 근사 반영합니다.
- *  - 기회비용은 두 시나리오에 동일한 원칙으로 대칭 반영합니다: 전세는
- *    보증금(집에 넣지 않고 은행 등에 예치했다면 벌 수 있었던 돈)을,
- *    매매는 자기자본(집에 넣지 않고 투자했다면 벌 수 있었던 돈)을 각각
- *    투자수익률 가정으로 "기회비용"으로 계산해 순비용에 더합니다. 매매는
- *    대신 집값 상승분을 "자본이득"으로 별도 반영합니다 — 매입가 전체
- *    (대출 포함)에 대해 상승하므로, 자기자본만 투입하고도 집값 전체의
- *    상승분을 얻는 레버리지 효과가 그대로 드러납니다.
- *    (이전 버전은 매매의 자기자본에는 기회비용을 매기지 않아, 투자수익률
- *    가정을 집값 상승률보다 높게 잡을수록 비합리적으로 매매가 유리하게
- *    나오는 오류가 있었습니다 — 2026-07-25 3인 교차검증으로 발견해 수정.)
  *  - 대출 이자는 실제 상환 스케줄(원리금균등)에서 비교기간에 해당하는
  *    회차의 이자 합계를 사용합니다(대출 잔액이 계속 줄어드는 것을 반영).
  *  - 전세보증금이 보유 현금보다 큰 경우(전세자금대출이 필요한 상황)는
@@ -35,7 +45,7 @@
  *  - 취득세: acquisitionTaxCalculator.ts (지방세법)
  *  - 대출이자: loanCalculator.ts
  *  - 재산세: propertyTaxCalculator.ts (지방세법)
- *  - 전세 중개수수료: brokerageFeeCalculator.ts (공인중개사법 시행규칙)
+ *  - 중개수수료(매매·전세): brokerageFeeCalculator.ts (공인중개사법 시행규칙)
  *
  * 📋 법령 현황 추적: 프로젝트 루트 LEGAL_REFERENCES.md →
  *    "부동산 > 전세 vs 매매 비교 계산기". 값을 갱신하면 그 문서도 함께
@@ -65,7 +75,7 @@ export interface BuyVsJeonseInput {
   loanTermYears: number;
   /** 연간 주택가격 상승률 가정(%). */
   priceGrowthRatePercent: number;
-  /** 여유자금·보증금 기회비용 계산에 쓰는 연 수익률 가정(%). */
+  /** 여유자금 운용 연 수익률 가정(%). */
   investReturnRatePercent: number;
   /** 전세 재계약(2년 주기) 시 보증금 인상률 가정(%). */
   jeonseRenewalIncreasePercent: number;
@@ -80,16 +90,13 @@ export interface BuyVsJeonseInput {
 export interface BuyScenarioResult {
   loanAmount: number;
   acquisitionTax: number;
+  brokerageFee: number;
   totalLoanInterest: number;
   annualPropertyTax: number;
   totalPropertyTax: number;
   /** 종합부동산세(연, 재산세액공제 반영 후 결정세액+농특세). 공제금액 이하면 0. */
   annualComprehensiveTax: number;
   totalComprehensiveTax: number;
-  /** 매매가에 투입된 자기자본(= min(보유현금, 매매가)). */
-  equityInHome: number;
-  /** 자기자본을 투자수익률 가정으로 운용했다면 벌었을 기회비용. */
-  equityOpportunityCost: number;
   /** 보유현금이 매매가를 초과할 때의 잉여자금(= max(0, 보유현금 − 매매가)). */
   surplusCash: number;
   /** 잉여자금을 투자수익률 가정으로 운용한 수익. */
@@ -101,8 +108,9 @@ export interface BuyScenarioResult {
 
 export interface JeonseScenarioResult {
   brokerageFee: number;
+  /** 보유현금 중 보증금·중개수수료를 뺀 여유자금. */
   surplusCash: number;
-  depositOpportunityCost: number;
+  /** 여유자금을 투자수익률 가정으로 운용한 수익. */
   surplusInvestReturn: number;
   expectedFinalDeposit: number;
   netCost: number;
@@ -123,14 +131,11 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
   const years = Math.max(0, input.years || 0);
   const months = Math.round(years * 12);
 
-  // 두 시나리오 모두 "묶인 자금을 투자했다면 벌었을 돈"을 같은 수익률
-  // 가정으로 계산하므로, 성장 배율을 한 번만 구해 공유한다.
+  // 양쪽 시나리오의 여유자금이 같은 수익률 가정으로 굴러간다고 본다.
   const growthFactor = Math.pow(1 + input.investReturnRatePercent / 100, years) - 1;
 
   // ---------------- 매매 시나리오 ----------------
   const loanAmount = Math.max(0, purchasePrice - cashOnHand);
-  const equityInHome = Math.min(cashOnHand, purchasePrice);
-  const equityOpportunityCost = equityInHome * growthFactor;
   const buySurplusCash = Math.max(0, cashOnHand - purchasePrice);
   const buySurplusInvestReturn = buySurplusCash * growthFactor;
 
@@ -141,6 +146,7 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
     isRegulatedArea: false,
     isOver85Sqm: input.isOver85Sqm,
   });
+  const buyBrokerage = calculateBrokerageFee({ dealType: '매매', amount: purchasePrice });
 
   let totalLoanInterest = 0;
   if (loanAmount > 0) {
@@ -188,37 +194,34 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
 
   const buyNetCost =
     acquisition.total +
+    buyBrokerage.fee +
     totalLoanInterest +
     totalPropertyTax +
-    totalComprehensiveTax +
-    equityOpportunityCost -
+    totalComprehensiveTax -
     capitalGain -
     buySurplusInvestReturn;
 
   // ---------------- 전세 시나리오 ----------------
   const brokerage = calculateBrokerageFee({ dealType: '임대차', amount: jeonseDeposit });
   const surplusCash = Math.max(0, cashOnHand - jeonseDeposit - brokerage.fee);
-
-  const depositOpportunityCost = jeonseDeposit * growthFactor;
   const surplusInvestReturn = surplusCash * growthFactor;
 
   const renewalCycles = Math.floor(years / 2);
   const expectedFinalDeposit =
     jeonseDeposit * Math.pow(1 + input.jeonseRenewalIncreasePercent / 100, renewalCycles);
 
-  const jeonseNetCost = brokerage.fee + depositOpportunityCost - surplusInvestReturn;
+  const jeonseNetCost = brokerage.fee - surplusInvestReturn;
 
   return {
     buy: {
       loanAmount,
       acquisitionTax: acquisition.total,
+      brokerageFee: buyBrokerage.fee,
       totalLoanInterest,
       annualPropertyTax,
       totalPropertyTax,
       annualComprehensiveTax,
       totalComprehensiveTax,
-      equityInHome,
-      equityOpportunityCost,
       surplusCash: buySurplusCash,
       surplusInvestReturn: buySurplusInvestReturn,
       expectedFuturePrice,
@@ -228,7 +231,6 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
     jeonse: {
       brokerageFee: brokerage.fee,
       surplusCash,
-      depositOpportunityCost,
       surplusInvestReturn,
       expectedFinalDeposit,
       netCost: jeonseNetCost,
