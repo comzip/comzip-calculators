@@ -13,12 +13,13 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
 >
   <h1>{meta.title}</h1>
   <p class="note">
-    같은 보유현금으로 <strong>매매</strong>할 때와 <strong>전세</strong>로 살 때,
-    일정 기간 후 실제로 얼마나 이득/손해를 보는지 비교합니다. 매매는 "집값
-    상승분 − (취득세+중개수수료+대출이자+재산세+종부세)", 전세는 "여유자금
-    운용수익 − 중개수수료"를 계산해서 두 값을 직접 비교합니다. 계산 결과의
-    각 항목 옆에 실제 계산 공식을 함께 표시하니 어떻게 나온 숫자인지 바로
-    확인할 수 있습니다.
+    같은 보유현금(자기자본)으로 <strong>매매</strong>할 때와
+    <strong>전세</strong>로 살 때, 일정 기간 후 그 돈이 실제로 얼마가
+    되는지(최종 자기자본)를 직접 비교합니다. 매매는 "보유현금 + 집값
+    상승분 + 잉여자금 운용수익 − 취득세 − 중개수수료 − 대출이자 − 재산세 −
+    종부세", 전세는 "보유현금 + 여유자금 운용수익 − 중개수수료"를 계산해서
+    두 최종 금액을 비교합니다. 계산 결과의 각 항목 옆에 실제 계산 공식을
+    함께 표시하니 어떻게 나온 숫자인지 바로 확인할 수 있습니다.
   </p>
 
   <form class="calc-form" id="compare-form">
@@ -179,16 +180,28 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <span class="value"><span id="verdict-value">-</span></span>
       </div>
       <div class="result-item">
-        <span class="label" id="diff-label">비용 차이</span>
+        <span class="label" id="diff-label">최종 자기자본 차이</span>
         <span class="value"><span id="cost-difference">-</span></span>
       </div>
     </div>
 
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">매매 시 최종 자기자본</span>
+        <span class="value"><span id="buy-final-capital-headline">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">전세 시 최종 자기자본</span>
+        <span class="value"><span id="jeonse-final-capital-headline">-</span></span>
+      </div>
+    </div>
+
     <p class="note">
-      아래 "순비용"은 각 시나리오에서 실제로 나가는 돈(매매는 취득세·중개수수료·
-      이자·재산세·종부세, 전세는 중개수수료)을 더한 뒤, 그 대가로 얻는
-      이득(집값 상승분 또는 여유자금 운용수익)을 뺀 금액입니다. 이 값이
-      작을수록(마이너스면 오히려 이득) 유리합니다.
+      아래 표는 <strong>시작 자기자본(보유현금)</strong>에서 출발해, 매매·전세
+      각각 실제로 나가는 돈(<span class="minus">−</span> 표시)과 실제로
+      불어나는 돈(<span class="plus">+</span> 표시)을 그대로 더하고 빼서
+      비교기간 종료 시점의 <strong>최종 자기자본</strong>을 계산합니다. 이
+      최종 자기자본이 클수록 유리합니다.
     </p>
 
     <table class="breakdown">
@@ -197,72 +210,80 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td>대출금 <span class="hint">= 매매가 − 보유현금</span></td>
+          <td>시작 자기자본(보유현금)</td>
+          <td id="buy-starting-cash">-</td>
+        </tr>
+        <tr>
+          <td>
+            대출금 <span class="hint">(참고용, 최종 자기자본 계산에 직접 포함되지 않음)</span>
+            <span class="formula-line">= 매매가 − 보유현금</span>
+            <span class="formula-actual" id="buy-loan-amount-formula">-</span>
+          </td>
           <td id="buy-loan-amount">-</td>
         </tr>
         <tr>
-          <td
-            >취득세 등(1회) <span class="hint"
-              >= 매매가 × 취득세율(1~3%) + 지방교육세(+농특세)</span
-            ></td
-          >
-          <td id="buy-acquisition-tax">-</td>
+          <td>
+            취득세 등(1회)
+            <span class="formula-line">= 취득세 본세 + 지방교육세 + 농어촌특별세</span>
+            <span class="formula-actual" id="buy-acquisition-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-acquisition-tax">-</td>
         </tr>
         <tr>
-          <td>중개수수료(1회) <span class="hint">= 매매가 × 중개보수 요율(구간별, 상한액 적용)</span></td>
-          <td id="buy-brokerage-fee">-</td>
+          <td>
+            중개수수료(1회)
+            <span class="formula-line">= 매매가 × 중개보수 상한요율(구간별, 한도액 적용)</span>
+            <span class="formula-actual" id="buy-brokerage-fee-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-brokerage-fee">-</td>
         </tr>
         <tr>
-          <td
-            >기간 내 대출이자 합계 <span class="hint"
-              >= 대출금·연이자율 기준 원리금균등상환 스케줄의 비교기간분 이자 합</span
-            ></td
-          >
-          <td id="buy-total-interest">-</td>
+          <td>
+            기간 내 대출이자 합계
+            <span class="formula-line">= 원리금균등상환(대출금, 연이자율, 대출기간) 스케줄의 비교기간분 이자 합</span>
+            <span class="formula-actual" id="buy-total-interest-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-interest">-</td>
         </tr>
         <tr>
-          <td
-            >재산세 <span class="hint"
-              >= 공시가격 × 공정시장가액비율 × 세율 (연 <span id="buy-annual-tax-hint"></span
-              >)</span
-            ></td
-          >
-          <td id="buy-total-property-tax">-</td>
+          <td>
+            재산세
+            <span class="formula-line">= (재산세 본세 + 지방교육세 + 도시지역분) × 비교기간</span>
+            <span class="formula-actual" id="buy-total-property-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-property-tax">-</td>
         </tr>
         <tr id="buy-comprehensive-row" class="hidden">
-          <td
-            >종합부동산세 <span class="hint"
-              >= (공시가격 − 12억) × 공정시장가액비율 × 세율 − 재산세액공제 (연
-              <span id="buy-annual-comprehensive-hint"></span>, 1세대1주택 공제금액
-              12억원 초과분)</span
-            ></td
-          >
-          <td id="buy-total-comprehensive-tax">-</td>
+          <td>
+            종합부동산세 <span class="hint">(1세대1주택 공제금액 12억원 초과분)</span>
+            <span class="formula-line">= (산출세액 − 재산세액공제) × 1.2(농특세 포함) × 비교기간</span>
+            <span class="formula-actual" id="buy-total-comprehensive-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-comprehensive-tax">-</td>
         </tr>
         <tr id="buy-surplus-row" class="hidden">
-          <td
-            >잉여자금 운용 수익 <span class="hint"
-              >= 잉여자금 × ((1+수익률)^년 − 1) (보유현금이 매매가보다 많을 때, 차감)</span
-            ></td
-          >
-          <td id="buy-surplus-return">-</td>
+          <td>
+            잉여자금 운용 수익 <span class="hint">(보유현금이 매매가보다 많을 때)</span>
+            <span class="formula-line">= 잉여자금 × ((1+수익률)^비교기간 − 1)</span>
+            <span class="formula-actual" id="buy-surplus-return-formula">-</span>
+          </td>
+          <td class="amount-plus" id="buy-surplus-return">-</td>
         </tr>
         <tr>
-          <td
-            >예상 자본이득(집값 상승분) <span class="hint"
-              >= 매매가 × ((1+집값상승률)^년 − 1) (차감)</span
-            ></td
-          >
-          <td id="buy-capital-gain">-</td>
+          <td>
+            예상 자본이득(집값 상승분)
+            <span class="formula-line">= 매매가 × ((1+집값상승률)^비교기간 − 1)</span>
+            <span class="formula-actual" id="buy-capital-gain-formula">-</span>
+          </td>
+          <td class="amount-plus" id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td
-            >매매 순비용 <span class="hint"
-              >= 취득세 + 중개수수료 + 이자 + 재산세 + 종부세 − 자본이득 − 잉여자금
-              수익</span
-            ></td
-          >
-          <td id="buy-net-cost">-</td>
+          <td>
+            매매 시 최종 자기자본
+            <span class="formula-line">= 시작 자기자본 + 자본이득 + 잉여자금 수익 − 취득세 − 중개수수료 − 이자 − 재산세 − 종부세</span>
+            <span class="formula-actual" id="buy-final-capital-formula">-</span>
+          </td>
+          <td id="buy-final-capital">-</td>
         </tr>
       </tbody>
     </table>
@@ -273,33 +294,49 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td>중개수수료(1회) <span class="hint">= 보증금 × 중개보수 요율(구간별, 상한액 적용)</span></td>
-          <td id="jeonse-brokerage-fee">-</td>
+          <td>시작 자기자본(보유현금)</td>
+          <td id="jeonse-starting-cash">-</td>
         </tr>
         <tr>
-          <td
-            >여유자금 <span class="hint"
-              >= 보유현금 − 보증금 − 중개수수료</span
-            ></td
-          >
+          <td>
+            중개수수료(1회)
+            <span class="formula-line">= 보증금 × 중개보수 상한요율(구간별, 한도액 적용)</span>
+            <span class="formula-actual" id="jeonse-brokerage-fee-formula">-</span>
+          </td>
+          <td class="amount-minus" id="jeonse-brokerage-fee">-</td>
+        </tr>
+        <tr>
+          <td>
+            여유자금 <span class="hint">(참고용, 최종 자기자본 계산에 직접 포함되지 않음)</span>
+            <span class="formula-line">= 보유현금 − 보증금 − 중개수수료</span>
+            <span class="formula-actual" id="jeonse-surplus-cash-formula">-</span>
+          </td>
           <td id="jeonse-surplus-cash">-</td>
         </tr>
         <tr>
-          <td>여유자금 운용 수익 <span class="hint">= 여유자금 × ((1+수익률)^년 − 1) (차감)</span></td>
-          <td id="jeonse-surplus-return">-</td>
+          <td>
+            여유자금 운용 수익
+            <span class="formula-line">= 여유자금 × ((1+수익률)^비교기간 − 1)</span>
+            <span class="formula-actual" id="jeonse-surplus-return-formula">-</span>
+          </td>
+          <td class="amount-plus" id="jeonse-surplus-return">-</td>
         </tr>
         <tr>
-          <td
-            >기간 종료 시 예상 보증금 <span class="hint"
-              >= 보증금 × (1+재계약 인상률)^재계약횟수 (참고용, 순비용에 미반영 —
-              보증금은 원금 그대로 돌려받으므로 계산에 들어가지 않음)</span
-            ></td
-          >
+          <td>
+            기간 종료 시 예상 보증금
+            <span class="hint">(참고용 — 보증금은 원금 그대로 돌려받아 시작 자기자본에서 늘지도 줄지도 않으므로, 최종 자기자본 계산에 별도로 더하지 않음)</span>
+            <span class="formula-line">= 보증금 × (1+재계약 인상률)^재계약횟수</span>
+            <span class="formula-actual" id="jeonse-final-deposit-formula">-</span>
+          </td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
         <tr class="total">
-          <td>전세 순비용 <span class="hint">= 중개수수료 − 여유자금 운용 수익</span></td>
-          <td id="jeonse-net-cost">-</td>
+          <td>
+            전세 시 최종 자기자본
+            <span class="formula-line">= 시작 자기자본 + 여유자금 운용 수익 − 중개수수료</span>
+            <span class="formula-actual" id="jeonse-final-capital-formula">-</span>
+          </td>
+          <td id="jeonse-final-capital">-</td>
         </tr>
       </tbody>
     </table>
@@ -330,31 +367,33 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </p>
       <p><strong>매매 시나리오</strong></p>
       <ul>
-        <li>대출금 = 매매가 − 보유현금 = 5억 − 4억 = <strong>1억원</strong></li>
-        <li>취득세 등(1회) = 5억 × 세율 ≈ <strong>550만원</strong></li>
-        <li>중개수수료(1회) = 5억 × 중개보수 요율(구간별) ≈ <strong>200만원</strong></li>
-        <li>3년간 대출이자 합계(1억, 4%, 20년 원리금균등 스케줄의 첫 36개월분) ≈ <strong>1,141만원</strong></li>
-        <li>공시가격 = 5억 × 70% = 3.5억 → 재산세 연 15.4만원 × 3년 ≈ <strong>46만원</strong> (종부세는 3.5억 &lt; 12억이라 0원)</li>
-        <li>여유자금 = 0원(보유현금 4억이 매매가 5억보다 적어 남는 돈 없음)</li>
-        <li>예상 자본이득(차감) = 5억 × ((1.02)³ − 1) = 5억 × 6.12% ≈ <strong>3,060만원</strong></li>
-        <li>매매 순비용 = 550 + 200 + 1,141 + 46 + 0 − 3,060 ≈ <strong>−1,124만원</strong> (마이너스면 오히려 이득)</li>
+        <li>시작 자기자본(보유현금) = <strong>4억원</strong></li>
+        <li>대출금(참고) = 매매가 − 보유현금 = 5억 − 4억 = <strong>1억원</strong></li>
+        <li>취득세 등(1회) = 5억 × 세율 ≈ <strong>−550만원</strong></li>
+        <li>중개수수료(1회) = 5억 × 중개보수 요율(구간별) ≈ <strong>−200만원</strong></li>
+        <li>3년간 대출이자 합계(1억, 4%, 20년 원리금균등 스케줄의 첫 36개월분) ≈ <strong>−1,141만원</strong></li>
+        <li>공시가격 = 5억 × 70% = 3.5억 → 재산세 연 15.4만원 × 3년 ≈ <strong>−46만원</strong> (종부세는 3.5억 &lt; 12억이라 0원)</li>
+        <li>여유자금 = 0원(보유현금 4억이 매매가 5억보다 적어 남는 돈 없음) → 운용 수익도 0원</li>
+        <li>예상 자본이득(집값 상승분) = 5억 × ((1.02)³ − 1) = 5억 × 6.12% ≈ <strong>+3,060만원</strong></li>
+        <li>매매 시 최종 자기자본 = 4억 − 550 − 200 − 1,141 − 46 + 0 + 3,060(만원) ≈ <strong>41,124만원</strong></li>
       </ul>
       <p><strong>전세 시나리오</strong></p>
       <ul>
-        <li>중개수수료(1회) = 3억 × 중개보수 요율(구간별) ≈ <strong>90만원</strong></li>
-        <li>여유자금 = 4억(보유현금) − 3억(보증금) − 90만원 ≈ <strong>9,910만원</strong></li>
-        <li>여유자금 운용 수익(차감) = 9,910만원 × ((1.03)³ − 1) = 9,910만원 × 9.27% ≈ <strong>919만원</strong></li>
-        <li>전세 순비용 = 90 − 919 ≈ <strong>−829만원</strong></li>
+        <li>시작 자기자본(보유현금) = <strong>4억원</strong></li>
+        <li>중개수수료(1회) = 3억 × 중개보수 요율(구간별) ≈ <strong>−90만원</strong></li>
+        <li>여유자금(참고) = 4억(보유현금) − 3억(보증금) − 90만원 ≈ <strong>9,910만원</strong></li>
+        <li>여유자금 운용 수익 = 9,910만원 × ((1.03)³ − 1) = 9,910만원 × 9.27% ≈ <strong>+919만원</strong></li>
+        <li>전세 시 최종 자기자본 = 4억 − 90 + 919(만원) ≈ <strong>40,829만원</strong></li>
       </ul>
       <p>
-        매매 순비용(−1,124만원)이 전세 순비용(−829만원)보다 작으므로(둘 다
-        이득이지만 매매 쪽 이득이 더 큼), <strong>이 조건에서는 매매가 약
-        295만원 더 유리</strong>합니다. 매매의 보유현금 4억원 전액이 집값
-        상승(레버리지 포함 매매가 5억 전체에 대한 상승분)에 쓰이는 반면,
-        전세는 보증금 3억원을 제외한 9,910만원만 실제로 투자되기 때문입니다.
-        매매 쪽 중개수수료(200만원)가 전세 쪽(90만원)보다 크다는 점도 그
-        격차를 줄이는 방향으로 작용합니다. 위 입력값을 그대로 넣어보시면
-        결과 화면에서 이 숫자들을 그대로 확인할 수 있습니다.
+        매매 시 최종 자기자본(41,124만원)이 전세 시 최종 자기자본(40,829만원)
+        보다 크므로, <strong>이 조건에서는 매매가 약 295만원 더
+        유리</strong>합니다. 매매의 보유현금 4억원 전액이 집값 상승(레버리지
+        포함 매매가 5억 전체에 대한 상승분)에 쓰이는 반면, 전세는 보증금
+        3억원을 제외한 9,910만원만 실제로 투자되기 때문입니다. 매매 쪽
+        중개수수료(200만원)가 전세 쪽(90만원)보다 크다는 점은 그 격차를
+        줄이는 방향으로 작용합니다. 위 입력값을 그대로 넣어보시면 결과
+        화면에서 이 숫자들을 그대로 확인할 수 있습니다.
       </p>
     </details>
 
@@ -362,8 +401,9 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       <summary>종합부동산세도 반영되나요?</summary>
       <p>
         네. 공시가격(매매가 × 공시가격비율 가정)이 1세대 1주택 공제금액인
-        12억원을 초과하면 종합부동산세가 자동으로 계산되어 매매 순비용에
-        더해집니다(위 결과의 "종합부동산세" 항목이 이때만 표시됩니다).
+        12억원을 초과하면 종합부동산세가 자동으로 계산되어 매매 시 최종
+        자기자본에서 차감됩니다(위 결과의 "종합부동산세" 항목이 이때만
+        표시됩니다).
         재산세로 이미 낸 부분을 다시 걷지 않도록 재산세액공제(이중과세
         조정)도 근사 반영했습니다. 다만 고령자·장기보유 세액공제와
         세부담상한은 반영하지 않아 실제보다 다소 높게 나올 수 있습니다 —
@@ -376,10 +416,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       <summary>전세보증금은 왜 계산에 안 들어가나요?</summary>
       <p>
         전세보증금은 계약이 끝나면 이자 없이 원금 그대로 돌려받습니다.
-        즉 보증금 자체는 그 기간 동안 늘지도 줄지도 않으므로, 두 시나리오를
-        "실제로 얼마나 이득/손해를 봤는가"로 직접 비교할 때는 보증금
-        금액 자체가 아니라 <strong>보증금을 빼고 남은 여유자금이 실제로
-        얼마나 불어났는지</strong>만 비교하면 충분합니다. 매매의 자기자본도
+        즉 보증금 자체는 그 기간 동안 늘지도 줄지도 않으므로, "최종
+        자기자본"을 계산할 때는 시작 자기자본(보유현금)에 보증금이
+        그대로 남아있다고 보고, 보증금 금액 자체가 아니라
+        <strong>보증금을 빼고 남은 여유자금이 실제로 얼마나
+        불어났는지</strong>만 더하면 충분합니다. 매매의 자기자본도
         마찬가지로, 집값 상승분(자본이득)에 이미 그 돈의 성과가 반영되어
         있으므로 별도로 다시 계산하지 않습니다.
       </p>
@@ -463,6 +504,42 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     background: var(--bg);
     width: 100%;
   }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.breakdown td.amount-minus,
+  table.breakdown td.amount-plus {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.breakdown td.amount-minus {
+    color: #b91c1c;
+  }
+  table.breakdown td.amount-plus {
+    color: #15803d;
+  }
+  .plus {
+    color: #15803d;
+    font-weight: 700;
+  }
+  .minus {
+    color: #b91c1c;
+    font-weight: 700;
+  }
 </style>
 
 <script>
@@ -494,6 +571,15 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     const el = document.getElementById(id);
     if (el) el.textContent = won.format(Math.round(value));
   };
+  const setSignedWon = (id: string, value: number, sign: '+' | '−') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${sign}${won.format(Math.round(value))}`;
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct = (value: number) => `${Number(value.toFixed(2))}%`;
 
   const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
 
@@ -539,6 +625,10 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       return;
     }
 
+    const priceGrowthRatePercent = getNum('priceGrowthRatePercent');
+    const investReturnRatePercent = getNum('investReturnRatePercent');
+    const jeonseRenewalIncreasePercent = getNum('jeonseRenewalIncreasePercent');
+
     const r = calculateBuyVsJeonse({
       purchasePrice,
       jeonseDeposit,
@@ -546,9 +636,9 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       years,
       loanAnnualRatePercent,
       loanTermYears,
-      priceGrowthRatePercent: getNum('priceGrowthRatePercent'),
-      investReturnRatePercent: getNum('investReturnRatePercent'),
-      jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
+      priceGrowthRatePercent,
+      investReturnRatePercent,
+      jeonseRenewalIncreasePercent,
       publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
       isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
       isUrbanArea: (document.getElementById('isUrbanArea') as HTMLInputElement).checked,
@@ -557,28 +647,54 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
     const diffLabel = document.getElementById('diff-label') as HTMLSpanElement;
     const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
-    const diff = r.costDifference;
+    const diff = r.capitalDifference;
     if (diff > 0) {
-      verdictValue.textContent = '전세';
-      diffLabel.textContent = '매매보다 이만큼 저렴';
+      verdictValue.textContent = '매매';
+      diffLabel.textContent = '전세보다 최종 자기자본이 이만큼 많음';
       costDifferenceEl.textContent = won.format(Math.round(diff));
     } else if (diff < 0) {
-      verdictValue.textContent = '매매';
-      diffLabel.textContent = '전세보다 이만큼 저렴';
+      verdictValue.textContent = '전세';
+      diffLabel.textContent = '매매보다 최종 자기자본이 이만큼 많음';
       costDifferenceEl.textContent = won.format(Math.round(-diff));
     } else {
       verdictValue.textContent = '동일';
-      diffLabel.textContent = '비용 차이';
+      diffLabel.textContent = '최종 자기자본 차이';
       costDifferenceEl.textContent = '0원';
     }
 
+    setWon('buy-final-capital-headline', r.buy.finalCapital);
+    setWon('jeonse-final-capital-headline', r.jeonse.finalCapital);
+
+    setWon('buy-starting-cash', r.buy.startingCash);
+
     setWon('buy-loan-amount', r.buy.loanAmount);
-    setWon('buy-acquisition-tax', r.buy.acquisitionTax);
-    setWon('buy-brokerage-fee', r.buy.brokerageFee);
-    setWon('buy-total-interest', r.buy.totalLoanInterest);
-    setWon('buy-total-property-tax', r.buy.totalPropertyTax);
-    (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
-      Math.round(r.buy.annualPropertyTax),
+    setText('buy-loan-amount-formula', `= ${won.format(purchasePrice)} − ${won.format(cashOnHand)}`);
+
+    setSignedWon('buy-acquisition-tax', r.buy.acquisitionTax, '−');
+    setText(
+      'buy-acquisition-tax-formula',
+      `= ${won.format(r.buy.acquisitionTaxBase)} + ${won.format(r.buy.acquisitionLocalEduTax)} + ${won.format(r.buy.acquisitionRuralTax)}`,
+    );
+
+    setSignedWon('buy-brokerage-fee', r.buy.brokerageFee, '−');
+    const buyRawBrokerageFee = purchasePrice * r.buy.brokerageRatePercent;
+    setText(
+      'buy-brokerage-fee-formula',
+      r.buy.brokerageLimit !== undefined && buyRawBrokerageFee > r.buy.brokerageLimit
+        ? `= 한도액 적용 → ${won.format(r.buy.brokerageLimit)}`
+        : `= ${won.format(purchasePrice)} × ${fmtPct(r.buy.brokerageRatePercent * 100)}`,
+    );
+
+    setSignedWon('buy-total-interest', r.buy.totalLoanInterest, '−');
+    setText(
+      'buy-total-interest-formula',
+      `= 원리금균등상환(${won.format(r.buy.loanAmount)}, ${fmtPct(loanAnnualRatePercent)}, ${loanTermYears}년) 스케줄의 첫 ${r.buy.interestMonthsCounted}개월 이자 합`,
+    );
+
+    setSignedWon('buy-total-property-tax', r.buy.totalPropertyTax, '−');
+    setText(
+      'buy-total-property-tax-formula',
+      `= (${won.format(r.buy.annualPropertyTaxBase)} + ${won.format(r.buy.annualPropertyLocalEduTax)} + ${won.format(r.buy.annualPropertyUrbanAreaTax)}) × ${years}년`,
     );
 
     const comprehensiveRow = document.getElementById(
@@ -586,22 +702,69 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     ) as HTMLTableRowElement;
     comprehensiveRow.classList.toggle('hidden', r.buy.annualComprehensiveTax <= 0);
     if (r.buy.annualComprehensiveTax > 0) {
-      setWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax);
-      (document.getElementById('buy-annual-comprehensive-hint') as HTMLSpanElement).textContent =
-        won.format(Math.round(r.buy.annualComprehensiveTax));
+      setSignedWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax, '−');
+      setText(
+        'buy-total-comprehensive-tax-formula',
+        `= (${won.format(r.buy.annualComprehensiveCalculatedTax)} − ${won.format(r.buy.annualComprehensivePropertyCredit)}) × 1.2 × ${years}년`,
+      );
     }
+
     const buySurplusRow = document.getElementById('buy-surplus-row') as HTMLTableRowElement;
     buySurplusRow.classList.toggle('hidden', r.buy.surplusCash <= 0);
-    if (r.buy.surplusCash > 0) setWon('buy-surplus-return', r.buy.surplusInvestReturn);
+    if (r.buy.surplusCash > 0) {
+      setSignedWon('buy-surplus-return', r.buy.surplusInvestReturn, '+');
+      setText(
+        'buy-surplus-return-formula',
+        `= ${won.format(r.buy.surplusCash)} × ((1+${fmtPct(investReturnRatePercent)})^${years} − 1)`,
+      );
+    }
 
-    setWon('buy-capital-gain', r.buy.capitalGain);
-    setWon('buy-net-cost', r.buy.netCost);
+    setSignedWon('buy-capital-gain', r.buy.capitalGain, '+');
+    setText(
+      'buy-capital-gain-formula',
+      `= ${won.format(purchasePrice)} × ((1+${fmtPct(priceGrowthRatePercent)})^${years} − 1)`,
+    );
 
-    setWon('jeonse-brokerage-fee', r.jeonse.brokerageFee);
+    setWon('buy-final-capital', r.buy.finalCapital);
+    setText(
+      'buy-final-capital-formula',
+      `= ${won.format(r.buy.startingCash)} + ${won.format(r.buy.capitalGain)} + ${won.format(r.buy.surplusInvestReturn)} − ${won.format(r.buy.acquisitionTax)} − ${won.format(r.buy.brokerageFee)} − ${won.format(r.buy.totalLoanInterest)} − ${won.format(r.buy.totalPropertyTax)} − ${won.format(r.buy.totalComprehensiveTax)}`,
+    );
+
+    setWon('jeonse-starting-cash', r.jeonse.startingCash);
+
+    setSignedWon('jeonse-brokerage-fee', r.jeonse.brokerageFee, '−');
+    const jeonseRawBrokerageFee = jeonseDeposit * r.jeonse.brokerageRatePercent;
+    setText(
+      'jeonse-brokerage-fee-formula',
+      r.jeonse.brokerageLimit !== undefined && jeonseRawBrokerageFee > r.jeonse.brokerageLimit
+        ? `= 한도액 적용 → ${won.format(r.jeonse.brokerageLimit)}`
+        : `= ${won.format(jeonseDeposit)} × ${fmtPct(r.jeonse.brokerageRatePercent * 100)}`,
+    );
+
     setWon('jeonse-surplus-cash', r.jeonse.surplusCash);
-    setWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn);
+    setText(
+      'jeonse-surplus-cash-formula',
+      `= ${won.format(cashOnHand)} − ${won.format(jeonseDeposit)} − ${won.format(r.jeonse.brokerageFee)}`,
+    );
+
+    setSignedWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn, '+');
+    setText(
+      'jeonse-surplus-return-formula',
+      `= ${won.format(r.jeonse.surplusCash)} × ((1+${fmtPct(investReturnRatePercent)})^${years} − 1)`,
+    );
+
     setWon('jeonse-final-deposit', r.jeonse.expectedFinalDeposit);
-    setWon('jeonse-net-cost', r.jeonse.netCost);
+    setText(
+      'jeonse-final-deposit-formula',
+      `= ${won.format(jeonseDeposit)} × (1+${fmtPct(jeonseRenewalIncreasePercent)})^${r.jeonse.renewalCycles}`,
+    );
+
+    setWon('jeonse-final-capital', r.jeonse.finalCapital);
+    setText(
+      'jeonse-final-capital-formula',
+      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)}`,
+    );
 
     result.classList.remove('hidden');
   });

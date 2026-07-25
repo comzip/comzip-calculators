@@ -15,13 +15,14 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
   <h1>{meta.titleEn}</h1>
   <p class="note">
     Compares <strong>buying</strong> a home versus renting under
-    <strong>jeonse</strong> (Korea's lump-sum deposit lease) with the same
-    starting cash, over a chosen holding period — how much you'd actually
-    gain or lose under each. Buying is "appreciation − (acquisition tax +
-    brokerage fee + loan interest + property tax + comprehensive real estate
-    tax)"; jeonse is "surplus-cash investment return − brokerage fee." Every
-    line item in the results below shows the exact formula used, so you can
-    see how each figure was derived.
+    <strong>jeonse</strong> (Korea's lump-sum deposit lease), starting from
+    the same cash on hand, by directly comparing what that cash actually
+    becomes (<strong>final capital</strong>) by the end of the holding
+    period. Buying is "cash on hand + appreciation + surplus-cash return −
+    acquisition tax − brokerage fee − loan interest − property tax −
+    comprehensive real estate tax"; jeonse is "cash on hand + surplus-cash
+    return − brokerage fee." Every line item in the results below shows the
+    exact formula used, so you can see how each figure was derived.
   </p>
 
   <form class="calc-form" id="compare-form">
@@ -184,17 +185,29 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <span class="value"><span id="verdict-value">-</span></span>
       </div>
       <div class="result-item">
-        <span class="label" id="diff-label">Cost difference</span>
+        <span class="label" id="diff-label">Final capital difference</span>
         <span class="value"><span id="cost-difference">-</span></span>
       </div>
     </div>
 
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Final capital if buying</span>
+        <span class="value"><span id="buy-final-capital-headline">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Final capital if jeonse</span>
+        <span class="value"><span id="jeonse-final-capital-headline">-</span></span>
+      </div>
+    </div>
+
     <p class="note">
-      The "net cost" below adds up what you actually pay in each scenario
-      (buying: acquisition tax, brokerage fee, interest, property tax,
-      comprehensive real estate tax; jeonse: brokerage fee), then subtracts
-      what you gain in return (appreciation, or surplus-cash investment
-      return). A smaller number is better — negative means a net gain.
+      The table below starts from your <strong>starting capital (cash on
+      hand)</strong> and adds what actually grows it (<span class="plus"
+      >+</span>) and subtracts what actually leaves your pocket (<span
+      class="minus">−</span>) in each scenario, arriving at the
+      <strong>final capital</strong> at the end of the comparison period. A
+      larger final capital is better.
     </p>
 
     <table class="breakdown">
@@ -203,75 +216,80 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td>Loan amount <span class="hint">= purchase price − cash on hand</span></td>
+          <td>Starting capital (cash on hand)</td>
+          <td id="buy-starting-cash">-</td>
+        </tr>
+        <tr>
+          <td>
+            Loan amount <span class="hint">(reference only, not directly part of final capital)</span>
+            <span class="formula-line">= purchase price − cash on hand</span>
+            <span class="formula-actual" id="buy-loan-amount-formula">-</span>
+          </td>
           <td id="buy-loan-amount">-</td>
         </tr>
         <tr>
-          <td
-            >Acquisition tax etc. (one-time) <span class="hint"
-              >= purchase price × acquisition tax rate (1–3%) + local education tax
-              (+ rural development tax)</span
-            ></td
-          >
-          <td id="buy-acquisition-tax">-</td>
+          <td>
+            Acquisition tax etc. (one-time)
+            <span class="formula-line">= base tax + local education tax + rural development tax</span>
+            <span class="formula-actual" id="buy-acquisition-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-acquisition-tax">-</td>
         </tr>
         <tr>
-          <td
-            >Brokerage fee (one-time) <span class="hint"
-              >= purchase price × brokerage rate (bracketed, capped)</span
-            ></td
-          >
-          <td id="buy-brokerage-fee">-</td>
+          <td>
+            Brokerage fee (one-time)
+            <span class="formula-line">= purchase price × capped brokerage rate (bracketed)</span>
+            <span class="formula-actual" id="buy-brokerage-fee-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-brokerage-fee">-</td>
         </tr>
         <tr>
-          <td
-            >Loan interest paid over the period <span class="hint"
-              >= sum of the interest portions in the equal-payment amortization
-              schedule over the comparison period</span
-            ></td
-          >
-          <td id="buy-total-interest">-</td>
+          <td>
+            Loan interest paid over the period
+            <span class="formula-line">= equal-payment amortization(loan amount, annual rate, loan term) schedule's interest over the comparison period</span>
+            <span class="formula-actual" id="buy-total-interest-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-interest">-</td>
         </tr>
         <tr>
-          <td
-            >Property tax <span class="hint"
-              >= announced value × fair market ratio × tax rate (annual
-              <span id="buy-annual-tax-hint"></span>)</span
-            ></td
-          >
-          <td id="buy-total-property-tax">-</td>
+          <td>
+            Property tax
+            <span class="formula-line">= (base tax + local education tax + urban area surtax) × comparison period</span>
+            <span class="formula-actual" id="buy-total-property-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-property-tax">-</td>
         </tr>
         <tr id="buy-comprehensive-row" class="hidden">
-          <td
-            >Comprehensive real estate tax <span class="hint"
-              >= (announced value − 1.2B) × fair market ratio × tax rate −
-              property tax credit (annual <span id="buy-annual-comprehensive-hint"></span>, on
-              the amount exceeding the 1.2 billion KRW single-home
-              deduction)</span
-            ></td
-          >
-          <td id="buy-total-comprehensive-tax">-</td>
+          <td>
+            Comprehensive real estate tax <span class="hint">(on the amount exceeding the 1.2B KRW single-home deduction)</span>
+            <span class="formula-line">= (calculated tax − property tax credit) × 1.2 (incl. surtax) × comparison period</span>
+            <span class="formula-actual" id="buy-total-comprehensive-tax-formula">-</span>
+          </td>
+          <td class="amount-minus" id="buy-total-comprehensive-tax">-</td>
         </tr>
         <tr id="buy-surplus-row" class="hidden">
-          <td
-            >Surplus cash investment return <span class="hint"
-              >= surplus cash × ((1+return rate)^years − 1) (when cash on hand
-              exceeds the purchase price, deducted)</span
-            ></td
-          >
-          <td id="buy-surplus-return">-</td>
+          <td>
+            Surplus cash investment return <span class="hint">(when cash on hand exceeds the purchase price)</span>
+            <span class="formula-line">= surplus cash × ((1+return rate)^years − 1)</span>
+            <span class="formula-actual" id="buy-surplus-return-formula">-</span>
+          </td>
+          <td class="amount-plus" id="buy-surplus-return">-</td>
         </tr>
         <tr>
-          <td
-            >Expected capital gain (appreciation) <span class="hint"
-              >= purchase price × ((1+growth rate)^years − 1) (deducted)</span
-            ></td
-          >
-          <td id="buy-capital-gain">-</td>
+          <td>
+            Expected capital gain (appreciation)
+            <span class="formula-line">= purchase price × ((1+growth rate)^years − 1)</span>
+            <span class="formula-actual" id="buy-capital-gain-formula">-</span>
+          </td>
+          <td class="amount-plus" id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of buying <span class="hint">= acquisition tax + brokerage fee + interest + property tax + comprehensive real estate tax − capital gain − surplus cash return</span></td>
-          <td id="buy-net-cost">-</td>
+          <td>
+            Final capital if buying
+            <span class="formula-line">= starting capital + capital gain + surplus cash return − acquisition tax − brokerage fee − interest − property tax − comprehensive real estate tax</span>
+            <span class="formula-actual" id="buy-final-capital-formula">-</span>
+          </td>
+          <td id="buy-final-capital">-</td>
         </tr>
       </tbody>
     </table>
@@ -282,34 +300,49 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </caption>
       <tbody>
         <tr>
-          <td
-            >Brokerage fee (one-time) <span class="hint"
-              >= deposit × brokerage rate (bracketed, capped)</span
-            ></td
-          >
-          <td id="jeonse-brokerage-fee">-</td>
+          <td>Starting capital (cash on hand)</td>
+          <td id="jeonse-starting-cash">-</td>
         </tr>
         <tr>
-          <td>Surplus cash <span class="hint">= cash on hand − deposit − brokerage fee</span></td>
+          <td>
+            Brokerage fee (one-time)
+            <span class="formula-line">= deposit × capped brokerage rate (bracketed)</span>
+            <span class="formula-actual" id="jeonse-brokerage-fee-formula">-</span>
+          </td>
+          <td class="amount-minus" id="jeonse-brokerage-fee">-</td>
+        </tr>
+        <tr>
+          <td>
+            Surplus cash <span class="hint">(reference only, not directly part of final capital)</span>
+            <span class="formula-line">= cash on hand − deposit − brokerage fee</span>
+            <span class="formula-actual" id="jeonse-surplus-cash-formula">-</span>
+          </td>
           <td id="jeonse-surplus-cash">-</td>
         </tr>
         <tr>
-          <td>Surplus cash investment return <span class="hint">= surplus cash × ((1+return rate)^years − 1) (deducted)</span></td>
-          <td id="jeonse-surplus-return">-</td>
+          <td>
+            Surplus cash investment return
+            <span class="formula-line">= surplus cash × ((1+return rate)^years − 1)</span>
+            <span class="formula-actual" id="jeonse-surplus-return-formula">-</span>
+          </td>
+          <td class="amount-plus" id="jeonse-surplus-return">-</td>
         </tr>
         <tr>
-          <td
-            >Expected deposit at period end <span class="hint"
-              >= deposit × (1+renewal increase rate)^renewal cycles (reference
-              only — the deposit is returned at face value, so it isn't part of
-              net cost)</span
-            ></td
-          >
+          <td>
+            Expected deposit at period end
+            <span class="hint">(reference only — the deposit is returned at face value, so it stays in your starting capital unchanged and isn't added separately to final capital)</span>
+            <span class="formula-line">= deposit × (1+renewal increase rate)^renewal cycles</span>
+            <span class="formula-actual" id="jeonse-final-deposit-formula">-</span>
+          </td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of jeonse <span class="hint">= brokerage fee − surplus cash return</span></td>
-          <td id="jeonse-net-cost">-</td>
+          <td>
+            Final capital if jeonse
+            <span class="formula-line">= starting capital + surplus cash return − brokerage fee</span>
+            <span class="formula-actual" id="jeonse-final-capital-formula">-</span>
+          </td>
+          <td id="jeonse-final-capital">-</td>
         </tr>
       </tbody>
     </table>
@@ -345,32 +378,33 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       </p>
       <p><strong>Buying scenario</strong></p>
       <ul>
-        <li>Loan amount = purchase price − cash on hand = 500M − 400M = <strong>100M KRW</strong></li>
-        <li>Acquisition tax etc. (one-time) = 500M × tax rate ≈ <strong>5.5M KRW</strong></li>
-        <li>Brokerage fee (one-time) = 500M × brokerage rate (bracketed) ≈ <strong>2M KRW</strong></li>
-        <li>Interest over 3 years (first 36 months of a 100M/4%/20yr equal-payment schedule) ≈ <strong>11.4M KRW</strong></li>
-        <li>Announced value = 500M × 70% = 350M → property tax ≈ 1.536M/yr × 3yr ≈ <strong>4.6M KRW</strong> (comprehensive tax is 0 since 350M &lt; 1.2B)</li>
-        <li>Surplus cash = 0 (cash on hand 400M is less than the 500M purchase price, so nothing is left over)</li>
-        <li>Expected capital gain (deducted) = 500M × ((1.02)³ − 1) = 500M × 6.12% ≈ <strong>30.6M KRW</strong></li>
-        <li>Net cost of buying = 5.5 + 2 + 11.4 + 4.6 + 0 − 30.6 ≈ <strong>−11.2M KRW</strong> (negative means a net gain)</li>
+        <li>Starting capital (cash on hand) = <strong>400M KRW</strong></li>
+        <li>Loan amount (reference) = purchase price − cash on hand = 500M − 400M = <strong>100M KRW</strong></li>
+        <li>Acquisition tax etc. (one-time) = 500M × tax rate ≈ <strong>−5.5M KRW</strong></li>
+        <li>Brokerage fee (one-time) = 500M × brokerage rate (bracketed) ≈ <strong>−2M KRW</strong></li>
+        <li>Interest over 3 years (first 36 months of a 100M/4%/20yr equal-payment schedule) ≈ <strong>−11.4M KRW</strong></li>
+        <li>Announced value = 500M × 70% = 350M → property tax ≈ 1.536M/yr × 3yr ≈ <strong>−4.6M KRW</strong> (comprehensive tax is 0 since 350M &lt; 1.2B)</li>
+        <li>Surplus cash = 0 (cash on hand 400M is less than the 500M purchase price, so nothing is left over) → surplus return is also 0</li>
+        <li>Expected capital gain (appreciation) = 500M × ((1.02)³ − 1) = 500M × 6.12% ≈ <strong>+30.6M KRW</strong></li>
+        <li>Final capital if buying = 400 − 5.5 − 2 − 11.4 − 4.6 + 0 + 30.6M ≈ <strong>411.2M KRW</strong></li>
       </ul>
       <p><strong>Jeonse scenario</strong></p>
       <ul>
-        <li>Brokerage fee (one-time) = 300M × brokerage rate (bracketed) ≈ <strong>0.9M KRW</strong></li>
-        <li>Surplus cash = 400M (cash on hand) − 300M (deposit) − 0.9M ≈ <strong>99.1M KRW</strong></li>
-        <li>Surplus cash investment return (deducted) = 99.1M × ((1.03)³ − 1) = 99.1M × 9.27% ≈ <strong>9.2M KRW</strong></li>
-        <li>Net cost of jeonse = 0.9 − 9.2 ≈ <strong>−8.3M KRW</strong></li>
+        <li>Starting capital (cash on hand) = <strong>400M KRW</strong></li>
+        <li>Brokerage fee (one-time) = 300M × brokerage rate (bracketed) ≈ <strong>−0.9M KRW</strong></li>
+        <li>Surplus cash (reference) = 400M (cash on hand) − 300M (deposit) − 0.9M ≈ <strong>99.1M KRW</strong></li>
+        <li>Surplus cash investment return = 99.1M × ((1.03)³ − 1) = 99.1M × 9.27% ≈ <strong>+9.2M KRW</strong></li>
+        <li>Final capital if jeonse = 400 − 0.9 + 9.2M ≈ <strong>408.3M KRW</strong></li>
       </ul>
       <p>
-        Buying's net cost (−11.2M) is lower than jeonse's (−8.3M) — both are
-        net gains, but buying's is bigger — so <strong>under these
-        conditions buying is about 2.9M KRW better</strong>. All 400M KRW of
-        the buyer's cash works toward appreciation on the full 500M home
-        (leverage), while the renter only actually invests 99.1M KRW (the
-        rest sits in the deposit, earning nothing). Buying's brokerage fee
-        (2M) is also larger than jeonse's (0.9M), which narrows the gap.
-        Enter these same inputs above and you'll see these exact figures in
-        the results.
+        Buying's final capital (411.2M) is higher than jeonse's (408.3M) —
+        so <strong>under these conditions buying leaves you about 2.9M KRW
+        better off</strong>. All 400M KRW of the buyer's cash works toward
+        appreciation on the full 500M home (leverage), while the renter only
+        actually invests 99.1M KRW (the rest sits in the deposit, earning
+        nothing). Buying's brokerage fee (2M) is also larger than jeonse's
+        (0.9M), which narrows the gap. Enter these same inputs above and
+        you'll see these exact figures in the results.
       </p>
     </details>
 
@@ -379,9 +413,10 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       <p>
         Yes. If the announced value (purchase price × your announced-value
         ratio assumption) exceeds the 1.2 billion KRW single-home deduction,
-        comprehensive real estate tax is calculated automatically and added
-        to the net cost of buying (the "Comprehensive real estate tax" row
-        above only appears in that case). It also approximates the property
+        comprehensive real estate tax is calculated automatically and
+        subtracted from the final capital if buying (the "Comprehensive real
+        estate tax" row above only appears in that case). It also
+        approximates the property
         tax credit so tax already paid via property tax isn't double-counted.
         Senior/long-term-holding credits and the tax burden cap aren't
         reflected, though, so the real amount may be somewhat lower — check
@@ -486,6 +521,42 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     background: var(--bg);
     width: 100%;
   }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.breakdown td.amount-minus,
+  table.breakdown td.amount-plus {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.breakdown td.amount-minus {
+    color: #b91c1c;
+  }
+  table.breakdown td.amount-plus {
+    color: #15803d;
+  }
+  .plus {
+    color: #15803d;
+    font-weight: 700;
+  }
+  .minus {
+    color: #b91c1c;
+    font-weight: 700;
+  }
 </style>
 
 <script>
@@ -517,6 +588,15 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     const el = document.getElementById(id);
     if (el) el.textContent = won.format(Math.round(value));
   };
+  const setSignedWon = (id: string, value: number, sign: '+' | '−') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${sign}${won.format(Math.round(value))}`;
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct = (value: number) => `${Number(value.toFixed(2))}%`;
 
   const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
 
@@ -562,6 +642,10 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       return;
     }
 
+    const priceGrowthRatePercent = getNum('priceGrowthRatePercent');
+    const investReturnRatePercent = getNum('investReturnRatePercent');
+    const jeonseRenewalIncreasePercent = getNum('jeonseRenewalIncreasePercent');
+
     const r = calculateBuyVsJeonse({
       purchasePrice,
       jeonseDeposit,
@@ -569,9 +653,9 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       years,
       loanAnnualRatePercent,
       loanTermYears,
-      priceGrowthRatePercent: getNum('priceGrowthRatePercent'),
-      investReturnRatePercent: getNum('investReturnRatePercent'),
-      jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
+      priceGrowthRatePercent,
+      investReturnRatePercent,
+      jeonseRenewalIncreasePercent,
       publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
       isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
       isUrbanArea: (document.getElementById('isUrbanArea') as HTMLInputElement).checked,
@@ -580,28 +664,54 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
     const diffLabel = document.getElementById('diff-label') as HTMLSpanElement;
     const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
-    const diff = r.costDifference;
+    const diff = r.capitalDifference;
     if (diff > 0) {
-      verdictValue.textContent = 'Jeonse';
-      diffLabel.textContent = 'Cheaper than buying by';
+      verdictValue.textContent = 'Buying';
+      diffLabel.textContent = 'More final capital than jeonse, by';
       costDifferenceEl.textContent = won.format(Math.round(diff));
     } else if (diff < 0) {
-      verdictValue.textContent = 'Buying';
-      diffLabel.textContent = 'Cheaper than jeonse by';
+      verdictValue.textContent = 'Jeonse';
+      diffLabel.textContent = 'More final capital than buying, by';
       costDifferenceEl.textContent = won.format(Math.round(-diff));
     } else {
       verdictValue.textContent = 'Tie';
-      diffLabel.textContent = 'Cost difference';
+      diffLabel.textContent = 'Final capital difference';
       costDifferenceEl.textContent = '₩0';
     }
 
+    setWon('buy-final-capital-headline', r.buy.finalCapital);
+    setWon('jeonse-final-capital-headline', r.jeonse.finalCapital);
+
+    setWon('buy-starting-cash', r.buy.startingCash);
+
     setWon('buy-loan-amount', r.buy.loanAmount);
-    setWon('buy-acquisition-tax', r.buy.acquisitionTax);
-    setWon('buy-brokerage-fee', r.buy.brokerageFee);
-    setWon('buy-total-interest', r.buy.totalLoanInterest);
-    setWon('buy-total-property-tax', r.buy.totalPropertyTax);
-    (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
-      Math.round(r.buy.annualPropertyTax),
+    setText('buy-loan-amount-formula', `= ${won.format(purchasePrice)} − ${won.format(cashOnHand)}`);
+
+    setSignedWon('buy-acquisition-tax', r.buy.acquisitionTax, '−');
+    setText(
+      'buy-acquisition-tax-formula',
+      `= ${won.format(r.buy.acquisitionTaxBase)} + ${won.format(r.buy.acquisitionLocalEduTax)} + ${won.format(r.buy.acquisitionRuralTax)}`,
+    );
+
+    setSignedWon('buy-brokerage-fee', r.buy.brokerageFee, '−');
+    const buyRawBrokerageFee = purchasePrice * r.buy.brokerageRatePercent;
+    setText(
+      'buy-brokerage-fee-formula',
+      r.buy.brokerageLimit !== undefined && buyRawBrokerageFee > r.buy.brokerageLimit
+        ? `= capped at ${won.format(r.buy.brokerageLimit)}`
+        : `= ${won.format(purchasePrice)} × ${fmtPct(r.buy.brokerageRatePercent * 100)}`,
+    );
+
+    setSignedWon('buy-total-interest', r.buy.totalLoanInterest, '−');
+    setText(
+      'buy-total-interest-formula',
+      `= equal-payment amortization(${won.format(r.buy.loanAmount)}, ${fmtPct(loanAnnualRatePercent)}, ${loanTermYears}yr) schedule's first ${r.buy.interestMonthsCounted} months of interest`,
+    );
+
+    setSignedWon('buy-total-property-tax', r.buy.totalPropertyTax, '−');
+    setText(
+      'buy-total-property-tax-formula',
+      `= (${won.format(r.buy.annualPropertyTaxBase)} + ${won.format(r.buy.annualPropertyLocalEduTax)} + ${won.format(r.buy.annualPropertyUrbanAreaTax)}) × ${years}yr`,
     );
 
     const comprehensiveRow = document.getElementById(
@@ -609,23 +719,69 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     ) as HTMLTableRowElement;
     comprehensiveRow.classList.toggle('hidden', r.buy.annualComprehensiveTax <= 0);
     if (r.buy.annualComprehensiveTax > 0) {
-      setWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax);
-      (document.getElementById('buy-annual-comprehensive-hint') as HTMLSpanElement).textContent =
-        won.format(Math.round(r.buy.annualComprehensiveTax));
+      setSignedWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax, '−');
+      setText(
+        'buy-total-comprehensive-tax-formula',
+        `= (${won.format(r.buy.annualComprehensiveCalculatedTax)} − ${won.format(r.buy.annualComprehensivePropertyCredit)}) × 1.2 × ${years}yr`,
+      );
     }
 
     const buySurplusRow = document.getElementById('buy-surplus-row') as HTMLTableRowElement;
     buySurplusRow.classList.toggle('hidden', r.buy.surplusCash <= 0);
-    if (r.buy.surplusCash > 0) setWon('buy-surplus-return', r.buy.surplusInvestReturn);
+    if (r.buy.surplusCash > 0) {
+      setSignedWon('buy-surplus-return', r.buy.surplusInvestReturn, '+');
+      setText(
+        'buy-surplus-return-formula',
+        `= ${won.format(r.buy.surplusCash)} × ((1+${fmtPct(investReturnRatePercent)})^${years} − 1)`,
+      );
+    }
 
-    setWon('buy-capital-gain', r.buy.capitalGain);
-    setWon('buy-net-cost', r.buy.netCost);
+    setSignedWon('buy-capital-gain', r.buy.capitalGain, '+');
+    setText(
+      'buy-capital-gain-formula',
+      `= ${won.format(purchasePrice)} × ((1+${fmtPct(priceGrowthRatePercent)})^${years} − 1)`,
+    );
 
-    setWon('jeonse-brokerage-fee', r.jeonse.brokerageFee);
+    setWon('buy-final-capital', r.buy.finalCapital);
+    setText(
+      'buy-final-capital-formula',
+      `= ${won.format(r.buy.startingCash)} + ${won.format(r.buy.capitalGain)} + ${won.format(r.buy.surplusInvestReturn)} − ${won.format(r.buy.acquisitionTax)} − ${won.format(r.buy.brokerageFee)} − ${won.format(r.buy.totalLoanInterest)} − ${won.format(r.buy.totalPropertyTax)} − ${won.format(r.buy.totalComprehensiveTax)}`,
+    );
+
+    setWon('jeonse-starting-cash', r.jeonse.startingCash);
+
+    setSignedWon('jeonse-brokerage-fee', r.jeonse.brokerageFee, '−');
+    const jeonseRawBrokerageFee = jeonseDeposit * r.jeonse.brokerageRatePercent;
+    setText(
+      'jeonse-brokerage-fee-formula',
+      r.jeonse.brokerageLimit !== undefined && jeonseRawBrokerageFee > r.jeonse.brokerageLimit
+        ? `= capped at ${won.format(r.jeonse.brokerageLimit)}`
+        : `= ${won.format(jeonseDeposit)} × ${fmtPct(r.jeonse.brokerageRatePercent * 100)}`,
+    );
+
     setWon('jeonse-surplus-cash', r.jeonse.surplusCash);
-    setWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn);
+    setText(
+      'jeonse-surplus-cash-formula',
+      `= ${won.format(cashOnHand)} − ${won.format(jeonseDeposit)} − ${won.format(r.jeonse.brokerageFee)}`,
+    );
+
+    setSignedWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn, '+');
+    setText(
+      'jeonse-surplus-return-formula',
+      `= ${won.format(r.jeonse.surplusCash)} × ((1+${fmtPct(investReturnRatePercent)})^${years} − 1)`,
+    );
+
     setWon('jeonse-final-deposit', r.jeonse.expectedFinalDeposit);
-    setWon('jeonse-net-cost', r.jeonse.netCost);
+    setText(
+      'jeonse-final-deposit-formula',
+      `= ${won.format(jeonseDeposit)} × (1+${fmtPct(jeonseRenewalIncreasePercent)})^${r.jeonse.renewalCycles}`,
+    );
+
+    setWon('jeonse-final-capital', r.jeonse.finalCapital);
+    setText(
+      'jeonse-final-capital-formula',
+      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)}`,
+    );
 
     result.classList.remove('hidden');
   });
