@@ -1,0 +1,432 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    같은 예산으로 <strong>매매</strong>할 때와 <strong>전세</strong>로 살 때,
+    일정 기간 보유·거주하면 어느 쪽이 실제로 더 유리한지 비교합니다. 취득세·대출이자·재산세·집값
+    상승분(매매)과 중개수수료·보증금 기회비용(전세)을 함께 계산합니다.
+  </p>
+
+  <form class="calc-form" id="compare-form">
+    <label>
+      매매가 (원)
+      <input
+        type="number"
+        id="purchasePrice"
+        name="purchasePrice"
+        min="0"
+        step="any"
+        placeholder="예: 600000000"
+        required
+      />
+      <span class="amount-preview" id="purchasePrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      전세보증금 (원)
+      <input
+        type="number"
+        id="jeonseDeposit"
+        name="jeonseDeposit"
+        min="0"
+        step="any"
+        placeholder="예: 400000000"
+        required
+      />
+      <span class="amount-preview" id="jeonseDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      보유 현금(자기자본) (원)
+      <span class="hint"
+        >매매 시 매매가에 우선 투입하고 부족분을 대출로 조달합니다. 전세 시
+        보증금을 뺀 나머지는 여유자금으로 운용한다고 가정합니다.</span
+      >
+      <input
+        type="number"
+        id="cashOnHand"
+        name="cashOnHand"
+        min="0"
+        step="any"
+        placeholder="예: 200000000"
+        required
+      />
+      <span class="amount-preview" id="cashOnHand-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      비교(예상 거주) 기간 (년)
+      <input
+        type="number"
+        id="years"
+        name="years"
+        min="1"
+        step="1"
+        placeholder="예: 5"
+        required
+      />
+    </label>
+
+    <label>
+      대출 연이자율 (%)
+      <input
+        type="number"
+        id="loanAnnualRatePercent"
+        name="loanAnnualRatePercent"
+        min="0"
+        step="0.01"
+        placeholder="예: 4.2"
+        required
+      />
+    </label>
+
+    <label>
+      대출 기간 (년)
+      <input
+        type="number"
+        id="loanTermYears"
+        name="loanTermYears"
+        min="1"
+        step="1"
+        placeholder="예: 30"
+        required
+      />
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="isOver85Sqm" />
+      <span>전용면적 85㎡ 초과 (취득세 농어촌특별세 부과 대상)</span>
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>가정값 (기본값 사용 가능)</legend>
+      <label>
+        연간 집값 상승률 가정 (%)
+        <input
+          type="number"
+          id="priceGrowthRatePercent"
+          name="priceGrowthRatePercent"
+          step="0.1"
+          value="2"
+        />
+      </label>
+      <label>
+        여유자금·보증금 기회비용 연 수익률 가정 (%)
+        <span class="hint">정기예금·안전자산 수준을 가정합니다.</span>
+        <input
+          type="number"
+          id="investReturnRatePercent"
+          name="investReturnRatePercent"
+          step="0.1"
+          value="3.5"
+        />
+      </label>
+      <label>
+        전세 재계약(2년 주기) 보증금 인상률 가정 (%)
+        <span class="hint">법정 상한은 5%입니다.</span>
+        <input
+          type="number"
+          id="jeonseRenewalIncreasePercent"
+          name="jeonseRenewalIncreasePercent"
+          step="0.1"
+          value="5"
+        />
+      </label>
+      <label>
+        공시가격 ÷ 매매가 비율 가정 (%)
+        <span class="hint">재산세 계산에 쓰이며, 통상 시세의 60~70% 수준입니다.</span>
+        <input
+          type="number"
+          id="publicPriceRatioPercent"
+          name="publicPriceRatioPercent"
+          step="1"
+          value="70"
+        />
+      </label>
+    </fieldset>
+
+    <button class="btn" type="submit">비교하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label" id="verdict-label">더 유리한 선택</span>
+        <span class="value"><span id="verdict-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">비용 차이</span>
+        <span class="value"><span id="cost-difference">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        매매 시나리오
+      </caption>
+      <tbody>
+        <tr>
+          <td>대출금</td>
+          <td id="buy-loan-amount">-</td>
+        </tr>
+        <tr>
+          <td>취득세 등(1회)</td>
+          <td id="buy-acquisition-tax">-</td>
+        </tr>
+        <tr>
+          <td>기간 내 대출이자 합계</td>
+          <td id="buy-total-interest">-</td>
+        </tr>
+        <tr>
+          <td>재산세 <span class="hint">(연 <span id="buy-annual-tax-hint"></span>)</span></td>
+          <td id="buy-total-property-tax">-</td>
+        </tr>
+        <tr>
+          <td>예상 자본이득(집값 상승분)</td>
+          <td id="buy-capital-gain">-</td>
+        </tr>
+        <tr class="total">
+          <td>매매 순비용</td>
+          <td id="buy-net-cost">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        전세 시나리오
+      </caption>
+      <tbody>
+        <tr>
+          <td>중개수수료(1회)</td>
+          <td id="jeonse-brokerage-fee">-</td>
+        </tr>
+        <tr>
+          <td>여유자금 운용 수익 <span class="hint">(차감)</span></td>
+          <td id="jeonse-surplus-return">-</td>
+        </tr>
+        <tr>
+          <td>보증금 기회비용</td>
+          <td id="jeonse-opportunity-cost">-</td>
+        </tr>
+        <tr>
+          <td>기간 종료 시 예상 보증금 <span class="hint">(참고용)</span></td>
+          <td id="jeonse-final-deposit">-</td>
+        </tr>
+        <tr class="total">
+          <td>전세 순비용</td>
+          <td id="jeonse-net-cost">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세는 비교기간
+    내내 최초 공시가격 기준으로 동일하다고 가정하며(공시가격 상승 미반영),
+    종합부동산세·중개보수 협의가·실제 대출 한도(DSR 등)·양도소득세는
+    반영하지 않았습니다. 자기자본이 매매가보다 크게 남는 경우의 잉여자금
+    운용도 반영하지 않습니다. 실제 의사결정 전 반드시 전문가와 상담하고
+    실제 금리·시세를 확인하세요.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>왜 재산세만 반영하고 종합부동산세는 빠졌나요?</summary>
+      <p>
+        종합부동산세는 1세대 1주택 기준 공시가격 12억원을 초과하는 고가주택에만
+        부과됩니다. 이 계산기가 다루는 일반적인 실거주 매수 시나리오에서는
+        해당하지 않는 경우가 많아 제외했습니다. 공시가격이 12억원에 가깝거나
+        초과한다면 <a href="/calculators/property-tax-calculator">보유세 계산기</a>에서
+        종합부동산세를 별도로 확인하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>"보증금 기회비용"이 무엇인가요?</summary>
+      <p>
+        전세보증금은 계약 종료 시 그대로 돌려받으므로 그 자체가 손실은
+        아닙니다. 다만 그 돈을 정기예금 등 안전자산에 넣어두었다면 벌 수
+        있었던 이자(기회비용)를 포기하는 셈이므로, 매매의 "집값 상승분(자본이득)"과
+        대응되는 개념으로 반영했습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>대출이자는 왜 "총 이자"가 아니라 "기간 내 이자"인가요?</summary>
+      <p>
+        대출기간(예: 30년) 전체의 총 이자가 아니라, 실제 비교하려는 보유기간(예:
+        5년) 동안 상환하는 이자만 계산합니다. 원리금균등상환은 초기에 이자
+        비중이 크므로, 짧은 보유기간을 비교할 때는 이 방식이 실제 부담에
+        더 가깝습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>어떤 경우에 매매가 유리하고, 어떤 경우에 전세가 유리한가요?</summary>
+      <p>
+        집값 상승률 가정이 대출금리·투자수익률보다 충분히 높으면 매매가
+        유리해지고, 반대로 집값이 정체되거나 하락할 것으로 보면(또는
+        대출금리가 높으면) 전세의 기회비용이 상대적으로 작아 전세가 유리해질
+        수 있습니다. 가정값을 바꿔가며 여러 시나리오를 비교해 보세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .method-toggle label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  .method-toggle input {
+    font: inherit;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { calculateBuyVsJeonse } from '../../lib/buyVsJeonseCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('compare-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('purchasePrice', 'purchasePrice-preview');
+  bindAmountPreview('jeonseDeposit', 'jeonseDeposit-preview');
+  bindAmountPreview('cashOnHand', 'cashOnHand-preview');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const purchasePrice = getNum('purchasePrice');
+    const jeonseDeposit = getNum('jeonseDeposit');
+    const cashOnHand = getNum('cashOnHand');
+    const years = getNum('years');
+    const loanAnnualRatePercent = getNum('loanAnnualRatePercent');
+    const loanTermYears = getNum('loanTermYears');
+
+    if (!purchasePrice || purchasePrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '매매가를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!jeonseDeposit || jeonseDeposit <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '전세보증금을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!cashOnHand || cashOnHand <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '보유 현금(자기자본)을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!years || years < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '비교 기간을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!loanAnnualRatePercent || loanAnnualRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '대출 연이자율을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!loanTermYears || loanTermYears < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '대출 기간을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateBuyVsJeonse({
+      purchasePrice,
+      jeonseDeposit,
+      cashOnHand,
+      years,
+      loanAnnualRatePercent,
+      loanTermYears,
+      priceGrowthRatePercent: getNum('priceGrowthRatePercent'),
+      investReturnRatePercent: getNum('investReturnRatePercent'),
+      jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
+      publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
+      isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
+    });
+
+    const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
+    const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
+    const diff = r.costDifference;
+    if (diff > 0) {
+      verdictValue.textContent = '전세';
+      costDifferenceEl.textContent = `매매가 ${won.format(Math.round(diff))} 더 비쌈`;
+    } else if (diff < 0) {
+      verdictValue.textContent = '매매';
+      costDifferenceEl.textContent = `전세가 ${won.format(Math.round(-diff))} 더 비쌈`;
+    } else {
+      verdictValue.textContent = '동일';
+      costDifferenceEl.textContent = '차이 없음';
+    }
+
+    setWon('buy-loan-amount', r.buy.loanAmount);
+    setWon('buy-acquisition-tax', r.buy.acquisitionTax);
+    setWon('buy-total-interest', r.buy.totalLoanInterest);
+    setWon('buy-total-property-tax', r.buy.totalPropertyTax);
+    (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
+      Math.round(r.buy.annualPropertyTax),
+    );
+    setWon('buy-capital-gain', r.buy.capitalGain);
+    setWon('buy-net-cost', r.buy.netCost);
+
+    setWon('jeonse-brokerage-fee', r.jeonse.brokerageFee);
+    setWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn);
+    setWon('jeonse-opportunity-cost', r.jeonse.depositOpportunityCost);
+    setWon('jeonse-final-deposit', r.jeonse.expectedFinalDeposit);
+    setWon('jeonse-net-cost', r.jeonse.netCost);
+
+    result.classList.remove('hidden');
+  });
+</script>

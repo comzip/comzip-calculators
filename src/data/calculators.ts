@@ -177,6 +177,18 @@ export const calculators: Calculator[] = [
       'Enter the officially assessed value to estimate property tax (housing, land, buildings) and comprehensive real estate tax together — accounting for the fair market value ratio, progressive rates, local education tax, and urban area tax.',
   },
   {
+    slug: 'buy-vs-jeonse-calculator',
+    title: '전세 vs 매매 비교 계산기',
+    titleEn: 'Korea Jeonse vs. Buying Comparison Calculator',
+    navLabel: '전세 vs 매매 비교',
+    navLabelEn: 'Jeonse vs Buying',
+    category: '부동산',
+    description:
+      '매매가·전세보증금·자기자본을 입력하면 취득세·대출이자·재산세·집값 상승분(매매)과 중개수수료·보증금 기회비용(전세)을 함께 계산해 N년 보유 시 어느 쪽이 더 유리한지 비교합니다.',
+    descriptionEn:
+      'Enter the purchase price, jeonse deposit, and cash on hand to compare buying (acquisition tax, loan interest, property tax, expected appreciation) against jeonse (brokerage fee, deposit opportunity cost) over N years of holding.',
+  },
+  {
     slug: 'bmi-calculator',
     title: 'BMI 계산기',
     titleEn: 'BMI Calculator',

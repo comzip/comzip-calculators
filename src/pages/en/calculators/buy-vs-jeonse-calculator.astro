@@ -1,0 +1,442 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Compares <strong>buying</strong> a home versus renting under
+    <strong>jeonse</strong> (Korea's lump-sum deposit lease) with the same
+    budget, over a chosen holding period. Buying factors in acquisition tax,
+    loan interest, property tax, and expected appreciation; jeonse factors in
+    the brokerage fee and the opportunity cost of the deposit.
+  </p>
+
+  <form class="calc-form" id="compare-form">
+    <label>
+      Purchase price (KRW)
+      <input
+        type="number"
+        id="purchasePrice"
+        name="purchasePrice"
+        min="0"
+        step="any"
+        placeholder="e.g. 600000000"
+        required
+      />
+      <span class="amount-preview" id="purchasePrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Jeonse deposit (KRW)
+      <input
+        type="number"
+        id="jeonseDeposit"
+        name="jeonseDeposit"
+        min="0"
+        step="any"
+        placeholder="e.g. 400000000"
+        required
+      />
+      <span class="amount-preview" id="jeonseDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Cash on hand (KRW)
+      <span class="hint"
+        >For buying, this goes toward the purchase price first, and the
+        shortfall is financed with a loan. For jeonse, whatever's left after
+        the deposit is assumed to be invested as surplus cash.</span
+      >
+      <input
+        type="number"
+        id="cashOnHand"
+        name="cashOnHand"
+        min="0"
+        step="any"
+        placeholder="e.g. 200000000"
+        required
+      />
+      <span class="amount-preview" id="cashOnHand-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Comparison (expected residence) period (years)
+      <input
+        type="number"
+        id="years"
+        name="years"
+        min="1"
+        step="1"
+        placeholder="e.g. 5"
+        required
+      />
+    </label>
+
+    <label>
+      Loan annual interest rate (%)
+      <input
+        type="number"
+        id="loanAnnualRatePercent"
+        name="loanAnnualRatePercent"
+        min="0"
+        step="0.01"
+        placeholder="e.g. 4.2"
+        required
+      />
+    </label>
+
+    <label>
+      Loan term (years)
+      <input
+        type="number"
+        id="loanTermYears"
+        name="loanTermYears"
+        min="1"
+        step="1"
+        placeholder="e.g. 30"
+        required
+      />
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="isOver85Sqm" />
+      <span>Exclusive area over 85㎡ (subject to acquisition tax's special rural development tax)</span>
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>Assumptions (defaults provided)</legend>
+      <label>
+        Annual home price growth assumption (%)
+        <input
+          type="number"
+          id="priceGrowthRatePercent"
+          name="priceGrowthRatePercent"
+          step="0.1"
+          value="2"
+        />
+      </label>
+      <label>
+        Annual return assumption for surplus cash / deposit opportunity cost (%)
+        <span class="hint">Assumes a safe-asset level such as a term deposit.</span>
+        <input
+          type="number"
+          id="investReturnRatePercent"
+          name="investReturnRatePercent"
+          step="0.1"
+          value="3.5"
+        />
+      </label>
+      <label>
+        Jeonse renewal (2-year cycle) deposit increase assumption (%)
+        <span class="hint">The statutory cap is 5%.</span>
+        <input
+          type="number"
+          id="jeonseRenewalIncreasePercent"
+          name="jeonseRenewalIncreasePercent"
+          step="0.1"
+          value="5"
+        />
+      </label>
+      <label>
+        Announced value ÷ purchase price ratio assumption (%)
+        <span class="hint">Used for the property tax calculation; typically 60–70% of market price.</span>
+        <input
+          type="number"
+          id="publicPriceRatioPercent"
+          name="publicPriceRatioPercent"
+          step="1"
+          value="70"
+        />
+      </label>
+    </fieldset>
+
+    <button class="btn" type="submit">Compare</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label" id="verdict-label">Better option</span>
+        <span class="value"><span id="verdict-value">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Cost difference</span>
+        <span class="value"><span id="cost-difference">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Buying scenario
+      </caption>
+      <tbody>
+        <tr>
+          <td>Loan amount</td>
+          <td id="buy-loan-amount">-</td>
+        </tr>
+        <tr>
+          <td>Acquisition tax etc. (one-time)</td>
+          <td id="buy-acquisition-tax">-</td>
+        </tr>
+        <tr>
+          <td>Loan interest paid over the period</td>
+          <td id="buy-total-interest">-</td>
+        </tr>
+        <tr>
+          <td>Property tax <span class="hint">(annual <span id="buy-annual-tax-hint"></span>)</span></td>
+          <td id="buy-total-property-tax">-</td>
+        </tr>
+        <tr>
+          <td>Expected capital gain (appreciation)</td>
+          <td id="buy-capital-gain">-</td>
+        </tr>
+        <tr class="total">
+          <td>Net cost of buying</td>
+          <td id="buy-net-cost">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Jeonse scenario
+      </caption>
+      <tbody>
+        <tr>
+          <td>Brokerage fee (one-time)</td>
+          <td id="jeonse-brokerage-fee">-</td>
+        </tr>
+        <tr>
+          <td>Surplus cash investment return <span class="hint">(deducted)</span></td>
+          <td id="jeonse-surplus-return">-</td>
+        </tr>
+        <tr>
+          <td>Deposit opportunity cost</td>
+          <td id="jeonse-opportunity-cost">-</td>
+        </tr>
+        <tr>
+          <td>Expected deposit at period end <span class="hint">(reference only)</span></td>
+          <td id="jeonse-final-deposit">-</td>
+        </tr>
+        <tr class="total">
+          <td>Net cost of jeonse</td>
+          <td id="jeonse-net-cost">-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. Property tax is
+    assumed constant at the initial announced value throughout the comparison
+    period (appreciation of the announced value is not reflected), and
+    comprehensive real estate tax, negotiated brokerage rates, actual loan
+    limits (e.g. DSR), and capital gains tax on resale are not included.
+    Surplus cash left over when cash on hand exceeds the purchase price is
+    also not modeled. Always consult a professional and confirm actual rates
+    and market prices before making a real decision.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why is property tax included but not comprehensive real estate tax?</summary>
+      <p>
+        Comprehensive real estate tax only applies to high-value homes — over
+        1.2 billion KRW in announced value for a single-home household. Most
+        typical home-buying scenarios this calculator targets don't reach
+        that threshold, so it's excluded. If your announced value is close to
+        or above that, check comprehensive real estate tax separately with
+        the <a href="/en/calculators/property-tax-calculator">property holding tax calculator</a>.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is "deposit opportunity cost"?</summary>
+      <p>
+        A jeonse deposit is returned in full when the lease ends, so it isn't
+        a loss by itself. But if that money had been placed in a safe
+        interest-bearing asset instead, it would have earned interest — that
+        foregone interest is the opportunity cost, mirrored against buying's
+        "capital gain from appreciation."
+      </p>
+    </details>
+
+    <details>
+      <summary>Why "interest over the period" instead of the loan's total interest?</summary>
+      <p>
+        Rather than the total interest over the entire loan term (e.g. 30
+        years), this only counts the interest paid during the actual holding
+        period you're comparing (e.g. 5 years). Since equal-payment
+        amortization front-loads interest, this better reflects the real
+        burden for a shorter holding period.
+      </p>
+    </details>
+
+    <details>
+      <summary>When does buying win, and when does jeonse win?</summary>
+      <p>
+        If your assumed price growth rate is comfortably above the loan rate
+        and investment return rate, buying tends to win. If home prices are
+        expected to stagnate or decline (or the loan rate is high), jeonse's
+        relatively smaller opportunity cost can make it the better choice.
+        Try adjusting the assumptions to compare different scenarios.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .method-toggle label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  .method-toggle input {
+    font: inherit;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { calculateBuyVsJeonse } from '../../../lib/buyVsJeonseCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('compare-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('purchasePrice', 'purchasePrice-preview');
+  bindAmountPreview('jeonseDeposit', 'jeonseDeposit-preview');
+  bindAmountPreview('cashOnHand', 'cashOnHand-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+
+  const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const purchasePrice = getNum('purchasePrice');
+    const jeonseDeposit = getNum('jeonseDeposit');
+    const cashOnHand = getNum('cashOnHand');
+    const years = getNum('years');
+    const loanAnnualRatePercent = getNum('loanAnnualRatePercent');
+    const loanTermYears = getNum('loanTermYears');
+
+    if (!purchasePrice || purchasePrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid purchase price.';
+      return;
+    }
+    if (!jeonseDeposit || jeonseDeposit <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid jeonse deposit.';
+      return;
+    }
+    if (!cashOnHand || cashOnHand <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter valid cash on hand.';
+      return;
+    }
+    if (!years || years < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid comparison period.';
+      return;
+    }
+    if (!loanAnnualRatePercent || loanAnnualRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid loan interest rate.';
+      return;
+    }
+    if (!loanTermYears || loanTermYears < 1) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid loan term.';
+      return;
+    }
+
+    const r = calculateBuyVsJeonse({
+      purchasePrice,
+      jeonseDeposit,
+      cashOnHand,
+      years,
+      loanAnnualRatePercent,
+      loanTermYears,
+      priceGrowthRatePercent: getNum('priceGrowthRatePercent'),
+      investReturnRatePercent: getNum('investReturnRatePercent'),
+      jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
+      publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
+      isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
+    });
+
+    const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
+    const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
+    const diff = r.costDifference;
+    if (diff > 0) {
+      verdictValue.textContent = 'Jeonse';
+      costDifferenceEl.textContent = `Buying costs ${won.format(Math.round(diff))} more`;
+    } else if (diff < 0) {
+      verdictValue.textContent = 'Buying';
+      costDifferenceEl.textContent = `Jeonse costs ${won.format(Math.round(-diff))} more`;
+    } else {
+      verdictValue.textContent = 'Tie';
+      costDifferenceEl.textContent = 'No difference';
+    }
+
+    setWon('buy-loan-amount', r.buy.loanAmount);
+    setWon('buy-acquisition-tax', r.buy.acquisitionTax);
+    setWon('buy-total-interest', r.buy.totalLoanInterest);
+    setWon('buy-total-property-tax', r.buy.totalPropertyTax);
+    (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
+      Math.round(r.buy.annualPropertyTax),
+    );
+    setWon('buy-capital-gain', r.buy.capitalGain);
+    setWon('buy-net-cost', r.buy.netCost);
+
+    setWon('jeonse-brokerage-fee', r.jeonse.brokerageFee);
+    setWon('jeonse-surplus-return', r.jeonse.surplusInvestReturn);
+    setWon('jeonse-opportunity-cost', r.jeonse.depositOpportunityCost);
+    setWon('jeonse-final-deposit', r.jeonse.expectedFinalDeposit);
+    setWon('jeonse-net-cost', r.jeonse.netCost);
+
+    result.classList.remove('hidden');
+  });
+</script>
