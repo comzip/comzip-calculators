@@ -14,8 +14,10 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
   <h1>{meta.title}</h1>
   <p class="note">
     같은 예산으로 <strong>매매</strong>할 때와 <strong>전세</strong>로 살 때,
-    일정 기간 보유·거주하면 어느 쪽이 실제로 더 유리한지 비교합니다. 취득세·대출이자·재산세·집값
-    상승분(매매)과 중개수수료·보증금 기회비용(전세)을 함께 계산합니다.
+    일정 기간 보유·거주하면 어느 쪽이 실제로 더 유리한지 비교합니다. 취득세·대출이자·재산세·종부세·집값
+    상승분(매매)과 중개수수료·보증금 기회비용(전세)을 계산하며, 자기자본과
+    보증금에 묶이는 돈의 기회비용을 두 시나리오에 동일한 기준으로
+    반영합니다.
   </p>
 
   <form class="calc-form" id="compare-form">
@@ -127,8 +129,12 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         />
       </label>
       <label>
-        여유자금·보증금 기회비용 연 수익률 가정 (%)
-        <span class="hint">정기예금·안전자산 수준을 가정합니다.</span>
+        자기자본·보증금 기회비용(투자수익률) 연 수익률 가정 (%)
+        <span class="hint"
+          >매매의 자기자본과 전세의 보증금·여유자금 모두 이 수익률로 운용
+          가능하다고 가정합니다. 너무 높게 잡으면(집값 상승률보다 훨씬 높으면)
+          전세가 유리하게, 낮게 잡으면 매매가 유리하게 나옵니다.</span
+        >
         <input
           type="number"
           id="investReturnRatePercent"
@@ -215,11 +221,27 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
           <td id="buy-total-comprehensive-tax">-</td>
         </tr>
         <tr>
+          <td
+            >자기자본 기회비용 <span class="hint"
+              >(자기자본을 투자했다면 벌었을 돈)</span
+            ></td
+          >
+          <td id="buy-equity-opportunity-cost">-</td>
+        </tr>
+        <tr id="buy-surplus-row" class="hidden">
+          <td>잉여자금 운용 수익 <span class="hint">(보유현금이 매매가보다 많을 때, 차감)</span></td>
+          <td id="buy-surplus-return">-</td>
+        </tr>
+        <tr>
           <td>예상 자본이득(집값 상승분) <span class="hint">(차감)</span></td>
           <td id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td>매매 순비용 <span class="hint">= 취득세 + 이자 + 재산세 + 종부세 − 자본이득</span></td>
+          <td
+            >매매 순비용 <span class="hint"
+              >= 취득세 + 이자 + 재산세 + 종부세 + 자기자본 기회비용 − 자본이득</span
+            ></td
+          >
           <td id="buy-net-cost">-</td>
         </tr>
       </tbody>
@@ -258,15 +280,49 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세·종합부동산세는
     비교기간 내내 최초 공시가격 기준으로 동일하다고 가정하며(공시가격 상승
     미반영), 종합부동산세의 고령자·장기보유 세액공제·세부담상한, 중개보수
-    협의가, 실제 대출 한도(DSR 등), 양도소득세는 반영하지 않았습니다. 자기자본이
-    매매가보다 크게 남는 경우의 잉여자금 운용도 반영하지 않습니다. 실제
-    의사결정 전 반드시 전문가와 상담하고 실제 금리·시세를 확인하세요.
+    협의가, 실제 대출 한도(DSR 등), 양도소득세는 반영하지 않았습니다.
+    전세보증금이 보유 현금보다 큰 경우(전세자금대출이 필요한 상황)도
+    반영하지 않습니다. 실제 의사결정 전 반드시 전문가와 상담하고 실제
+    금리·시세를 확인하세요.
   </div>
 
   <AdSlot />
 
   <section class="faq">
     <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>실제 숫자로 어떻게 계산되는지 예시로 보여주세요</summary>
+      <p>
+        매매가 5억원, 전세보증금 3억원, 보유 현금 4억원, 비교기간 3년,
+        대출금리 4%(20년), 집값 상승률 2%, 투자수익률 3%, 공시가격비율
+        70%인 경우로 계산해 보겠습니다.
+      </p>
+      <p><strong>매매 시나리오</strong></p>
+      <ul>
+        <li>대출금 = 5억 − 4억(자기자본) = <strong>1억원</strong></li>
+        <li>취득세 등(1회) = <strong>550만원</strong></li>
+        <li>3년간 대출이자 합계(1억, 4%, 20년 원리금균등 스케줄의 첫 36개월분) ≈ <strong>1,141만원</strong></li>
+        <li>공시가격 = 5억 × 70% = 3.5억 → 재산세 연 15.4만원 × 3년 ≈ <strong>46만원</strong> (종부세는 3.5억 &lt; 12억이라 0원)</li>
+        <li>자기자본 기회비용 = 4억 × ((1.03)³ − 1) = 4억 × 9.27% ≈ <strong>3,709만원</strong></li>
+        <li>예상 자본이득(차감) = 5억 × ((1.02)³ − 1) = 5억 × 6.12% ≈ <strong>3,060만원</strong></li>
+        <li>매매 순비용 = 550 + 1,141 + 46 + 3,709 − 3,060 ≈ <strong>2,385만원</strong></li>
+      </ul>
+      <p><strong>전세 시나리오</strong></p>
+      <ul>
+        <li>중개수수료(1회) = <strong>90만원</strong></li>
+        <li>여유자금 = 4억(자기자본) − 3억(보증금) − 90만원 ≈ <strong>9,910만원</strong></li>
+        <li>보증금 기회비용 = 3억 × 9.27% ≈ <strong>2,782만원</strong></li>
+        <li>여유자금 운용 수익(차감) = 9,910만원 × 9.27% ≈ <strong>919만원</strong></li>
+        <li>전세 순비용 = 90 + 2,782 − 919 ≈ <strong>1,953만원</strong></li>
+      </ul>
+      <p>
+        매매 순비용(2,385만원)이 전세 순비용(1,953만원)보다 크므로,
+        <strong>이 조건에서는 전세가 약 432만원 더 유리</strong>합니다. 위
+        입력값을 그대로 넣어보시면 결과 화면에서 이 숫자들을 그대로 확인할
+        수 있습니다.
+      </p>
+    </details>
 
     <details>
       <summary>종합부동산세도 반영되나요?</summary>
@@ -283,12 +339,31 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     </details>
 
     <details>
-      <summary>"보증금 기회비용"이 무엇인가요?</summary>
+      <summary>"자기자본 기회비용"과 "보증금 기회비용"이 무엇인가요?</summary>
       <p>
-        전세보증금은 계약 종료 시 그대로 돌려받으므로 그 자체가 손실은
-        아닙니다. 다만 그 돈을 정기예금 등 안전자산에 넣어두었다면 벌 수
-        있었던 이자(기회비용)를 포기하는 셈이므로, 매매의 "집값 상승분(자본이득)"과
-        대응되는 개념으로 반영했습니다.
+        전세보증금과 매매의 자기자본(대출을 뺀 자기 돈)은 둘 다 계약 종료
+        시(또는 매도 시) 그대로 남는 원금이라 그 자체는 손실이 아닙니다.
+        다만 그 돈을 집에 묶어두지 않고 투자했다면 벌 수 있었던 수익(투자수익률
+        가정 기준)을 포기하는 셈이므로, <strong>두 시나리오 모두 동일한
+        기준으로</strong> 기회비용을 반영합니다. 매매는 대신 대출을 포함한
+        매매가 전체가 상승하는 "자본이득"을 별도로 얻기 때문에(레버리지
+        효과), 자기자본만 투입하고도 집 전체 가격 상승의 이득을 누릴 수
+        있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>투자수익률 가정을 올렸더니 결과가 확 바뀌었어요, 버그인가요?</summary>
+      <p>
+        아닙니다, 의도된 동작입니다. 투자수익률 가정이 집값 상승률보다
+        훨씬 높다면(예: 20% vs 3%), 집에 돈을 묶어두는 것 자체가 상대적으로
+        손해이므로 두 시나리오 모두에서 "자기자본/보증금 기회비용"이 커져
+        순비용이 늘어납니다. 다만 전세는 보증금을 뺀 나머지 여유자금을
+        실제로 투자해 그 수익을 다시 차감하는 반면, 매매는 자기자본
+        대부분이 집에 묶여 있어 투자수익을 거의 누리지 못하므로, 투자수익률
+        가정이 높을수록 상대적으로 전세가 유리해지는 것이 정상입니다 — 실제로
+        더 높은 수익을 낼 자신이 있다면 집을 사기보다 전세로 살며 그 돈을
+        투자하는 편이 합리적이라는 재무 원칙과 일치합니다.
       </p>
     </details>
 
@@ -315,6 +390,15 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
 </BaseLayout>
 
 <style>
+  .faq ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+  .faq li {
+    margin: 4px 0;
+  }
   .method-toggle label {
     display: grid;
     gap: 6px;
@@ -456,6 +540,12 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       (document.getElementById('buy-annual-comprehensive-hint') as HTMLSpanElement).textContent =
         won.format(Math.round(r.buy.annualComprehensiveTax));
     }
+    setWon('buy-equity-opportunity-cost', r.buy.equityOpportunityCost);
+
+    const buySurplusRow = document.getElementById('buy-surplus-row') as HTMLTableRowElement;
+    buySurplusRow.classList.toggle('hidden', r.buy.surplusCash <= 0);
+    if (r.buy.surplusCash > 0) setWon('buy-surplus-return', r.buy.surplusInvestReturn);
+
     setWon('buy-capital-gain', r.buy.capitalGain);
     setWon('buy-net-cost', r.buy.netCost);
 

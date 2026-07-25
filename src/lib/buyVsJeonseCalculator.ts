@@ -8,17 +8,27 @@
  * 이 계산기는 다음과 같이 단순화합니다.
  *
  *  - 매매: 자기자본을 매매가에 우선 투입하고, 부족분(매매가−자기자본,
- *    음수면 0)을 대출로 조달한다고 가정합니다. 자기자본이 매매가보다
- *    많이 남는 경우의 잉여자금 운용은 반영하지 않습니다.
+ *    음수면 0)을 대출로 조달한다고 가정합니다. 자기자본이 매매가를
+ *    초과하는 경우 남는 돈(잉여자금)은 전세의 여유자금과 동일하게
+ *    투자수익률 가정으로 운용된다고 가정합니다.
  *  - 재산세·종합부동산세는 비교기간 내내 최초 공시가격 기준으로 동일하다고
  *    가정합니다(공시가격 상승분 미반영). 종합부동산세는 1세대1주택 공제금액
  *    (12억원)을 초과하는 공시가격에서만 발생하며, 재산세액공제(이중과세
  *    조정)까지 근사 반영합니다.
- *  - 전세는 보증금을 은행 등에 예치했을 때 벌 수 있었던 이자를
- *    "기회비용"으로, 매매는 집값 상승분을 "자본이득"으로 반영해 두
- *    시나리오의 순비용을 비교합니다.
+ *  - 기회비용은 두 시나리오에 동일한 원칙으로 대칭 반영합니다: 전세는
+ *    보증금(집에 넣지 않고 은행 등에 예치했다면 벌 수 있었던 돈)을,
+ *    매매는 자기자본(집에 넣지 않고 투자했다면 벌 수 있었던 돈)을 각각
+ *    투자수익률 가정으로 "기회비용"으로 계산해 순비용에 더합니다. 매매는
+ *    대신 집값 상승분을 "자본이득"으로 별도 반영합니다 — 매입가 전체
+ *    (대출 포함)에 대해 상승하므로, 자기자본만 투입하고도 집값 전체의
+ *    상승분을 얻는 레버리지 효과가 그대로 드러납니다.
+ *    (이전 버전은 매매의 자기자본에는 기회비용을 매기지 않아, 투자수익률
+ *    가정을 집값 상승률보다 높게 잡을수록 비합리적으로 매매가 유리하게
+ *    나오는 오류가 있었습니다 — 2026-07-25 3인 교차검증으로 발견해 수정.)
  *  - 대출 이자는 실제 상환 스케줄(원리금균등)에서 비교기간에 해당하는
  *    회차의 이자 합계를 사용합니다(대출 잔액이 계속 줄어드는 것을 반영).
+ *  - 전세보증금이 보유 현금보다 큰 경우(전세자금대출이 필요한 상황)는
+ *    반영하지 않습니다 — 보증금 전액을 자기 돈으로 낸다고 가정합니다.
  * =================================================================
  *
  * 아래 계산은 이미 검증된 기존 계산기 모듈을 그대로 재사용합니다:
@@ -76,6 +86,14 @@ export interface BuyScenarioResult {
   /** 종합부동산세(연, 재산세액공제 반영 후 결정세액+농특세). 공제금액 이하면 0. */
   annualComprehensiveTax: number;
   totalComprehensiveTax: number;
+  /** 매매가에 투입된 자기자본(= min(보유현금, 매매가)). */
+  equityInHome: number;
+  /** 자기자본을 투자수익률 가정으로 운용했다면 벌었을 기회비용. */
+  equityOpportunityCost: number;
+  /** 보유현금이 매매가를 초과할 때의 잉여자금(= max(0, 보유현금 − 매매가)). */
+  surplusCash: number;
+  /** 잉여자금을 투자수익률 가정으로 운용한 수익. */
+  surplusInvestReturn: number;
   expectedFuturePrice: number;
   capitalGain: number;
   netCost: number;
@@ -105,8 +123,16 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
   const years = Math.max(0, input.years || 0);
   const months = Math.round(years * 12);
 
+  // 두 시나리오 모두 "묶인 자금을 투자했다면 벌었을 돈"을 같은 수익률
+  // 가정으로 계산하므로, 성장 배율을 한 번만 구해 공유한다.
+  const growthFactor = Math.pow(1 + input.investReturnRatePercent / 100, years) - 1;
+
   // ---------------- 매매 시나리오 ----------------
   const loanAmount = Math.max(0, purchasePrice - cashOnHand);
+  const equityInHome = Math.min(cashOnHand, purchasePrice);
+  const equityOpportunityCost = equityInHome * growthFactor;
+  const buySurplusCash = Math.max(0, cashOnHand - purchasePrice);
+  const buySurplusInvestReturn = buySurplusCash * growthFactor;
 
   const acquisition = calculateAcquisitionTax({
     propertyType: '주택',
@@ -164,14 +190,15 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
     acquisition.total +
     totalLoanInterest +
     totalPropertyTax +
-    totalComprehensiveTax -
-    capitalGain;
+    totalComprehensiveTax +
+    equityOpportunityCost -
+    capitalGain -
+    buySurplusInvestReturn;
 
   // ---------------- 전세 시나리오 ----------------
   const brokerage = calculateBrokerageFee({ dealType: '임대차', amount: jeonseDeposit });
   const surplusCash = Math.max(0, cashOnHand - jeonseDeposit - brokerage.fee);
 
-  const growthFactor = Math.pow(1 + input.investReturnRatePercent / 100, years) - 1;
   const depositOpportunityCost = jeonseDeposit * growthFactor;
   const surplusInvestReturn = surplusCash * growthFactor;
 
@@ -190,6 +217,10 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
       totalPropertyTax,
       annualComprehensiveTax,
       totalComprehensiveTax,
+      equityInHome,
+      equityOpportunityCost,
+      surplusCash: buySurplusCash,
+      surplusInvestReturn: buySurplusInvestReturn,
       expectedFuturePrice,
       capitalGain,
       netCost: buyNetCost,
