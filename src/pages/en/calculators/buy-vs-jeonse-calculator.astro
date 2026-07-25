@@ -113,6 +113,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       <span>Exclusive area over 85㎡ (subject to acquisition tax's special rural development tax)</span>
     </label>
 
+    <label class="check-row">
+      <input type="checkbox" id="isUrbanArea" />
+      <span>Located in an urban area (subject to property tax's urban area surtax)</span>
+    </label>
+
     <fieldset class="method-toggle">
       <legend>Assumptions (defaults provided)</legend>
       <label>
@@ -172,10 +177,17 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <span class="value"><span id="verdict-value">-</span></span>
       </div>
       <div class="result-item">
-        <span class="label">Cost difference</span>
+        <span class="label" id="diff-label">Cost difference</span>
         <span class="value"><span id="cost-difference">-</span></span>
       </div>
     </div>
+
+    <p class="note">
+      The "net cost" below adds up what you actually pay in each scenario
+      (acquisition tax, interest, and property tax — or brokerage fee and
+      opportunity cost), then subtracts what you gain in return
+      (appreciation, or investment return). A smaller number is better.
+    </p>
 
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
@@ -198,12 +210,21 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
           <td>Property tax <span class="hint">(annual <span id="buy-annual-tax-hint"></span>)</span></td>
           <td id="buy-total-property-tax">-</td>
         </tr>
+        <tr id="buy-comprehensive-row" class="hidden">
+          <td
+            >Comprehensive real estate tax <span class="hint"
+              >(annual <span id="buy-annual-comprehensive-hint"></span>, on the amount
+              exceeding the 1.2 billion KRW single-home deduction)</span
+            ></td
+          >
+          <td id="buy-total-comprehensive-tax">-</td>
+        </tr>
         <tr>
-          <td>Expected capital gain (appreciation)</td>
+          <td>Expected capital gain (appreciation) <span class="hint">(deducted)</span></td>
           <td id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of buying</td>
+          <td>Net cost of buying <span class="hint">= acquisition tax + interest + property tax + comprehensive real estate tax − capital gain</span></td>
           <td id="buy-net-cost">-</td>
         </tr>
       </tbody>
@@ -227,11 +248,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
           <td id="jeonse-opportunity-cost">-</td>
         </tr>
         <tr>
-          <td>Expected deposit at period end <span class="hint">(reference only)</span></td>
+          <td>Expected deposit at period end <span class="hint">(reference only, not part of net cost)</span></td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
         <tr class="total">
-          <td>Net cost of jeonse</td>
+          <td>Net cost of jeonse <span class="hint">= brokerage fee + deposit opportunity cost − surplus cash return</span></td>
           <td id="jeonse-net-cost">-</td>
         </tr>
       </tbody>
@@ -239,14 +260,15 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
   </div>
 
   <div class="disclaimer">
-    This result is a <strong>simplified estimate</strong>. Property tax is
-    assumed constant at the initial announced value throughout the comparison
-    period (appreciation of the announced value is not reflected), and
-    comprehensive real estate tax, negotiated brokerage rates, actual loan
-    limits (e.g. DSR), and capital gains tax on resale are not included.
-    Surplus cash left over when cash on hand exceeds the purchase price is
-    also not modeled. Always consult a professional and confirm actual rates
-    and market prices before making a real decision.
+    This result is a <strong>simplified estimate</strong>. Property tax and
+    comprehensive real estate tax are assumed constant at the initial
+    announced value throughout the comparison period (appreciation of the
+    announced value is not reflected), and comprehensive real estate tax's
+    senior/long-term-holding credits and tax burden cap, negotiated brokerage
+    rates, actual loan limits (e.g. DSR), and capital gains tax on resale are
+    not included. Surplus cash left over when cash on hand exceeds the
+    purchase price is also not modeled. Always consult a professional and
+    confirm actual rates and market prices before making a real decision.
   </div>
 
   <AdSlot lang="en" />
@@ -255,14 +277,18 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     <h2>Frequently Asked Questions</h2>
 
     <details>
-      <summary>Why is property tax included but not comprehensive real estate tax?</summary>
+      <summary>Is comprehensive real estate tax included?</summary>
       <p>
-        Comprehensive real estate tax only applies to high-value homes — over
-        1.2 billion KRW in announced value for a single-home household. Most
-        typical home-buying scenarios this calculator targets don't reach
-        that threshold, so it's excluded. If your announced value is close to
-        or above that, check comprehensive real estate tax separately with
-        the <a href="/en/calculators/property-tax-calculator">property holding tax calculator</a>.
+        Yes. If the announced value (purchase price × your announced-value
+        ratio assumption) exceeds the 1.2 billion KRW single-home deduction,
+        comprehensive real estate tax is calculated automatically and added
+        to the net cost of buying (the "Comprehensive real estate tax" row
+        above only appears in that case). It also approximates the property
+        tax credit so tax already paid via property tax isn't double-counted.
+        Senior/long-term-holding credits and the tax burden cap aren't
+        reflected, though, so the real amount may be somewhat lower — check
+        the exact figure with the
+        <a href="/en/calculators/property-tax-calculator">property holding tax calculator</a>.
       </p>
     </details>
 
@@ -405,20 +431,25 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
       publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
       isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
+      isUrbanArea: (document.getElementById('isUrbanArea') as HTMLInputElement).checked,
     });
 
     const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
+    const diffLabel = document.getElementById('diff-label') as HTMLSpanElement;
     const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
     const diff = r.costDifference;
     if (diff > 0) {
       verdictValue.textContent = 'Jeonse';
-      costDifferenceEl.textContent = `Buying costs ${won.format(Math.round(diff))} more`;
+      diffLabel.textContent = 'Cheaper than buying by';
+      costDifferenceEl.textContent = won.format(Math.round(diff));
     } else if (diff < 0) {
       verdictValue.textContent = 'Buying';
-      costDifferenceEl.textContent = `Jeonse costs ${won.format(Math.round(-diff))} more`;
+      diffLabel.textContent = 'Cheaper than jeonse by';
+      costDifferenceEl.textContent = won.format(Math.round(-diff));
     } else {
       verdictValue.textContent = 'Tie';
-      costDifferenceEl.textContent = 'No difference';
+      diffLabel.textContent = 'Cost difference';
+      costDifferenceEl.textContent = '₩0';
     }
 
     setWon('buy-loan-amount', r.buy.loanAmount);
@@ -428,6 +459,17 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
       Math.round(r.buy.annualPropertyTax),
     );
+
+    const comprehensiveRow = document.getElementById(
+      'buy-comprehensive-row',
+    ) as HTMLTableRowElement;
+    comprehensiveRow.classList.toggle('hidden', r.buy.annualComprehensiveTax <= 0);
+    if (r.buy.annualComprehensiveTax > 0) {
+      setWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax);
+      (document.getElementById('buy-annual-comprehensive-hint') as HTMLSpanElement).textContent =
+        won.format(Math.round(r.buy.annualComprehensiveTax));
+    }
+
     setWon('buy-capital-gain', r.buy.capitalGain);
     setWon('buy-net-cost', r.buy.netCost);
 

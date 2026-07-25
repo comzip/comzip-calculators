@@ -10,9 +10,10 @@
  *  - 매매: 자기자본을 매매가에 우선 투입하고, 부족분(매매가−자기자본,
  *    음수면 0)을 대출로 조달한다고 가정합니다. 자기자본이 매매가보다
  *    많이 남는 경우의 잉여자금 운용은 반영하지 않습니다.
- *  - 재산세는 비교기간 내내 최초 공시가격 기준으로 동일하다고 가정합니다
- *    (공시가격 상승분 미반영). 종합부동산세는 대부분 사례에서 해당되지
- *    않아 포함하지 않았습니다(공시가격 합계가 클 경우 별도 확인 필요).
+ *  - 재산세·종합부동산세는 비교기간 내내 최초 공시가격 기준으로 동일하다고
+ *    가정합니다(공시가격 상승분 미반영). 종합부동산세는 1세대1주택 공제금액
+ *    (12억원)을 초과하는 공시가격에서만 발생하며, 재산세액공제(이중과세
+ *    조정)까지 근사 반영합니다.
  *  - 전세는 보증금을 은행 등에 예치했을 때 벌 수 있었던 이자를
  *    "기회비용"으로, 매매는 집값 상승분을 "자본이득"으로 반영해 두
  *    시나리오의 순비용을 비교합니다.
@@ -36,7 +37,7 @@
 
 import { calculateAcquisitionTax } from './acquisitionTaxCalculator';
 import { calculateLoan } from './loanCalculator';
-import { calculatePropertyTax } from './propertyTaxCalculator';
+import { calculatePropertyTax, calculateComprehensiveTax } from './propertyTaxCalculator';
 import { calculateBrokerageFee } from './brokerageFeeCalculator';
 
 export interface BuyVsJeonseInput {
@@ -62,6 +63,8 @@ export interface BuyVsJeonseInput {
   publicPriceRatioPercent: number;
   /** 전용면적 85㎡ 초과 여부(취득세의 농어촌특별세 부과 여부). */
   isOver85Sqm: boolean;
+  /** 도시지역 내 소재 여부(재산세 도시지역분 부과 대상). */
+  isUrbanArea: boolean;
 }
 
 export interface BuyScenarioResult {
@@ -70,6 +73,9 @@ export interface BuyScenarioResult {
   totalLoanInterest: number;
   annualPropertyTax: number;
   totalPropertyTax: number;
+  /** 종합부동산세(연, 재산세액공제 반영 후 결정세액+농특세). 공제금액 이하면 0. */
+  annualComprehensiveTax: number;
+  totalComprehensiveTax: number;
   expectedFuturePrice: number;
   capitalGain: number;
   netCost: number;
@@ -130,16 +136,36 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
     assetType: '주택',
     baseValue: publicPrice,
     singleHouseholdSpecial: true,
-    urbanArea: false,
+    urbanArea: input.isUrbanArea,
   });
   const annualPropertyTax = propertyTaxResult.total;
   const totalPropertyTax = annualPropertyTax * years;
+
+  // 공시가격이 1세대1주택 공제금액(12억원)을 넘으면 종합부동산세도 부과된다.
+  // 재산세액공제(이중과세 조정)까지 근사 반영하기 위해 방금 계산한 재산세
+  // 결과를 linkedPropertyTax로 넘긴다.
+  const comprehensiveTaxResult = calculateComprehensiveTax({
+    totalPublicPrice: publicPrice,
+    houseCount: '1주택',
+    linkedPropertyTax: {
+      propertyTaxPaid: propertyTaxResult.propertyTax,
+      fairMarketRatio: propertyTaxResult.fairMarketRatio,
+      topMarginalRate: propertyTaxResult.topMarginalRate,
+    },
+  });
+  const annualComprehensiveTax = comprehensiveTaxResult.totalWithSurtax;
+  const totalComprehensiveTax = annualComprehensiveTax * years;
 
   const expectedFuturePrice =
     purchasePrice * Math.pow(1 + input.priceGrowthRatePercent / 100, years);
   const capitalGain = expectedFuturePrice - purchasePrice;
 
-  const buyNetCost = acquisition.total + totalLoanInterest + totalPropertyTax - capitalGain;
+  const buyNetCost =
+    acquisition.total +
+    totalLoanInterest +
+    totalPropertyTax +
+    totalComprehensiveTax -
+    capitalGain;
 
   // ---------------- 전세 시나리오 ----------------
   const brokerage = calculateBrokerageFee({ dealType: '임대차', amount: jeonseDeposit });
@@ -162,6 +188,8 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
       totalLoanInterest,
       annualPropertyTax,
       totalPropertyTax,
+      annualComprehensiveTax,
+      totalComprehensiveTax,
       expectedFuturePrice,
       capitalGain,
       netCost: buyNetCost,

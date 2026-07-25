@@ -109,6 +109,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       <span>전용면적 85㎡ 초과 (취득세 농어촌특별세 부과 대상)</span>
     </label>
 
+    <label class="check-row">
+      <input type="checkbox" id="isUrbanArea" />
+      <span>도시지역 내 소재 (재산세 도시지역분 추가 부과)</span>
+    </label>
+
     <fieldset class="method-toggle">
       <legend>가정값 (기본값 사용 가능)</legend>
       <label>
@@ -168,10 +173,16 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <span class="value"><span id="verdict-value">-</span></span>
       </div>
       <div class="result-item">
-        <span class="label">비용 차이</span>
+        <span class="label" id="diff-label">비용 차이</span>
         <span class="value"><span id="cost-difference">-</span></span>
       </div>
     </div>
+
+    <p class="note">
+      아래 "순비용"은 각 시나리오에서 실제로 나가는 돈(취득세·이자·재산세 또는
+      중개수수료·기회비용)을 더한 뒤, 그 대가로 얻는 이득(집값 상승분 또는
+      투자수익)을 뺀 금액입니다. 이 값이 작을수록 유리합니다.
+    </p>
 
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
@@ -194,12 +205,21 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
           <td>재산세 <span class="hint">(연 <span id="buy-annual-tax-hint"></span>)</span></td>
           <td id="buy-total-property-tax">-</td>
         </tr>
+        <tr id="buy-comprehensive-row" class="hidden">
+          <td
+            >종합부동산세 <span class="hint"
+              >(연 <span id="buy-annual-comprehensive-hint"></span>, 1세대1주택 공제금액
+              12억원 초과분)</span
+            ></td
+          >
+          <td id="buy-total-comprehensive-tax">-</td>
+        </tr>
         <tr>
-          <td>예상 자본이득(집값 상승분)</td>
+          <td>예상 자본이득(집값 상승분) <span class="hint">(차감)</span></td>
           <td id="buy-capital-gain">-</td>
         </tr>
         <tr class="total">
-          <td>매매 순비용</td>
+          <td>매매 순비용 <span class="hint">= 취득세 + 이자 + 재산세 + 종부세 − 자본이득</span></td>
           <td id="buy-net-cost">-</td>
         </tr>
       </tbody>
@@ -223,11 +243,11 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
           <td id="jeonse-opportunity-cost">-</td>
         </tr>
         <tr>
-          <td>기간 종료 시 예상 보증금 <span class="hint">(참고용)</span></td>
+          <td>기간 종료 시 예상 보증금 <span class="hint">(참고용, 순비용에 미반영)</span></td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
         <tr class="total">
-          <td>전세 순비용</td>
+          <td>전세 순비용 <span class="hint">= 중개수수료 + 보증금 기회비용 − 여유자금 수익</span></td>
           <td id="jeonse-net-cost">-</td>
         </tr>
       </tbody>
@@ -235,12 +255,12 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
   </div>
 
   <div class="disclaimer">
-    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세는 비교기간
-    내내 최초 공시가격 기준으로 동일하다고 가정하며(공시가격 상승 미반영),
-    종합부동산세·중개보수 협의가·실제 대출 한도(DSR 등)·양도소득세는
-    반영하지 않았습니다. 자기자본이 매매가보다 크게 남는 경우의 잉여자금
-    운용도 반영하지 않습니다. 실제 의사결정 전 반드시 전문가와 상담하고
-    실제 금리·시세를 확인하세요.
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 재산세·종합부동산세는
+    비교기간 내내 최초 공시가격 기준으로 동일하다고 가정하며(공시가격 상승
+    미반영), 종합부동산세의 고령자·장기보유 세액공제·세부담상한, 중개보수
+    협의가, 실제 대출 한도(DSR 등), 양도소득세는 반영하지 않았습니다. 자기자본이
+    매매가보다 크게 남는 경우의 잉여자금 운용도 반영하지 않습니다. 실제
+    의사결정 전 반드시 전문가와 상담하고 실제 금리·시세를 확인하세요.
   </div>
 
   <AdSlot />
@@ -249,13 +269,16 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     <h2>자주 묻는 질문</h2>
 
     <details>
-      <summary>왜 재산세만 반영하고 종합부동산세는 빠졌나요?</summary>
+      <summary>종합부동산세도 반영되나요?</summary>
       <p>
-        종합부동산세는 1세대 1주택 기준 공시가격 12억원을 초과하는 고가주택에만
-        부과됩니다. 이 계산기가 다루는 일반적인 실거주 매수 시나리오에서는
-        해당하지 않는 경우가 많아 제외했습니다. 공시가격이 12억원에 가깝거나
-        초과한다면 <a href="/calculators/property-tax-calculator">보유세 계산기</a>에서
-        종합부동산세를 별도로 확인하세요.
+        네. 공시가격(매매가 × 공시가격비율 가정)이 1세대 1주택 공제금액인
+        12억원을 초과하면 종합부동산세가 자동으로 계산되어 매매 순비용에
+        더해집니다(위 결과의 "종합부동산세" 항목이 이때만 표시됩니다).
+        재산세로 이미 낸 부분을 다시 걷지 않도록 재산세액공제(이중과세
+        조정)도 근사 반영했습니다. 다만 고령자·장기보유 세액공제와
+        세부담상한은 반영하지 않아 실제보다 다소 높게 나올 수 있습니다 —
+        정확한 금액은 <a href="/calculators/property-tax-calculator">보유세 계산기</a>에서
+        별도로 확인하세요.
       </p>
     </details>
 
@@ -395,20 +418,25 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       jeonseRenewalIncreasePercent: getNum('jeonseRenewalIncreasePercent'),
       publicPriceRatioPercent: getNum('publicPriceRatioPercent'),
       isOver85Sqm: (document.getElementById('isOver85Sqm') as HTMLInputElement).checked,
+      isUrbanArea: (document.getElementById('isUrbanArea') as HTMLInputElement).checked,
     });
 
     const verdictValue = document.getElementById('verdict-value') as HTMLSpanElement;
+    const diffLabel = document.getElementById('diff-label') as HTMLSpanElement;
     const costDifferenceEl = document.getElementById('cost-difference') as HTMLSpanElement;
     const diff = r.costDifference;
     if (diff > 0) {
       verdictValue.textContent = '전세';
-      costDifferenceEl.textContent = `매매가 ${won.format(Math.round(diff))} 더 비쌈`;
+      diffLabel.textContent = '매매보다 이만큼 저렴';
+      costDifferenceEl.textContent = won.format(Math.round(diff));
     } else if (diff < 0) {
       verdictValue.textContent = '매매';
-      costDifferenceEl.textContent = `전세가 ${won.format(Math.round(-diff))} 더 비쌈`;
+      diffLabel.textContent = '전세보다 이만큼 저렴';
+      costDifferenceEl.textContent = won.format(Math.round(-diff));
     } else {
       verdictValue.textContent = '동일';
-      costDifferenceEl.textContent = '차이 없음';
+      diffLabel.textContent = '비용 차이';
+      costDifferenceEl.textContent = '0원';
     }
 
     setWon('buy-loan-amount', r.buy.loanAmount);
@@ -418,6 +446,16 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     (document.getElementById('buy-annual-tax-hint') as HTMLSpanElement).textContent = won.format(
       Math.round(r.buy.annualPropertyTax),
     );
+
+    const comprehensiveRow = document.getElementById(
+      'buy-comprehensive-row',
+    ) as HTMLTableRowElement;
+    comprehensiveRow.classList.toggle('hidden', r.buy.annualComprehensiveTax <= 0);
+    if (r.buy.annualComprehensiveTax > 0) {
+      setWon('buy-total-comprehensive-tax', r.buy.totalComprehensiveTax);
+      (document.getElementById('buy-annual-comprehensive-hint') as HTMLSpanElement).textContent =
+        won.format(Math.round(r.buy.annualComprehensiveTax));
+    }
     setWon('buy-capital-gain', r.buy.capitalGain);
     setWon('buy-net-cost', r.buy.netCost);
 
