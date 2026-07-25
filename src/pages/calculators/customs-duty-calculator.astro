@@ -2,8 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import AdSlot from '../../components/AdSlot.astro';
 import { calculators } from '../../data/calculators';
+import { CUSTOMS_ITEMS } from '../../lib/customsDutyCalculator';
 
 const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
+
+// 대분류 순서(관세청 공식 계산기와 동일한 순서)를 유지하기 위해, 등장 순서
+// 그대로 그룹핑합니다(정렬하지 않음).
+const categories: string[] = [];
+for (const item of CUSTOMS_ITEMS) {
+  if (!categories.includes(item.category)) categories.push(item.category);
+}
 ---
 
 <BaseLayout
@@ -13,50 +21,39 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
 >
   <h1>{meta.title}</h1>
   <p class="note">
-    해외직구 물품가격·구입국가·품목을 입력하면 <strong>목록통관 면세 여부</strong>와
-    예상 <strong>관세·부가세</strong>를 계산합니다. 맥주·탁주는 주세·교육세까지
-    함께 계산합니다.
+    관세청 <strong>"해외직구물품 예상세액 조회"</strong> 공식 계산기와 동일한
+    품목·세율로 <strong>관세·부가세</strong>를 계산합니다(개별소비세·주세·교육세
+    해당 품목 포함). 품목 137개, 관세율 구분(기본관세/한·EU FTA/한·미 FTA)까지
+    실제 결과와 대조 검증했습니다.
   </p>
 
   <form class="calc-form" id="customs-form">
-    <fieldset class="method-toggle">
-      <legend>구입국가</legend>
-      <label class="method-option">
-        <input type="radio" name="origin" value="US" checked />
-        <span>미국</span>
-      </label>
-      <label class="method-option">
-        <input type="radio" name="origin" value="OTHER" />
-        <span>미국 외 국가</span>
-      </label>
-    </fieldset>
-    <p class="note" id="origin-hint">
-      면세기준: 미국 발송 특송화물 200달러 / 그 외 국가 150달러
-    </p>
+    <label>
+      구입물품
+      <select id="itemId">
+        <option value="">선택해주세요</option>
+        {
+          categories.map((category) => (
+            <optgroup label={category}>
+              {CUSTOMS_ITEMS.filter((item) => item.category === category).map((item) => (
+                <option value={item.id}>{item.name}</option>
+              ))}
+            </optgroup>
+          ))
+        }
+      </select>
+    </label>
 
     <label>
-      품목
-      <select id="category">
-        <option value="의류·신발·가방" selected>의류·신발·가방 (관세율 13%)</option>
-        <option value="전자제품">전자제품 (관세율 0%)</option>
-        <option value="화장품">화장품·스킨케어 (관세율 6.5%)</option>
-        <option value="향수">향수·디퓨저 (관세율 7%)</option>
-        <option value="식품·간식">식품·간식 (관세율 8%)</option>
-        <option value="완구·취미">완구·피규어·취미 (관세율 8%)</option>
-        <option value="서적">서적·교재 (관세율 0%)</option>
-        <option value="스포츠·아웃도어">스포츠·아웃도어 (관세율 8%)</option>
-        <option value="주얼리·액세서리">주얼리·액세서리 (관세율 8%)</option>
-        <option value="기타">기타 (관세율 8%)</option>
-        <option value="맥주">맥주</option>
-        <option value="탁주">탁주(막걸리)</option>
-        <option value="기능성화장품">기능성화장품 (미백·주름개선·자외선차단 표기)</option>
-        <option value="건강기능식품">건강기능식품·영양제</option>
-        <option value="기타주류">그 외 주류 (위스키·와인 등)</option>
-        <option value="담배">담배</option>
+      관세율 구분
+      <select id="tariffKind">
+        <option value="1">기본관세</option>
+        <option value="4">한·EU FTA</option>
+        <option value="5">한·미 FTA</option>
       </select>
       <span class="hint"
-        >관세율은 각 카테고리의 대표 HS 코드 기준 근사치이며, 정확한 세율은 실제
-        품목의 HS 품목분류에 따라 다를 수 있습니다.</span
+        >구입한 물품의 원산지가 EU·미국이고 FTA 원산지 요건을 충족하면 해당
+        FTA 세율을, 아니면 기본관세를 선택하세요.</span
       >
     </label>
 
@@ -75,12 +72,6 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     </label>
 
     <label>
-      국제배송비 (미화, US$, 선택)
-      <span class="hint">면세기준 초과 시 과세가격에 포함됩니다.</span>
-      <input type="number" id="shippingUsd" name="shippingUsd" min="0" step="any" placeholder="예: 20" />
-    </label>
-
-    <label>
       적용 환율 (원/US$)
       <span class="hint">관세청 고시환율 기준으로 입력하세요. 예: 1400</span>
       <input
@@ -94,76 +85,70 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
       />
     </label>
 
-    <label id="volume-field">
-      용량 (리터)
-      <span class="hint">맥주·탁주는 주세가 리터당 정액으로 부과되어 용량이 필요합니다.</span>
-      <input type="number" id="volumeLiters" name="volumeLiters" min="0" step="any" placeholder="예: 1.5" />
-    </label>
-
     <button class="btn" type="submit">계산하기</button>
   </form>
 
   <p class="note" id="error-msg" role="alert"></p>
 
   <div class="result-box hidden" id="result" aria-live="polite">
-    <div id="excluded-notice" class="disclaimer strong-disclaimer hidden">
-      <strong>이 품목은 목록통관 배제대상입니다.</strong> 국가와 무관하게 미화
-      150달러 기준이 적용되며, 초과 시 수입신고(정식통관)가 필요합니다. 정확한
-      세액은 관세청(국번없이 125) 또는 관세사를 통해 확인하세요.
-    </div>
-
     <div id="exempt-notice" class="disclaimer hidden">
-      <strong>면세기준 이하로 관세·부가세가 면제됩니다.</strong>
+      <strong>면세기준(미화 150달러 상당) 이하로 관세·부가세가 면제됩니다.</strong>
+      <span id="exempt-alcohol-note"></span>
     </div>
 
     <div class="result-grid">
       <div class="result-item">
-        <span class="label">예상 총 세액</span>
-        <span class="value"><span id="total-tax">-</span></span>
+        <span class="label">예상 납부세액</span>
+        <span class="value"><span id="display-total">-</span></span>
       </div>
     </div>
 
     <table class="breakdown" id="breakdown-table">
       <tbody>
-        <tr id="row-taxable">
+        <tr>
           <td>과세가격</td>
-          <td id="cell-taxable">-</td>
+          <td id="cell-price">-</td>
         </tr>
-        <tr id="row-tariff" class="hidden">
+        <tr id="row-tariff">
           <td>관세 <span class="hint" id="tariff-rate-hint"></span></td>
           <td id="cell-tariff">-</td>
+        </tr>
+        <tr id="row-consumption" class="hidden">
+          <td>개별소비세</td>
+          <td id="cell-consumption">-</td>
         </tr>
         <tr id="row-liquor" class="hidden">
           <td>주세</td>
           <td id="cell-liquor">-</td>
         </tr>
+        <tr id="row-agriculture" class="hidden">
+          <td>농어촌특별세</td>
+          <td id="cell-agriculture">-</td>
+        </tr>
         <tr id="row-education" class="hidden">
-          <td>교육세 <span class="hint">(주세의 30%)</span></td>
+          <td>교육세</td>
           <td id="cell-education">-</td>
         </tr>
-        <tr id="row-vat" class="hidden">
+        <tr id="row-vat">
           <td>부가가치세</td>
           <td id="cell-vat">-</td>
         </tr>
         <tr class="total">
-          <td>합계</td>
+          <td>세목 합계 <span class="hint">(면세 미반영)</span></td>
           <td id="cell-total">-</td>
         </tr>
       </tbody>
     </table>
-
-    <div id="luxury-notice" class="disclaimer hidden">
-      과세가격이 200만원을 초과해 <strong>개별소비세(20%) + 교육세</strong>가 별도로
-      부과될 수 있습니다. 이 계산기는 자동 계산하지 않으니 관세사·관세청을 통해
-      확인하세요.
-    </div>
   </div>
 
   <div class="disclaimer">
-    본 계산 결과는 <strong>간이 추정치</strong>입니다. 실제 세액은 품목의 정확한
-    HS 품목분류, 통관 시점 관세청 고시환율, 자가사용인정기준 초과 여부 등에
-    따라 달라질 수 있습니다. 실제 납부세액은 관세청(국번없이 125) 또는
-    관세사를 통해 반드시 확인하세요.
+    본 계산 결과는 관세청 공식 계산기의 로직을 재현한 <strong>간이 추정치</strong>입니다.
+    실제 세액은 품목의 정확한 HS 품목분류, 통관 시점 관세청 고시환율,
+    자가사용인정기준 초과 여부 등에 따라 달라질 수 있습니다. 관세청 공식
+    계산기는 국가·배송방법과 무관하게 면세기준을 미화 150달러로 계산하며(일부
+    특송화물에 적용되는 200달러 특례는 반영되어 있지 않음), 이 계산기도 동일하게
+    동작합니다. 실제 납부세액은 관세청(국번없이 125) 또는 관세사를 통해
+    반드시 확인하세요.
   </div>
 
   <AdSlot />
@@ -172,82 +157,59 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     <h2>자주 묻는 질문</h2>
 
     <details>
-      <summary>면세기준(150달러/200달러)은 어떻게 다른가요?</summary>
+      <summary>왜 미국인데도 200달러가 아니라 150달러 기준인가요?</summary>
       <p>
-        개인이 자가사용 목적으로 해외직구한 물품은 미화 150달러 이하면
-        수입신고 없이 면세로 통관됩니다. 다만 미국에서 발송된 특송화물은
-        한·미 FTA에 따라 기준이 200달러로 높습니다. 기준을 <strong
-          >단 1달러라도 초과하면 전체 금액에 과세</strong
-        >됩니다(초과분만 과세되는 게 아닙니다).
+        관세청 공식 "해외직구물품 예상세액 조회" 계산기는 배송 방법(특송화물
+        여부)을 입력받지 않기 때문에, 국가와 무관하게 항상 미화 150달러
+        기준으로 계산합니다. 실제로는 미국에서 <strong>특송화물(항공특송)</strong>로
+        발송된 물품에 한해 한·미 FTA 특례로 200달러까지 면세되는 경우가
+        있으나, 이 계산기는 관세청 공식 계산기의 결과값을 그대로 재현하는 것을
+        목표로 하여 150달러 기준을 사용합니다.
       </p>
     </details>
 
     <details>
-      <summary>목록통관 배제대상은 무엇인가요?</summary>
+      <summary>관세율 구분(기본관세/한·EU FTA/한·미 FTA)은 어떻게 고르나요?</summary>
       <p>
-        의약품·건강기능식품·기능성화장품·주류·담배·농림축수산물 등은
-        간편한 목록통관 대상에서 제외되어, 구입국가와 관계없이 150달러
-        기준이 적용되고 원칙적으로 정식 수입신고 절차를 거쳐야 합니다. 이
-        계산기는 이런 품목은 세액을 계산하지 않고 안내만 표시합니다.
+        구입한 물품의 원산지가 유럽연합 또는 미국이고, 해당 국가의 원산지
+        요건을 충족한다는 원산지증명 등이 있다면 협정관세(한·EU FTA, 한·미
+        FTA)를 선택할 수 있습니다. 원산지가 다르거나 확실하지 않다면
+        <strong>기본관세</strong>를 선택하세요. 많은 품목이 FTA 적용 시 관세가
+        0%가 됩니다.
       </p>
     </details>
 
     <details>
-      <summary>관세·부가세는 어떻게 계산되나요?</summary>
+      <summary>개별소비세·주세·교육세는 어떤 품목에 붙나요?</summary>
       <p>
-        관세는 <strong>과세가격 × 품목별 관세율</strong>로 계산되고, 부가세는
-        <strong>(과세가격 + 관세) × 10%</strong>로 관세를 더한 금액에 순차
-        적용됩니다. 품목별 관세율은 대표 HS 코드 기준 근사치로, 의류·신발·가방
-        13%, 화장품 6.5%, 향수 7%, 식품·완구·스포츠용품·주얼리 등 8%,
-        전자제품·서적은 0%를 사용합니다. 전자제품처럼 관세가 0%여도 면세기준을
-        초과하면 부가세 10%는 그대로 부과됩니다.
+        고급핸드백·고급손목시계는 과세가격이 <strong>200만원을 초과</strong>하는
+        경우에만 계산할 수 있으며, 그 초과분에 개별소비세 20% + 교육세(개별소비세의
+        30%)가 붙습니다. 와인·사케는 주세 30%, 위스키·브랜디는 주세 72% +
+        교육세(주세의 10%, 위스키·브랜디는 30%)가 부과됩니다. 이 품목들은
+        면세기준(150달러) 이하여도 <strong>주세는 항상 부과</strong>됩니다(관세·부가세만
+        면제).
       </p>
     </details>
 
     <details>
-      <summary>맥주·탁주는 왜 계산 방식이 다른가요?</summary>
+      <summary>부가세는 어떻게 계산되나요?</summary>
       <p>
-        맥주·탁주(막걸리)는 목록통관 배제대상이라 150달러 이하면 관세·부가세는
-        면제되지만, <strong>주세와 교육세는 가격과 무관하게 항상 부과</strong>됩니다.
-        주세는 용량(리터) 기준 정액으로 부과되며(맥주 리터당 885.7원, 탁주
-        리터당 44.4원, 2024년 기준), 맥주는 추가로 주세액의 30%가 교육세로
-        붙습니다(탁주는 교육세 면제). 150달러를 초과하면 관세(0%)와 부가세도
-        함께 부과됩니다.
+        부가세 = (과세가격 + 관세 + 개별소비세 + 교육세 + 주세 + 농어촌특별세) ×
+        10%로, 다른 모든 세목을 더한 금액에 마지막으로 10%가 적용됩니다.
       </p>
     </details>
   </section>
 </BaseLayout>
 
-<style>
-  .strong-disclaimer {
-    background: #fef2f2;
-    border-color: #fca5a5;
-  }
-  #origin-hint {
-    margin-top: -8px;
-  }
-</style>
-
 <script>
-  import { calculateCustomsDuty } from '../../lib/customsDutyCalculator';
-  import type { CustomsCategory } from '../../lib/customsDutyCalculator';
+  import { calculateCustomsDuty, getTariffRate } from '../../lib/customsDutyCalculator';
+  import type { TariffKind } from '../../lib/customsDutyCalculator';
 
   const form = document.getElementById('customs-form') as HTMLFormElement;
   const result = document.getElementById('result') as HTMLDivElement;
   const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
-  const categorySelect = document.getElementById('category') as HTMLSelectElement;
-  const volumeField = document.getElementById('volume-field') as HTMLLabelElement;
-  const volumeInput = document.getElementById('volumeLiters') as HTMLInputElement;
-
-  const ALCOHOL_CATEGORIES: CustomsCategory[] = ['맥주', '탁주'];
-
-  const syncVolumeField = () => {
-    const isAlcohol = ALCOHOL_CATEGORIES.includes(categorySelect.value as CustomsCategory);
-    volumeField.classList.toggle('hidden', !isAlcohol);
-    volumeInput.required = isAlcohol;
-  };
-  categorySelect.addEventListener('change', syncVolumeField);
-  syncVolumeField();
+  const itemSelect = document.getElementById('itemId') as HTMLSelectElement;
+  const kindSelect = document.getElementById('tariffKind') as HTMLSelectElement;
 
   const won = new Intl.NumberFormat('ko-KR', {
     style: 'currency',
@@ -266,18 +228,18 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
     event.preventDefault();
     errorMsg.textContent = '';
 
-    const category = categorySelect.value as CustomsCategory;
-    const isFromUS =
-      (form.querySelector('input[name="origin"]:checked') as HTMLInputElement).value === 'US';
+    const itemId = Number(itemSelect.value);
+    const tariffKind = Number(kindSelect.value) as TariffKind;
     const priceUsd = Number((document.getElementById('priceUsd') as HTMLInputElement).value);
-    const shippingUsd = Number(
-      (document.getElementById('shippingUsd') as HTMLInputElement).value,
-    );
     const exchangeRate = Number(
       (document.getElementById('exchangeRate') as HTMLInputElement).value,
     );
-    const volumeLiters = Number(volumeInput.value);
 
+    if (!itemId) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '구입물품을 선택해 주세요.';
+      return;
+    }
     if (!priceUsd || priceUsd <= 0) {
       result.classList.add('hidden');
       errorMsg.textContent = '물품가격을 올바르게 입력해 주세요.';
@@ -288,71 +250,46 @@ const meta = calculators.find((c) => c.slug === 'customs-duty-calculator')!;
       errorMsg.textContent = '적용 환율을 올바르게 입력해 주세요.';
       return;
     }
-    if (ALCOHOL_CATEGORIES.includes(category) && (!volumeLiters || volumeLiters <= 0)) {
+
+    const r = calculateCustomsDuty({ itemId, tariffKind, priceUsd, exchangeRate });
+
+    if (r.error) {
       result.classList.add('hidden');
-      errorMsg.textContent = '맥주·탁주는 용량(리터)을 올바르게 입력해 주세요.';
+      errorMsg.textContent = r.error;
       return;
     }
 
-    const r = calculateCustomsDuty({
-      category,
-      isFromUS,
-      priceUsd,
-      shippingUsd,
-      exchangeRate,
-      volumeLiters,
-    });
+    setWon('cell-price', r.priceKrw);
 
-    const excludedNotice = document.getElementById('excluded-notice') as HTMLDivElement;
+    showRow('row-tariff', true);
+    setWon('cell-tariff', r.tariff);
+    (document.getElementById('tariff-rate-hint') as HTMLSpanElement).textContent =
+      `(관세율 ${r.tariffRate}%)`;
+
+    showRow('row-consumption', r.consumptionTax > 0);
+    if (r.consumptionTax > 0) setWon('cell-consumption', r.consumptionTax);
+
+    showRow('row-liquor', r.liquorTax > 0);
+    if (r.liquorTax > 0) setWon('cell-liquor', r.liquorTax);
+
+    showRow('row-agriculture', r.agricultureTax > 0);
+    if (r.agricultureTax > 0) setWon('cell-agriculture', r.agricultureTax);
+
+    showRow('row-education', r.educationTax > 0);
+    if (r.educationTax > 0) setWon('cell-education', r.educationTax);
+
+    setWon('cell-vat', r.vat);
+    setWon('cell-total', r.total);
+    setWon('display-total', r.displayTotal);
+
     const exemptNotice = document.getElementById('exempt-notice') as HTMLDivElement;
-    const breakdownTable = document.getElementById('breakdown-table') as HTMLTableElement;
-    const luxuryNotice = document.getElementById('luxury-notice') as HTMLDivElement;
-
-    excludedNotice.classList.toggle('hidden', !r.isExcludedCategory);
-    luxuryNotice.classList.toggle('hidden', !r.luxuryExciseAdvisory);
-
-    if (r.isExcludedCategory) {
-      breakdownTable.classList.add('hidden');
-      exemptNotice.classList.add('hidden');
-      setWon('total-tax', 0);
-      result.classList.remove('hidden');
-      return;
+    exemptNotice.classList.toggle('hidden', !r.isBelowExemption);
+    if (r.isBelowExemption) {
+      const alcoholNote = document.getElementById('exempt-alcohol-note') as HTMLSpanElement;
+      alcoholNote.textContent = r.isAlcohol
+        ? ' 다만 주류는 면세기준 이하여도 주세는 부과되어, 예상 납부세액에 주세가 반영되었습니다.'
+        : '';
     }
-
-    breakdownTable.classList.remove('hidden');
-
-    const isAlcohol = ALCOHOL_CATEGORIES.includes(category);
-    // 맥주·탁주는 면세기준 이하여도 주세·교육세는 별도로 부과되므로,
-    // "면세" 안내는 관세·부가세만 없는 일반 품목일 때만 보여준다.
-    exemptNotice.classList.toggle('hidden', !(r.isExempt && !isAlcohol));
-
-    const showTariffVat = !r.isExempt || isAlcohol;
-
-    showRow('row-taxable', showTariffVat);
-    if (!r.isExempt) setWon('cell-taxable', r.taxablePriceKrw);
-    else if (isAlcohol) {
-      const cell = document.getElementById('cell-taxable');
-      if (cell) cell.textContent = '0원 (면세)';
-    }
-
-    showRow('row-tariff', showTariffVat);
-    if (showTariffVat) {
-      setWon('cell-tariff', r.tariff);
-      const rateHint = document.getElementById('tariff-rate-hint') as HTMLSpanElement;
-      rateHint.textContent = `(관세율 ${(r.tariffRate * 100).toFixed(1)}%)`;
-    }
-
-    showRow('row-liquor', r.liquorTax !== undefined);
-    if (r.liquorTax !== undefined) setWon('cell-liquor', r.liquorTax);
-
-    showRow('row-education', r.educationTax !== undefined && r.educationTax > 0);
-    if (r.educationTax) setWon('cell-education', r.educationTax);
-
-    showRow('row-vat', showTariffVat);
-    if (showTariffVat) setWon('cell-vat', r.vat);
-
-    setWon('cell-total', r.totalTax);
-    setWon('total-tax', r.totalTax);
 
     result.classList.remove('hidden');
   });

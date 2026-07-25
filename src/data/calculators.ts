@@ -220,9 +220,9 @@ export const calculators: Calculator[] = [
     navLabelEn: 'Customs Duty & VAT',
     category: '생활',
     description:
-      '해외직구 물품가격·구입국가·품목을 입력하면 목록통관 면세 여부와 예상 관세·부가세(맥주·탁주는 주세·교육세 포함)를 계산합니다.',
+      '관세청 "해외직구물품 예상세액 조회" 공식 계산기와 동일한 137개 품목·세율로 관세·부가세(해당 품목은 개별소비세·주세·교육세 포함)를 계산합니다.',
     descriptionEn:
-      'Enter your overseas purchase price, origin country, and item category to check duty-free eligibility and estimate customs duty and VAT for Korean imports (including liquor and education tax for beer/takju).',
+      'Calculates customs duty and VAT using the same 137 items and rates as Korea Customs’ official "Estimated Tax for Overseas Purchases" calculator (including individual consumption tax, liquor tax, and education tax where applicable).',
   },
 ];
 
