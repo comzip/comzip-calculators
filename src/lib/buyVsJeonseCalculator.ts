@@ -14,6 +14,7 @@
  *      매매 최종 자기자본 = 보유현금 + 집값 상승분 + 잉여자금 운용수익
  *                          − 취득세 − 중개수수료 − 대출이자 − 재산세 − 종부세
  *      전세 최종 자기자본 = 보유현금 + 여유자금 운용수익 − 중개수수료
+ *                          − 보증금 증액 기회비용
  *    매매·전세 모두 중개수수료가 발생합니다(공인중개사법 시행규칙상
  *    매매는 '매매' 요율표, 전세는 '임대차' 요율표를 적용).
  *    전세보증금은 계약 종료 시 원금 그대로 돌려받으므로(이자가 붙지
@@ -21,6 +22,15 @@
  *    뺀 나머지 여유자금만 투자수익률 가정으로 굴린 수익이 더해집니다.
  *    매매도 마찬가지로 자기자본 중 매매가를 넘는 잉여자금만 투자수익률로
  *    굴립니다.
+ *  - 전세 재계약(2년 주기)마다 보증금이 오르면, 그 증액분은 여유자금
+ *    투자 풀에서 인출해 충당한다고 봅니다(같은 보유현금에서만 조달한다는
+ *    전제상 외부 소득을 가정할 근거가 없습니다). 인출된 돈은 무이자
+ *    보증금에 묶여 더는 불어나지 않으므로, 인출 시점부터 비교기간
+ *    종료까지 계속 투자됐다면 벌었을 수익을 "보증금 증액 기회비용"으로
+ *    계산해 전세 최종 자기자본에서 차감합니다(매매의 대출 원금 상환과는
+ *    다릅니다 — 원금 상환은 집값 상승분에 이미 반영된 자산(주택 지분)으로
+ *    바뀌지만, 보증금 증액분은 아무것도 불리지 않는 곳에 묶이기 때문에
+ *    그냥 제외하면 안 됩니다. 2026-07-26 사용자 지적으로 발견해 추가).
  *
  *    (이전 버전들은 "순비용"을 지표로 삼거나 자기자본·보증금에 각각
  *    별도로 기회비용을 매겼는데, 둘 다 "결국 내 돈이 얼마가 됐는가"를
@@ -149,7 +159,16 @@ export interface JeonseScenarioResult {
   expectedFinalDeposit: number;
   /** 비교기간 중 재계약(2년 주기) 횟수. */
   renewalCycles: number;
-  /** 비교기간 종료 시점의 최종 자기자본 = 시작 자기자본 + 여유자금 운용수익 − 중개수수료. */
+  /**
+   * 재계약마다 오른 보증금(증액분)을 여유자금 투자 풀에서 인출해 충당한다고
+   * 볼 때, 그 인출된 돈이 남은 기간 동안 투자됐다면 벌었을 수익(기회비용).
+   * 증액분은 무이자로 보증금에 묶여 있다가 원금 그대로 돌아오므로, 그
+   * 기간만큼의 투자수익을 놓친 셈이다.
+   */
+  depositTopUpOpportunityCost: number;
+  /** depositTopUpOpportunityCost의 재계약 회차별 내역(표시용). */
+  depositTopUps: Array<{ topUp: number; yearsRemaining: number }>;
+  /** 비교기간 종료 시점의 최종 자기자본 = 시작 자기자본 + 여유자금 운용수익 − 중개수수료 − 보증금 증액 기회비용. */
   finalCapital: number;
 }
 
@@ -246,10 +265,31 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
   const surplusInvestReturn = surplusCash * growthFactor;
 
   const renewalCycles = Math.floor(years / 2);
-  const expectedFinalDeposit =
-    jeonseDeposit * Math.pow(1 + input.jeonseRenewalIncreasePercent / 100, renewalCycles);
+  const renewalRate = input.jeonseRenewalIncreasePercent / 100;
 
-  const jeonseFinalCapital = cashOnHand + surplusInvestReturn - brokerage.fee;
+  // 재계약마다 오른 보증금은 여유자금 투자 풀에서 인출해 충당한다고 본다
+  // (같은 보유현금에서만 조달한다는 이 계산기의 전제상, 외부 소득으로
+  // 충당한다고 가정할 근거가 없다 — 매매의 대출 원금 상환과 달리, 이
+  // 인출된 돈은 무이자 보증금에 묶여 더 이상 불어나지 않는다). 각 인출분이
+  // 인출 시점부터 비교기간 종료까지 계속 투자됐다면 벌었을 수익을
+  // 기회비용으로 계산해 최종 자기자본에서 차감한다.
+  let depositTopUpOpportunityCost = 0;
+  let previousDeposit = jeonseDeposit;
+  const depositTopUps: Array<{ topUp: number; yearsRemaining: number }> = [];
+  for (let cycle = 1; cycle <= renewalCycles; cycle++) {
+    const depositAtCycle = jeonseDeposit * Math.pow(1 + renewalRate, cycle);
+    const topUp = depositAtCycle - previousDeposit;
+    const yearsRemaining = years - cycle * 2;
+    depositTopUpOpportunityCost +=
+      topUp * (Math.pow(1 + input.investReturnRatePercent / 100, yearsRemaining) - 1);
+    depositTopUps.push({ topUp, yearsRemaining });
+    previousDeposit = depositAtCycle;
+  }
+
+  const expectedFinalDeposit = previousDeposit;
+
+  const jeonseFinalCapital =
+    cashOnHand + surplusInvestReturn - brokerage.fee - depositTopUpOpportunityCost;
 
   return {
     buy: {
@@ -288,6 +328,8 @@ export function calculateBuyVsJeonse(input: BuyVsJeonseInput): BuyVsJeonseResult
       surplusInvestReturn,
       expectedFinalDeposit,
       renewalCycles,
+      depositTopUpOpportunityCost,
+      depositTopUps,
       finalCapital: jeonseFinalCapital,
     },
     capitalDifference: buyFinalCapital - jeonseFinalCapital,

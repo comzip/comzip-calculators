@@ -330,16 +330,25 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <tr>
           <td>
             Expected deposit at period end
-            <span class="hint">(reference only — the deposit is returned at face value, so it stays in your starting capital unchanged and isn't added separately to final capital)</span>
+            <span class="hint">(reference only — the refund grows with each renewal increase, but that increase itself is returned at face value, so it isn't added separately to final capital. What renewal increases DO cost you is the foregone investment growth — see the row below)</span>
             <span class="formula-line">= deposit × (1+renewal increase rate)^renewal cycles</span>
             <span class="formula-actual" id="jeonse-final-deposit-formula">-</span>
           </td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
+        <tr id="jeonse-topup-row" class="hidden">
+          <td>
+            Deposit top-up opportunity cost
+            <span class="hint">(assuming each renewal's deposit increase is funded by withdrawing from surplus cash, this is the investment return that withdrawal would have earned)</span>
+            <span class="formula-line">= Σ each renewal's top-up × ((1+return rate)^years remaining after withdrawal − 1)</span>
+            <span class="formula-actual" id="jeonse-topup-cost-formula">-</span>
+          </td>
+          <td class="amount-minus" id="jeonse-topup-cost">-</td>
+        </tr>
         <tr class="total">
           <td>
             Final capital if jeonse
-            <span class="formula-line">= starting capital + surplus cash return − brokerage fee</span>
+            <span class="formula-line">= starting capital + surplus cash return − brokerage fee − deposit top-up opportunity cost</span>
             <span class="formula-actual" id="jeonse-final-capital-formula">-</span>
           </td>
           <td id="jeonse-final-capital">-</td>
@@ -394,17 +403,23 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <li>Brokerage fee (one-time) = 300M × brokerage rate (bracketed) ≈ <strong>−0.9M KRW</strong></li>
         <li>Surplus cash (reference) = 400M (cash on hand) − 300M (deposit) − 0.9M ≈ <strong>99.1M KRW</strong></li>
         <li>Surplus cash investment return = 99.1M × ((1.03)³ − 1) = 99.1M × 9.27% ≈ <strong>+9.2M KRW</strong></li>
-        <li>Final capital if jeonse = 400 − 0.9 + 9.2M ≈ <strong>408.3M KRW</strong></li>
+        <li>At the year-2 renewal, the deposit rises 5%, from 300M to 315M
+          → the 15M top-up is assumed funded from surplus cash. Had it
+          stayed invested for the 1 remaining year (3 − 2), it would have
+          earned 15M × ((1.03)¹ − 1) ≈ <strong>−0.45M KRW</strong> (deposit
+          top-up opportunity cost)</li>
+        <li>Final capital if jeonse = 400 − 0.9 + 9.2 − 0.45M ≈ <strong>407.8M KRW</strong></li>
       </ul>
       <p>
-        Buying's final capital (411.2M) is higher than jeonse's (408.3M) —
-        so <strong>under these conditions buying leaves you about 2.9M KRW
+        Buying's final capital (411.2M) is higher than jeonse's (407.8M) —
+        so <strong>under these conditions buying leaves you about 3.4M KRW
         better off</strong>. All 400M KRW of the buyer's cash works toward
         appreciation on the full 500M home (leverage), while the renter only
         actually invests 99.1M KRW (the rest sits in the deposit, earning
-        nothing). Buying's brokerage fee (2M) is also larger than jeonse's
-        (0.9M), which narrows the gap. Enter these same inputs above and
-        you'll see these exact figures in the results.
+        nothing) and loses a bit more to the renewal top-up's opportunity
+        cost. Buying's brokerage fee (2M) is also larger than jeonse's
+        (0.9M), which narrows the gap in the other direction. Enter these
+        same inputs above and you'll see these exact figures in the results.
       </p>
     </details>
 
@@ -428,14 +443,38 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     <details>
       <summary>Why doesn't the jeonse deposit itself appear in the calculation?</summary>
       <p>
-        A jeonse deposit is returned in full, with no interest, when the
-        lease ends — so the deposit itself neither grows nor shrinks over
+        The original deposit is returned in full, with no interest, when the
+        lease ends — so that amount itself neither grows nor shrinks over
         the period. When comparing how much each scenario actually gains or
         loses, all that matters is <strong>how much the leftover surplus
         cash (after setting aside the deposit) actually grew</strong>. The
         buyer's cash on hand works the same way — its performance already
         shows up fully in the capital gain, so it isn't counted a second
-        time.
+        time. Renewal increases to the deposit are the one exception —
+        see the next question.
+      </p>
+    </details>
+
+    <details>
+      <summary>What's the "deposit top-up opportunity cost"?</summary>
+      <p>
+        Jeonse deposits often increase at each 2-year renewal. The cash to
+        cover that increase has to come from somewhere — the natural
+        assumption here is that it's withdrawn from the surplus cash you'd
+        otherwise have invested, since this calculator assumes both
+        scenarios draw only from the same starting cash. The catch: once
+        that money sits in the deposit, it earns <strong>zero
+        interest</strong> — it just comes back at face value later. Had it
+        stayed invested, it would have kept growing. So each renewal's
+        top-up costs you the investment growth it would have earned for the
+        rest of the comparison period, and that foregone growth is
+        subtracted from the final capital if jeonse. This differs from the
+        buy side's loan principal repayment, which is excluded — principal
+        repayment converts cash into home equity that already appreciates
+        (fully captured via the capital gain figure), so nothing is lost
+        there. A jeonse deposit doesn't appreciate at all, so excluding its
+        top-ups the same way would overstate jeonse's result. Set the
+        renewal increase assumption to 0% and this line drops to zero.
       </p>
     </details>
 
@@ -777,10 +816,23 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       `= ${won.format(jeonseDeposit)} × (1+${fmtPct(jeonseRenewalIncreasePercent)})^${r.jeonse.renewalCycles}`,
     );
 
+    const jeonseTopupRow = document.getElementById('jeonse-topup-row') as HTMLTableRowElement;
+    jeonseTopupRow.classList.toggle('hidden', r.jeonse.depositTopUpOpportunityCost <= 0);
+    if (r.jeonse.depositTopUpOpportunityCost > 0) {
+      setSignedWon('jeonse-topup-cost', r.jeonse.depositTopUpOpportunityCost, '−');
+      const terms = r.jeonse.depositTopUps
+        .map(
+          (t) =>
+            `${won.format(Math.round(t.topUp))}×((1+${fmtPct(investReturnRatePercent)})^${t.yearsRemaining}−1)`,
+        )
+        .join(' + ');
+      setText('jeonse-topup-cost-formula', `= ${terms}`);
+    }
+
     setWon('jeonse-final-capital', r.jeonse.finalCapital);
     setText(
       'jeonse-final-capital-formula',
-      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)}`,
+      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)} − ${won.format(r.jeonse.depositTopUpOpportunityCost)}`,
     );
 
     result.classList.remove('hidden');

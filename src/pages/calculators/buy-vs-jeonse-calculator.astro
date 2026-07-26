@@ -324,16 +324,28 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <tr>
           <td>
             기간 종료 시 예상 보증금
-            <span class="hint">(참고용 — 보증금은 원금 그대로 돌려받아 시작 자기자본에서 늘지도 줄지도 않으므로, 최종 자기자본 계산에 별도로 더하지 않음)</span>
+            <span class="hint">(참고용 — 재계약마다 오른 만큼 반환액도 늘지만, 그 증액분 자체는 원금
+              그대로 돌려받아 늘지도 줄지도 않으므로 최종 자기자본에 별도로 더하지 않음.
+              대신 그 증액분을 마련하느라 놓친 투자수익을 아래에서 차감함)</span>
             <span class="formula-line">= 보증금 × (1+재계약 인상률)^재계약횟수</span>
             <span class="formula-actual" id="jeonse-final-deposit-formula">-</span>
           </td>
           <td id="jeonse-final-deposit">-</td>
         </tr>
+        <tr id="jeonse-topup-row" class="hidden">
+          <td>
+            보증금 증액 기회비용
+            <span class="hint">(재계약마다 오른 보증금을 여유자금에서 인출해 충당한다고 볼 때, 그 돈이
+              계속 투자됐다면 벌었을 수익)</span>
+            <span class="formula-line">= Σ 재계약별 증액분 × ((1+수익률)^인출 후 남은 기간 − 1)</span>
+            <span class="formula-actual" id="jeonse-topup-cost-formula">-</span>
+          </td>
+          <td class="amount-minus" id="jeonse-topup-cost">-</td>
+        </tr>
         <tr class="total">
           <td>
             전세 시 최종 자기자본
-            <span class="formula-line">= 시작 자기자본 + 여유자금 운용 수익 − 중개수수료</span>
+            <span class="formula-line">= 시작 자기자본 + 여유자금 운용 수익 − 중개수수료 − 보증금 증액 기회비용</span>
             <span class="formula-actual" id="jeonse-final-capital-formula">-</span>
           </td>
           <td id="jeonse-final-capital">-</td>
@@ -383,16 +395,21 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
         <li>중개수수료(1회) = 3억 × 중개보수 요율(구간별) ≈ <strong>−90만원</strong></li>
         <li>여유자금(참고) = 4억(보유현금) − 3억(보증금) − 90만원 ≈ <strong>9,910만원</strong></li>
         <li>여유자금 운용 수익 = 9,910만원 × ((1.03)³ − 1) = 9,910만원 × 9.27% ≈ <strong>+919만원</strong></li>
-        <li>전세 시 최종 자기자본 = 4억 − 90 + 919(만원) ≈ <strong>40,829만원</strong></li>
+        <li>2년 차 재계약에서 보증금이 3억 → 3.15억으로 5% 오름 → 증액분
+          1,500만원을 여유자금에서 인출해 충당한다고 보면, 그 돈이 나머지
+          1년(3년 − 2년) 더 투자됐다면 벌었을 수익 1,500만원 ×
+          ((1.03)¹ − 1) ≈ <strong>−45만원</strong>(보증금 증액 기회비용)</li>
+        <li>전세 시 최종 자기자본 = 4억 − 90 + 919 − 45(만원) ≈ <strong>40,784만원</strong></li>
       </ul>
       <p>
-        매매 시 최종 자기자본(41,124만원)이 전세 시 최종 자기자본(40,829만원)
-        보다 크므로, <strong>이 조건에서는 매매가 약 295만원 더
+        매매 시 최종 자기자본(41,124만원)이 전세 시 최종 자기자본(40,784만원)
+        보다 크므로, <strong>이 조건에서는 매매가 약 340만원 더
         유리</strong>합니다. 매매의 보유현금 4억원 전액이 집값 상승(레버리지
         포함 매매가 5억 전체에 대한 상승분)에 쓰이는 반면, 전세는 보증금
-        3억원을 제외한 9,910만원만 실제로 투자되기 때문입니다. 매매 쪽
-        중개수수료(200만원)가 전세 쪽(90만원)보다 크다는 점은 그 격차를
-        줄이는 방향으로 작용합니다. 위 입력값을 그대로 넣어보시면 결과
+        3억원을 제외한 9,910만원만 실제로 투자되고 그마저 재계약 증액분
+        때문에 일부 기회비용까지 발생하기 때문입니다. 매매 쪽
+        중개수수료(200만원)가 전세 쪽(90만원)보다 크다는 점은 반대로 그
+        격차를 줄이는 방향으로 작용합니다. 위 입력값을 그대로 넣어보시면 결과
         화면에서 이 숫자들을 그대로 확인할 수 있습니다.
       </p>
     </details>
@@ -415,14 +432,36 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
     <details>
       <summary>전세보증금은 왜 계산에 안 들어가나요?</summary>
       <p>
-        전세보증금은 계약이 끝나면 이자 없이 원금 그대로 돌려받습니다.
-        즉 보증금 자체는 그 기간 동안 늘지도 줄지도 않으므로, "최종
+        최초 보증금 자체는 계약이 끝나면 이자 없이 원금 그대로 돌려받습니다.
+        즉 그 금액 자체는 그 기간 동안 늘지도 줄지도 않으므로, "최종
         자기자본"을 계산할 때는 시작 자기자본(보유현금)에 보증금이
         그대로 남아있다고 보고, 보증금 금액 자체가 아니라
         <strong>보증금을 빼고 남은 여유자금이 실제로 얼마나
         불어났는지</strong>만 더하면 충분합니다. 매매의 자기자본도
         마찬가지로, 집값 상승분(자본이득)에 이미 그 돈의 성과가 반영되어
-        있으므로 별도로 다시 계산하지 않습니다.
+        있으므로 별도로 다시 계산하지 않습니다. 다만 재계약마다 보증금이
+        오르면 그 증액분을 마련하느라 여유자금 투자가 줄어드는 효과는
+        "보증금 증액 기회비용"으로 별도 반영합니다 — 바로 아래 항목을
+        참고하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>보증금 증액 기회비용이 뭔가요?</summary>
+      <p>
+        전세는 2년마다 재계약하면서 보증금이 오르는 경우가 많습니다. 이
+        인상분을 낼 돈은 결국 여유자금(투자하고 있던 돈)에서 나온다고
+        보는 것이 자연스럽습니다 — 이 계산기는 두 시나리오 모두 "같은
+        보유현금에서만 조달한다"는 전제를 쓰기 때문입니다. 문제는 그렇게
+        보증금에 들어간 돈은 <strong>무이자로 묶여서 더는 불어나지
+        않는다</strong>는 점입니다 — 계속 투자했다면 벌었을 수익을 그만큼
+        놓치는 셈입니다. 그래서 재계약마다 오른 금액이 인출된 시점부터
+        비교기간이 끝날 때까지 투자됐다면 벌었을 수익을 계산해서 최종
+        자기자본에서 뺍니다. 매매의 대출 원금 상환과는 다릅니다 — 원금
+        상환은 집값 상승분(이미 매매가 전체에 반영됨)으로 바뀌는 돈이라
+        중립적이지만, 보증금 증액분은 아무것도 불려주지 않는 곳에 묶이기
+        때문에 그냥 제외하면 실제보다 전세가 유리하게 나옵니다. 재계약
+        인상률 가정을 0%로 두면 이 항목은 0원이 됩니다.
       </p>
     </details>
 
@@ -760,10 +799,23 @@ const meta = calculators.find((c) => c.slug === 'buy-vs-jeonse-calculator')!;
       `= ${won.format(jeonseDeposit)} × (1+${fmtPct(jeonseRenewalIncreasePercent)})^${r.jeonse.renewalCycles}`,
     );
 
+    const jeonseTopupRow = document.getElementById('jeonse-topup-row') as HTMLTableRowElement;
+    jeonseTopupRow.classList.toggle('hidden', r.jeonse.depositTopUpOpportunityCost <= 0);
+    if (r.jeonse.depositTopUpOpportunityCost > 0) {
+      setSignedWon('jeonse-topup-cost', r.jeonse.depositTopUpOpportunityCost, '−');
+      const terms = r.jeonse.depositTopUps
+        .map(
+          (t) =>
+            `${won.format(Math.round(t.topUp))}×((1+${fmtPct(investReturnRatePercent)})^${t.yearsRemaining}−1)`,
+        )
+        .join(' + ');
+      setText('jeonse-topup-cost-formula', `= ${terms}`);
+    }
+
     setWon('jeonse-final-capital', r.jeonse.finalCapital);
     setText(
       'jeonse-final-capital-formula',
-      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)}`,
+      `= ${won.format(r.jeonse.startingCash)} + ${won.format(r.jeonse.surplusInvestReturn)} − ${won.format(r.jeonse.brokerageFee)} − ${won.format(r.jeonse.depositTopUpOpportunityCost)}`,
     );
 
     result.classList.remove('hidden');
