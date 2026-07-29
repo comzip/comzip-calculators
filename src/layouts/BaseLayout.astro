@@ -468,6 +468,16 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         gap: 12px;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       }
+      /* Below phone-width, a 2-up grid leaves each card too narrow for a
+         12+ digit won amount to fit on one line (no natural break point in
+         a comma-grouped number, so it wraps mid-number instead). Stacking
+         to a single column gives each card the full width, which is enough
+         for every value in practice to stay on one line. */
+      @media (max-width: 540px) {
+        .result-grid {
+          grid-template-columns: 1fr;
+        }
+      }
       .result-item {
         background: var(--bg-soft);
         border-radius: 8px;
@@ -481,16 +491,13 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       }
       .result-item .value {
         display: block;
-        /* Won amounts can run to 12+ digits with no spaces, so on narrow
-           viewports a fixed 1.5rem regularly overflowed the card instead of
-           wrapping (no natural break point in a comma-grouped number). Scale
-           down with viewport width, and allow a break as a last resort so a
-           number that still doesn't fit wraps inside the card instead of
-           spilling past its edge. */
-        font-size: clamp(1.05rem, 2.7vw + 0.45rem, 1.5rem);
-        overflow-wrap: anywhere;
+        font-size: 1.5rem;
         font-weight: 700;
         color: var(--accent-dark);
+        /* Safety net for the rare value still too wide even at full
+           card width (e.g. an extreme input) — wrap it inside the card
+           rather than let it spill past the edge. */
+        overflow-wrap: anywhere;
       }
 
       table.breakdown {
