@@ -481,7 +481,14 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       }
       .result-item .value {
         display: block;
-        font-size: 1.5rem;
+        /* Won amounts can run to 12+ digits with no spaces, so on narrow
+           viewports a fixed 1.5rem regularly overflowed the card instead of
+           wrapping (no natural break point in a comma-grouped number). Scale
+           down with viewport width, and allow a break as a last resort so a
+           number that still doesn't fit wraps inside the card instead of
+           spilling past its edge. */
+        font-size: clamp(1.05rem, 2.7vw + 0.45rem, 1.5rem);
+        overflow-wrap: anywhere;
         font-weight: 700;
         color: var(--accent-dark);
       }
