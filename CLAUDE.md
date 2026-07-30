@@ -23,8 +23,12 @@
 src/data/calculators.ts   ← 전체 계산기 목록의 단일 진실 공급원(SSOT)
 src/i18n/ui.ts             ← 헤더/푸터 등 공통 UI 문자열 사전 (ko/en)
 src/layouts/BaseLayout.astro
-                            ← 헤더 nav, 푸터, 전역 CSS, GA4/AdSense, hreflang,
-                               언어 전환 버튼을 전부 여기서 관리
+                            ← 헤더(브랜드+언어 전환만, nav 드롭다운 없음), 푸터,
+                               전역 CSS, GA4/AdSense, hreflang을 전부 여기서 관리
+src/pages/index.astro      ← 홈페이지의 카테고리 select + 검색 input 필터바
+                               (클라이언트 스크립트, CalculatorCard의 data-category/
+                               data-search 속성으로 필터링). 카테고리 브라우징의
+                               유일한 진입점 — 헤더에는 없다.
 src/components/            ← CalculatorCard, AdSlot (둘 다 lang prop을 받음)
 src/lib/*Calculator.ts     ← 계산 로직 (순수 함수, DOM/Astro 비의존)
 src/lib/formatKoreanWon.ts ← 금액 표기: formatKoreanWon(한글 억/만 단위, ko 페이지용),
@@ -40,9 +44,11 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
 1. `src/lib/<name>Calculator.ts` — 순수 계산 함수 (입출력 타입 정의 포함)
 2. `src/pages/calculators/<slug>.astro` — 한글 페이지 (폼 + 결과 + FAQ)
 3. `src/pages/en/calculators/<slug>.astro` — 영문 페이지 (같은 id/class, 텍스트만 번역)
-4. `src/data/calculators.ts`에 항목 추가 (`title`/`titleEn`, `navLabel`/`navLabelEn`,
-   `description`/`descriptionEn`, `category`) — 이것만 하면 홈 카드와 헤더 nav에
-   자동으로 반영됨. 별도로 하드코딩된 목록은 없다.
+4. `src/data/calculators.ts`에 항목 추가 (`title`/`titleEn`, `description`/
+   `descriptionEn`, `category`) — 이것만 하면 홈 카드와 필터바 카테고리 select에
+   자동으로 반영됨. 별도로 하드코딩된 목록은 없다. (`navLabel`/`navLabelEn` 필드는
+   과거 헤더 nav 드롭다운용이었으나 그 드롭다운이 삭제되면서 죽은 데이터가 됐다 —
+   신규 항목에 값은 채워 넣되, 실제로 쓰이는 곳은 없다는 점을 알고 있을 것.)
 5. 법령·고시가격 등 외부 기준값을 쓴다면 `LEGAL_REFERENCES.md`에 항목을 추가하고,
    `.ts` 파일 상단 주석에 `📋 법령 현황 추적: ... LEGAL_REFERENCES.md → "섹션명"`
    형태로 상호 참조를 남긴다 (기존 lib 파일들 참고).
@@ -50,7 +56,7 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
 ## 핵심 원칙
 
 **단일 진실 공급원을 지킨다.** 계산기 메타데이터(제목/설명/카테고리)는
-`calculators.ts`에만 존재한다. 홈페이지·헤더 nav·meta 태그가 전부 이 배열에서
+`calculators.ts`에만 존재한다. 홈페이지 카드·필터바·meta 태그가 전부 이 배열에서
 파생되므로, 페이지에 제목을 하드코딩하지 않는다.
 
 **공통 스타일은 `BaseLayout.astro`의 전역 CSS에만 정의한다.** `.calc-form`,
@@ -77,8 +83,6 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
   보정한다.
 - `<BaseLayout path=...>`는 `/en` 접두사 없는 로케일-중립 경로를 받는다
   (`path={`/calculators/${meta.slug}`}`) — 레이아웃이 내부적으로 `/en`을 붙인다.
-- 내비게이션 드롭다운에는 `title`이 아니라 `navLabel`/`navLabelEn`(괄호 없는 짧은
-  버전)을 쓴다. 모바일 폭에서 긴 영문 제목이 넘치는 문제를 이렇게 해결했다.
 
 **Astro 스코프 스타일의 함정.** Astro는 정적 템플릿에 작성된 엘리먼트에만
 `[data-astro-cid-*]`를 자동으로 붙인다. 클라이언트 `<script>`에서
@@ -90,11 +94,29 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
 **CSS 명시도 주의.** `.calc-form label { display: grid }` (0,1,1)이 `.method-option`
 같은 단일 클래스(0,1,0)를 조용히 덮어쓴 적이 있다. 폼 내부의 커스텀 옵션류
 클래스는 `.calc-form .method-option`처럼 부모로 한 번 더 감싸서 명시도를 올린다.
+같은 부류의 버그가 컴포넌트에서도 재발했다: Astro는 스코프드 `<style>`의 모든
+선택자에 `[data-astro-cid-*]` 속성 선택자를 자동으로 붙여 실효 명시도를 한 단계
+올리는데, `CalculatorCard.astro`의 로컬 `.calc-card { display: block }`이 이 덕분에
+(0,2,0)이 되어 전역 `.hidden { display: none }` (0,1,0)을 조용히 이겼다 (홈페이지
+필터에서 숨김 처리된 카드가 계속 레이아웃에 남던 버그). 컴포넌트 로컬 스타일이
+전역 상태 클래스(`.hidden` 등)와 상호작용해야 하면, 그 컴포넌트 스코프 안에서도
+`.calc-card.hidden`처럼 명시도를 맞춰 다시 선언해야 한다 — 전역 CSS만 고쳐서는
+안 이긴다.
+
+**계산식 투명성 패턴 (`formula-line`/`formula-actual`).** `buy-vs-jeonse-calculator`,
+`stock-averaging-calculator`에서 도입한 패턴: 결과 항목마다 일반식
+(`<span class="formula-line">= 매매가 − 보유현금</span>`)과 그 계산에 실제로 대입된
+숫자(`<span class="formula-actual" id="...">-</span>`, 클라이언트 스크립트가 채움)를
+나란히 보여준다. 아직 `BaseLayout.astro` 전역 CSS로 승격되지 않은 로컬 패턴이므로,
+새 계산기에 도입할 때는 기존 두 페이지의 마크업/스타일을 그대로 복사해 일관성을
+유지한다.
 
 ## 작업 검증 방식
 
 - 코드 수정 후 항상 `npm run build`로 빌드 확인 (전체 페이지 수가 예상대로
-  생성되는지까지 확인 — 현재 ko 18 + en 17 = 35페이지).
+  생성되는지까지 확인 — 현재 계산기 ko 17 + en 17, 정책/홈 등 ko 4 + en 3,
+  합계 41페이지. 계산기 카테고리는 급여/부동산/투자/생활 4개, `categoryOrder`
+  순서를 따른다).
 - UI/레이아웃 변경은 코드만 보고 끝내지 않는다. Playwright로 실제 렌더링을
   확인한다 (스크린샷, `getComputedStyle`, `checkValidity()` 등). Playwright는
   **프로젝트 의존성이 아니다** — 세션 스크래치패드에서 임시 검증 도구로만
