@@ -23,7 +23,7 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   </p>
 
   <form class="calc-form" id="stock-form">
-    <fieldset class="method-toggle">
+    <fieldset class="method-toggle stacked-options">
       <legend>Currency</legend>
       <label class="method-option">
         <input type="radio" name="currency" value="KRW" checked />
@@ -50,15 +50,17 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
         placeholder="e.g. 150"
         required
       />
+      <span class="amount-preview" id="existingAvgPrice-preview" aria-live="polite"></span>
     </label>
 
     <label>
       Current price
       <span class="hint">The price you're assuming for the additional purchase.</span>
       <input type="number" id="currentPrice" min="0" step="any" placeholder="e.g. 100" required />
+      <span class="amount-preview" id="currentPrice-preview" aria-live="polite"></span>
     </label>
 
-    <fieldset class="method-toggle">
+    <fieldset class="method-toggle stacked-options">
       <legend>Calculation mode</legend>
       <label class="method-option">
         <input type="radio" name="mode" value="추가매수" checked />
@@ -90,6 +92,7 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
         past the current price.</span
       >
       <input type="number" id="targetAvgPrice" min="0" step="any" placeholder="e.g. 120" />
+      <span class="amount-preview" id="targetAvgPrice-preview" aria-live="polite"></span>
     </label>
 
     <label>
@@ -373,21 +376,6 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
 </style>
 
 <style>
-  .method-toggle label {
-    display: grid;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    width: 100%;
-  }
-  .method-toggle input {
-    font: inherit;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    width: 100%;
-  }
   table.breakdown .hint,
   table.breakdown .formula-line,
   table.breakdown .formula-actual {
@@ -429,6 +417,34 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   const additionalSharesInput = document.getElementById('additionalShares') as HTMLInputElement;
   const targetAvgPriceInput = document.getElementById('targetAvgPrice') as HTMLInputElement;
 
+  const formatMoney = (value: number, currency: StockCurrency) => {
+    if (currency === 'KRW') {
+      return `₩${Math.round(value).toLocaleString('en-US')}`;
+    }
+    return `$${value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  // Live-format the amount as you type, in whichever currency is selected.
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    const update = () => {
+      const currency = (
+        document.querySelector('input[name="currency"]:checked') as HTMLInputElement
+      ).value as StockCurrency;
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatMoney(value, currency) : '';
+    };
+    input.addEventListener('input', update);
+    document.querySelectorAll('input[name="currency"]').forEach((el) => el.addEventListener('change', update));
+  };
+  bindAmountPreview('existingAvgPrice', 'existingAvgPrice-preview');
+  bindAmountPreview('currentPrice', 'currentPrice-preview');
+  bindAmountPreview('targetAvgPrice', 'targetAvgPrice-preview');
+
   const updateModeFields = () => {
     const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement).value;
     const isAdditional = mode === '추가매수';
@@ -448,15 +464,6 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     if (el) el.textContent = text;
   };
 
-  const formatMoney = (value: number, currency: StockCurrency) => {
-    if (currency === 'KRW') {
-      return `₩${Math.round(value).toLocaleString('en-US')}`;
-    }
-    return `$${value.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
   const formatShares = (value: number) => `${Math.round(value).toLocaleString('en-US')} sh`;
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 

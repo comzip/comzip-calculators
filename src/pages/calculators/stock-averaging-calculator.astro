@@ -21,7 +21,7 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   </p>
 
   <form class="calc-form" id="stock-form">
-    <fieldset class="method-toggle">
+    <fieldset class="method-toggle stacked-options">
       <legend>통화</legend>
       <label class="method-option">
         <input type="radio" name="currency" value="KRW" checked />
@@ -48,15 +48,17 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
         placeholder="예: 15000"
         required
       />
+      <span class="amount-preview" id="existingAvgPrice-preview" aria-live="polite"></span>
     </label>
 
     <label>
       현재가
       <span class="hint">추가 매수를 가정하는 가격입니다.</span>
       <input type="number" id="currentPrice" min="0" step="any" placeholder="예: 10000" required />
+      <span class="amount-preview" id="currentPrice-preview" aria-live="polite"></span>
     </label>
 
-    <fieldset class="method-toggle">
+    <fieldset class="method-toggle stacked-options">
       <legend>계산 방식</legend>
       <label class="method-option">
         <input type="radio" name="mode" value="추가매수" checked />
@@ -87,6 +89,7 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
         평단가가 현재가를 넘어설 수는 없습니다.</span
       >
       <input type="number" id="targetAvgPrice" min="0" step="any" placeholder="예: 12000" />
+      <span class="amount-preview" id="targetAvgPrice-preview" aria-live="polite"></span>
     </label>
 
     <label>
@@ -356,21 +359,6 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
 </style>
 
 <style>
-  .method-toggle label {
-    display: grid;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    width: 100%;
-  }
-  .method-toggle input {
-    font: inherit;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
-    width: 100%;
-  }
   table.breakdown .hint,
   table.breakdown .formula-line,
   table.breakdown .formula-actual {
@@ -402,6 +390,7 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
 <script>
   import { calculateStockAveraging } from '../../lib/stockAveragingCalculator';
   import type { StockCurrency, StockAveragingMode } from '../../lib/stockAveragingCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
 
   const form = document.getElementById('stock-form') as HTMLFormElement;
   const result = document.getElementById('result') as HTMLDivElement;
@@ -411,6 +400,41 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   const targetAvgPriceField = document.getElementById('targetAvgPrice-field') as HTMLLabelElement;
   const additionalSharesInput = document.getElementById('additionalShares') as HTMLInputElement;
   const targetAvgPriceInput = document.getElementById('targetAvgPrice') as HTMLInputElement;
+
+  const formatMoney = (value: number, currency: StockCurrency) => {
+    if (currency === 'KRW') {
+      return `₩${Math.round(value).toLocaleString('ko-KR')}`;
+    }
+    return `$${value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  // 원화는 "1만 5,000원" 같은 한글 단위로, 달러는 결과와 같은 "$1,500.00"
+  // 형식으로 입력 즉시 미리보기를 보여준다.
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    const update = () => {
+      const currency = (
+        document.querySelector('input[name="currency"]:checked') as HTMLInputElement
+      ).value as StockCurrency;
+      const value = Number(input.value);
+      if (value <= 0) {
+        preview.textContent = '';
+      } else if (currency === 'KRW') {
+        preview.textContent = formatKoreanWon(value);
+      } else {
+        preview.textContent = formatMoney(value, currency);
+      }
+    };
+    input.addEventListener('input', update);
+    document.querySelectorAll('input[name="currency"]').forEach((el) => el.addEventListener('change', update));
+  };
+  bindAmountPreview('existingAvgPrice', 'existingAvgPrice-preview');
+  bindAmountPreview('currentPrice', 'currentPrice-preview');
+  bindAmountPreview('targetAvgPrice', 'targetAvgPrice-preview');
 
   const updateModeFields = () => {
     const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement).value;
@@ -431,15 +455,6 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     if (el) el.textContent = text;
   };
 
-  const formatMoney = (value: number, currency: StockCurrency) => {
-    if (currency === 'KRW') {
-      return `₩${Math.round(value).toLocaleString('ko-KR')}`;
-    }
-    return `$${value.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
   const formatShares = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}주`;
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 

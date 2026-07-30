@@ -208,27 +208,47 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         border-bottom: 1px solid var(--border);
         background: var(--bg);
       }
+      /* Two-row header: row 1 is brand + lang-switch (fixed grid cells, can
+         never wrap into each other); row 2 is the category nav, given the
+         full container width so it doesn't have to compete with the other
+         two for space. DOM order (brand, nav, lang-switch) is unchanged —
+         grid placement alone moves lang-switch up to row 1, so reading/tab
+         order stays brand → categories → language, which is still sensible
+         for screen readers. This replaced a single-row flex layout that
+         wrapped messily once the category count grew (English labels in
+         particular): categories would split mid-row and the lang-switch
+         button would drop onto its own orphan line below everything. */
       .header-inner {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px 16px;
-        padding-top: 12px;
-        padding-bottom: 12px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        column-gap: 16px;
+        padding-top: 10px;
+        padding-bottom: 0;
       }
       .brand {
+        grid-column: 1;
+        grid-row: 1;
+        align-self: center;
         font-weight: 700;
         font-size: 1.15rem;
         color: var(--accent-dark);
         text-decoration: none;
       }
       .site-nav {
+        grid-column: 1 / -1;
+        grid-row: 2;
         display: flex;
         flex-wrap: wrap;
         gap: 4px 8px;
+        border-top: 1px solid var(--border);
+        padding-top: 6px;
+        padding-bottom: 10px;
+        margin-top: 8px;
       }
       .lang-switch {
+        grid-column: 3;
+        grid-row: 1;
+        align-self: center;
         padding: 6px 10px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -322,13 +342,15 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
 
       @media (max-width: 480px) {
         .header-inner {
-          gap: 8px;
+          column-gap: 8px;
         }
         .site-nav {
           gap: 2px 4px;
         }
         .nav-dropdown > summary {
-          padding: 6px 8px;
+          /* Bumped from 6px 8px: that padding gave ~35px touch targets,
+             under the 44px WCAG 2.5.5 minimum for touch interaction. */
+          padding: 10px 8px;
           font-size: 0.85rem;
         }
       }
@@ -427,6 +449,12 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       .calc-form .method-option input {
         width: auto;
         margin: 0;
+      }
+      /* Opt-in modifier: stack each `.method-option` on its own row instead
+         of flowing side by side (default `.method-toggle` behavior). Add
+         `stacked-options` alongside `method-toggle` on the fieldset. */
+      .calc-form .method-toggle.stacked-options .method-option {
+        width: 100%;
       }
       /* Shared checkbox-plus-label row (e.g. "1세대 1주택입니다"). */
       .calc-form .check-row {
