@@ -120,20 +120,33 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   <div class="result-box hidden" id="result" aria-live="polite">
     <div class="result-grid">
       <div class="result-item">
-        <span class="label">물타기 전 필요수익률</span>
-        <span class="value"><span id="breakeven-return-before">-</span></span>
+        <span class="label">현재 손실율</span>
+        <span class="value"><span id="loss-rate-before">-</span></span>
       </div>
-      <div class="result-item">
-        <span class="label">물타기 후 필요수익률</span>
+      <div class="result-item primary">
+        <span class="label" id="primary-label">-</span>
+        <span class="value"><span id="primary-value">-</span></span>
+        <span class="sub-caption" id="primary-caption"></span>
+      </div>
+    </div>
+
+    <div class="result-grid" id="secondary-grid">
+      <div class="result-item" id="loss-rate-after-item">
+        <span class="label">추가 매수 후 손실율</span>
+        <span class="value"><span id="loss-rate-after">-</span></span>
+      </div>
+      <div class="result-item" id="breakeven-after-item">
+        <span class="label">필요수익률(물타기 후)</span>
         <span class="value"><span id="breakeven-return-after">-</span></span>
       </div>
     </div>
 
     <p class="note">
-      "필요수익률"은 현재가에서 얼마나 더 올라야 거래비용(수수료·세금)까지
-      감안한 손익분기(본전)에 도달하는지를 나타냅니다. 숫자가 작을수록,
-      또는 마이너스(이미 손익분기를 넘어 수익 중)일수록 유리합니다. 물타기
-      후 이 숫자가 줄었다면, 그만큼 본전까지 덜 올라도 된다는 뜻입니다.
+      "손실율"은 평단가 대비 지금 얼마나 손실(또는 수익) 중인지를 그대로
+      보여주는 값입니다. "필요수익률"은 매수·매도 거래비용까지 감안해
+      진짜 본전에 도달하려면 현재가에서 얼마나 더 올라야 하는지를
+      보여줍니다 — 떨어진 비율만큼 오른다고 본전이 되는 게 아니라서(예:
+      20% 하락하면 25% 올라야 본전) 두 값이 서로 다릅니다.
     </p>
 
     <table class="breakdown">
@@ -385,6 +398,23 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     background: #fef2f2;
     border-radius: 6px;
   }
+  /* The "primary" headline item directly answers the question the
+     selected mode implies (new average price, or shares needed) — sized
+     up a bit from the other headline items so it reads as the answer,
+     not just one metric among several. */
+  .result-item.primary .value {
+    font-size: 1.75rem;
+  }
+  .result-item .sub-caption {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  #secondary-grid {
+    margin-top: 10px;
+  }
 </style>
 
 <script>
@@ -443,6 +473,10 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     targetAvgPriceField.classList.toggle('hidden', isAdditional);
     additionalSharesInput.required = isAdditional;
     targetAvgPriceInput.required = !isAdditional;
+    // 헤드라인은 모드마다 다른 값을 보여준다 — 재계산 없이 모드만 바꾸면
+    // 이전 모드의 결과가 새 모드의 라벨과 함께 남아 오해를 줄 수 있어,
+    // 모드를 바꾸는 즉시 결과를 다시 계산하기 전까지 숨긴다.
+    result.classList.add('hidden');
   };
   document
     .querySelectorAll('input[name="mode"]')
@@ -531,8 +565,38 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       infeasibleRow.classList.add('hidden');
     }
 
-    setText('breakeven-return-before', formatPercent(r.breakevenReturnBeforePercent));
-    setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+    setText('loss-rate-before', formatPercent(r.lossRateBeforePercent));
+
+    const primaryLabel = document.getElementById('primary-label') as HTMLSpanElement;
+    const primaryValue = document.getElementById('primary-value') as HTMLSpanElement;
+    const primaryCaption = document.getElementById('primary-caption') as HTMLSpanElement;
+    const secondaryGrid = document.getElementById('secondary-grid') as HTMLDivElement;
+
+    if (mode === '추가매수') {
+      primaryLabel.textContent = '새 평균단가';
+      primaryValue.textContent = formatMoney(r.newAvgPrice, currency);
+      const changePercent =
+        existingAvgPrice > 0 ? ((r.newAvgPrice - existingAvgPrice) / existingAvgPrice) * 100 : 0;
+      primaryCaption.textContent = `기존 ${formatMoney(existingAvgPrice, currency)} → 새 ${formatMoney(r.newAvgPrice, currency)} (${formatPercent(changePercent)})`;
+    } else if (!r.targetFeasible) {
+      primaryLabel.textContent = '필요 매수 수량';
+      primaryValue.textContent = '도달 불가';
+      primaryCaption.textContent = '';
+    } else {
+      primaryLabel.textContent = '필요 매수 수량';
+      primaryValue.textContent = formatShares(r.additionalShares);
+      primaryCaption.textContent = `추가 매수금액 약 ${formatMoney(r.additionalCost, currency)}`;
+    }
+
+    // 목표 평단가에 도달할 수 없으면(0주 추가 기준) "물타기 후" 지표들이
+    // 물타기 전과 완전히 같은 값이 되어 오해를 준다 — 그 경우 이 줄
+    // 전체를 숨긴다.
+    const secondaryFeasible = mode === '추가매수' || r.targetFeasible;
+    secondaryGrid.classList.toggle('hidden', !secondaryFeasible);
+    if (secondaryFeasible) {
+      setText('loss-rate-after', formatPercent(r.lossRateAfterPercent));
+      setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+    }
 
     setText('existing-summary', formatMoney(r.existingInvested, currency));
     setText(

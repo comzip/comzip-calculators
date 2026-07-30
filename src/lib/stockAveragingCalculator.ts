@@ -96,6 +96,16 @@ export interface StockAveragingResult {
   breakevenReturnBeforePercent: number;
   /** 물타기 후 손익분기가에 도달하는 데 필요한, 현재가 대비 수익률(%). */
   breakevenReturnAfterPercent: number;
+  /**
+   * 거래비용을 빼고, 기존 평단가만 놓고 봤을 때 현재가 기준 순수 손익률(%).
+   * 음수면 손실 중. "필요수익률"과 다른 지표다 — 이건 지금 얼마나
+   * 손실/수익 중인지를 보여주고, 필요수익률은 손실을 만회하는 데(거래비용
+   * 포함) 얼마나 더 올라야 하는지를 보여준다. 등락률의 비대칭성 때문에
+   * 두 값은 절대값이 같지 않다(예: 20% 하락은 25% 상승해야 만회된다).
+   */
+  lossRateBeforePercent: number;
+  /** 추가 매수 후 새 평단가 기준의 같은 순수 손익률(%). */
+  lossRateAfterPercent: number;
   /** 추가 하락 시나리오별 누적 시뮬레이션. */
   simulation: StockAveragingSimulationRow[];
 }
@@ -168,6 +178,8 @@ export function calculateStockAveraging(input: StockAveragingInput): StockAverag
   );
   const breakevenReturn = (breakevenPrice: number) =>
     currentPrice > 0 ? ((breakevenPrice - currentPrice) / currentPrice) * 100 : 0;
+  const lossRate = (avgPrice: number) =>
+    avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
 
   // ---------------- 시뮬레이션: 계속 같은 수량을 추가 매수한다면 ----------------
   const simulation: StockAveragingSimulationRow[] = [];
@@ -207,6 +219,8 @@ export function calculateStockAveraging(input: StockAveragingInput): StockAverag
     breakevenPriceAfter,
     breakevenReturnBeforePercent: breakevenReturn(breakevenPriceBefore),
     breakevenReturnAfterPercent: breakevenReturn(breakevenPriceAfter),
+    lossRateBeforePercent: lossRate(existingAvgPrice),
+    lossRateAfterPercent: lossRate(newAvgPrice),
     simulation,
   };
 }

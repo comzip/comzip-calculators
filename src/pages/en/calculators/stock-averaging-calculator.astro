@@ -124,21 +124,34 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   <div class="result-box hidden" id="result" aria-live="polite">
     <div class="result-grid">
       <div class="result-item">
-        <span class="label">Return needed before</span>
-        <span class="value"><span id="breakeven-return-before">-</span></span>
+        <span class="label">Current loss</span>
+        <span class="value"><span id="loss-rate-before">-</span></span>
       </div>
-      <div class="result-item">
+      <div class="result-item primary">
+        <span class="label" id="primary-label">-</span>
+        <span class="value"><span id="primary-value">-</span></span>
+        <span class="sub-caption" id="primary-caption"></span>
+      </div>
+    </div>
+
+    <div class="result-grid" id="secondary-grid">
+      <div class="result-item" id="loss-rate-after-item">
+        <span class="label">Loss after buying more</span>
+        <span class="value"><span id="loss-rate-after">-</span></span>
+      </div>
+      <div class="result-item" id="breakeven-after-item">
         <span class="label">Return needed after</span>
         <span class="value"><span id="breakeven-return-after">-</span></span>
       </div>
     </div>
 
     <p class="note">
-      "Return needed" is how much further the price has to rise from here to
-      reach breakeven (accounting for commission and tax). A smaller number
-      is better — negative means you're already past breakeven and in
-      profit. If this number dropped after averaging down, that's the
-      concrete benefit: less of a rally is needed to get back to even.
+      "Loss" is simply how far below (or above) your average cost the
+      current price is. "Return needed" goes further and accounts for
+      commission and tax — how much further the price actually has to rise
+      from here to reach true breakeven. The two aren't the same number,
+      because a drop and the rally that undoes it aren't symmetric (e.g. a
+      20% drop needs a 25% rally to recover).
     </p>
 
     <table class="breakdown">
@@ -402,6 +415,23 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     background: #fef2f2;
     border-radius: 6px;
   }
+  /* The "primary" headline item directly answers the question the
+     selected mode implies (new average price, or shares needed) — sized
+     up a bit from the other headline items so it reads as the answer,
+     not just one metric among several. */
+  .result-item.primary .value {
+    font-size: 1.75rem;
+  }
+  .result-item .sub-caption {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  #secondary-grid {
+    margin-top: 10px;
+  }
 </style>
 
 <script>
@@ -452,6 +482,10 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
     targetAvgPriceField.classList.toggle('hidden', isAdditional);
     additionalSharesInput.required = isAdditional;
     targetAvgPriceInput.required = !isAdditional;
+    // The headline shows different values per mode — without this, switching
+    // modes without resubmitting would leave the previous mode's result
+    // showing under the new mode's label, which reads as a wrong answer.
+    result.classList.add('hidden');
   };
   document
     .querySelectorAll('input[name="mode"]')
@@ -540,8 +574,38 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       infeasibleRow.classList.add('hidden');
     }
 
-    setText('breakeven-return-before', formatPercent(r.breakevenReturnBeforePercent));
-    setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+    setText('loss-rate-before', formatPercent(r.lossRateBeforePercent));
+
+    const primaryLabel = document.getElementById('primary-label') as HTMLSpanElement;
+    const primaryValue = document.getElementById('primary-value') as HTMLSpanElement;
+    const primaryCaption = document.getElementById('primary-caption') as HTMLSpanElement;
+    const secondaryGrid = document.getElementById('secondary-grid') as HTMLDivElement;
+
+    if (mode === '추가매수') {
+      primaryLabel.textContent = 'New average cost';
+      primaryValue.textContent = formatMoney(r.newAvgPrice, currency);
+      const changePercent =
+        existingAvgPrice > 0 ? ((r.newAvgPrice - existingAvgPrice) / existingAvgPrice) * 100 : 0;
+      primaryCaption.textContent = `${formatMoney(existingAvgPrice, currency)} → ${formatMoney(r.newAvgPrice, currency)} (${formatPercent(changePercent)})`;
+    } else if (!r.targetFeasible) {
+      primaryLabel.textContent = 'Shares needed';
+      primaryValue.textContent = 'Not achievable';
+      primaryCaption.textContent = '';
+    } else {
+      primaryLabel.textContent = 'Shares needed';
+      primaryValue.textContent = formatShares(r.additionalShares);
+      primaryCaption.textContent = `Costs approx. ${formatMoney(r.additionalCost, currency)}`;
+    }
+
+    // When the target average isn't reachable (0 additional shares), the
+    // "after" figures are identical to the "before" ones, which reads as
+    // misleading rather than informative — hide that whole row instead.
+    const secondaryFeasible = mode === '추가매수' || r.targetFeasible;
+    secondaryGrid.classList.toggle('hidden', !secondaryFeasible);
+    if (secondaryFeasible) {
+      setText('loss-rate-after', formatPercent(r.lossRateAfterPercent));
+      setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+    }
 
     setText('existing-summary', formatMoney(r.existingInvested, currency));
     setText(
