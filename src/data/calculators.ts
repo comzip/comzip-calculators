@@ -7,7 +7,7 @@
 // The home page and any navigation are generated from this array, so there is
 // no separate hardcoded list to keep in sync.
 
-export type CalculatorCategory = '급여' | '부동산' | '생활';
+export type CalculatorCategory = '급여' | '부동산' | '투자' | '생활';
 
 export interface Calculator {
   /** URL slug; the page lives at `src/pages/calculators/<slug>.astro`. */
@@ -34,12 +34,13 @@ export interface Calculator {
 
 // The order categories appear in on the home page. Add new categories here as
 // they are introduced so grouping stays deterministic.
-export const categoryOrder: CalculatorCategory[] = ['급여', '부동산', '생활'];
+export const categoryOrder: CalculatorCategory[] = ['급여', '부동산', '투자', '생활'];
 
 /** Display label for each category, per locale. */
 export const categoryLabels: Record<CalculatorCategory, { ko: string; en: string }> = {
   급여: { ko: '급여', en: 'Salary & Benefits' },
   부동산: { ko: '부동산', en: 'Real Estate' },
+  투자: { ko: '투자', en: 'Investing' },
   생활: { ko: '생활', en: 'Everyday Life' },
 };
 
@@ -187,6 +188,18 @@ export const calculators: Calculator[] = [
       '매매가·전세보증금·자기자본을 입력하면 취득세·대출이자·재산세·집값 상승분(매매)과 중개수수료·보증금 기회비용(전세)을 함께 계산해 N년 보유 시 어느 쪽이 더 유리한지 비교합니다.',
     descriptionEn:
       'Enter the purchase price, jeonse deposit, and cash on hand to compare buying (acquisition tax, loan interest, property tax, expected appreciation) against jeonse (brokerage fee, deposit opportunity cost) over N years of holding.',
+  },
+  {
+    slug: 'stock-averaging-calculator',
+    title: '주식 물타기 계산기',
+    titleEn: 'Stock Averaging Down Calculator',
+    navLabel: '주식 물타기',
+    navLabelEn: 'Stock Averaging Down',
+    category: '투자',
+    description:
+      '보유 주식수·평단가·현재가를 입력하면 추가 매수 후 새 평단가와 손익분기 수익률을 계산합니다. 목표 평단가를 먼저 정해 필요한 매수 수량을 거꾸로 계산할 수도 있고, 원화·달러 어느 쪽에도 쓸 수 있습니다.',
+    descriptionEn:
+      'Enter your current shares, average cost, and current price to see your new average cost and breakeven return after buying more. Work backward from a target average price, or use it for both KRW and USD holdings.',
   },
   {
     slug: 'bmi-calculator',

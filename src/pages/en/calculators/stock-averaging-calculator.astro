@@ -1,0 +1,625 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your current shares, average cost, and current price to see your
+    new average cost after buying more, and the return you'd need from here
+    to break even. If you haven't decided how many shares to buy, switch to
+    "Work backward from a target average" to solve for the shares needed to
+    hit a specific average price. Works for both KRW (domestic Korean
+    stocks) and USD (overseas stocks) — just switch the currency.
+  </p>
+
+  <form class="calc-form" id="stock-form">
+    <fieldset class="method-toggle">
+      <legend>Currency</legend>
+      <label class="method-option">
+        <input type="radio" name="currency" value="KRW" checked />
+        <span>KRW (₩) — domestic Korean stock</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="currency" value="USD" />
+        <span>USD ($) — overseas stock</span>
+      </label>
+    </fieldset>
+
+    <label>
+      Current shares held
+      <input type="number" id="existingShares" min="0" step="1" placeholder="e.g. 100" required />
+    </label>
+
+    <label>
+      Current average cost
+      <input
+        type="number"
+        id="existingAvgPrice"
+        min="0"
+        step="any"
+        placeholder="e.g. 150"
+        required
+      />
+    </label>
+
+    <label>
+      Current price
+      <span class="hint">The price you're assuming for the additional purchase.</span>
+      <input type="number" id="currentPrice" min="0" step="any" placeholder="e.g. 100" required />
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>Calculation mode</legend>
+      <label class="method-option">
+        <input type="radio" name="mode" value="추가매수" checked />
+        <span>Enter shares to buy</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="mode" value="목표평단가" />
+        <span>Work backward from a target average</span>
+      </label>
+    </fieldset>
+
+    <label id="additionalShares-field">
+      Additional shares to buy
+      <input
+        type="number"
+        id="additionalShares"
+        min="0"
+        step="1"
+        placeholder="e.g. 100"
+        required
+      />
+    </label>
+
+    <label id="targetAvgPrice-field" class="hidden">
+      Target average cost
+      <span class="hint"
+        >Only a value strictly "between" the current price and your existing
+        average is achievable — no amount of buying can push your average
+        past the current price.</span
+      >
+      <input type="number" id="targetAvgPrice" min="0" step="any" placeholder="e.g. 120" />
+    </label>
+
+    <label>
+      Brokerage commission rate (%)
+      <span class="hint"
+        >Assumed the same for buying and selling — this varies by broker, so
+        swap in your actual rate for an accurate result.
+        <strong>Reference — typical online rates:</strong> Korea's Kiwoom
+        Securities (Yeongungmun) charges 0.015%, and Toss Securities charges
+        0.015% (0.014% on NXT-matched trades). Many brokers also run
+        temporary 0% promotions for new accounts, so check your own
+        account's actual rate.</span
+      >
+      <input
+        type="number"
+        id="commissionRatePercent"
+        min="0"
+        step="0.001"
+        value="0.015"
+        required
+      />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Return needed before</span>
+        <span class="value"><span id="breakeven-return-before">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">Return needed after</span>
+        <span class="value"><span id="breakeven-return-after">-</span></span>
+      </div>
+    </div>
+
+    <p class="note">
+      "Return needed" is how much further the price has to rise from here to
+      reach breakeven (accounting for commission and tax). A smaller number
+      is better — negative means you're already past breakeven and in
+      profit. If this number dropped after averaging down, that's the
+      concrete benefit: less of a rally is needed to get back to even.
+    </p>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Purchase breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>
+            Existing position <span class="hint">(reference only)</span>
+            <span class="formula-line">= existing shares × existing average cost</span>
+            <span class="formula-actual" id="existing-summary-formula">-</span>
+          </td>
+          <td id="existing-summary">-</td>
+        </tr>
+        <tr id="infeasible-row" class="hidden">
+          <td colspan="2" id="infeasible-message" class="infeasible-message"></td>
+        </tr>
+        <tr>
+          <td>
+            Additional shares to buy
+            <span class="formula-line" id="additional-shares-formula-line">-</span>
+            <span class="formula-actual" id="additional-shares-formula">-</span>
+          </td>
+          <td id="additional-shares">-</td>
+        </tr>
+        <tr>
+          <td>
+            Cost of additional shares
+            <span class="formula-line">= additional shares × current price</span>
+            <span class="formula-actual" id="additional-cost-formula">-</span>
+          </td>
+          <td id="additional-cost">-</td>
+        </tr>
+        <tr>
+          <td>
+            Total shares held
+            <span class="formula-line">= existing shares + additional shares</span>
+            <span class="formula-actual" id="new-shares-formula">-</span>
+          </td>
+          <td id="new-shares">-</td>
+        </tr>
+        <tr>
+          <td>
+            Total invested
+            <span class="formula-line">= existing position value + cost of additional shares</span>
+            <span class="formula-actual" id="total-invested-formula">-</span>
+          </td>
+          <td id="total-invested">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            New average cost
+            <span class="formula-line">= total invested ÷ total shares held</span>
+            <span class="formula-actual" id="new-avg-price-formula">-</span>
+          </td>
+          <td id="new-avg-price">-</td>
+        </tr>
+        <tr>
+          <td>
+            Breakeven price before
+            <span class="hint" id="tax-note-before">(incl. transaction costs)</span>
+            <span class="formula-line">= existing average ÷ (1 − commission×2 − transaction tax)</span>
+            <span class="formula-actual" id="breakeven-price-before-formula">-</span>
+          </td>
+          <td id="breakeven-price-before">-</td>
+        </tr>
+        <tr>
+          <td>
+            Breakeven price after
+            <span class="hint" id="tax-note-after">(incl. transaction costs)</span>
+            <span class="formula-line">= new average ÷ (1 − commission×2 − transaction tax)</span>
+            <span class="formula-actual" id="breakeven-price-after-formula">-</span>
+          </td>
+          <td id="breakeven-price-after">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="schedule-scroll">
+      <table class="breakdown schedule" id="simulation-table">
+        <caption class="note" style="text-align:left;margin-bottom:6px;">
+          If the price keeps falling <span class="hint"
+            >(assumes you keep buying the same number of shares each round)</span
+          >
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">vs. current price</th>
+            <th scope="col">Buy price</th>
+            <th scope="col">Cumulative average</th>
+            <th scope="col">Cumulative invested</th>
+            <th scope="col">Return needed</th>
+          </tr>
+        </thead>
+        <tbody id="simulation-body">
+          <!-- rows injected by client script -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. For domestic
+    Korean stocks (KRW), the securities transaction tax on selling (0.20% on
+    both KOSPI and KOSDAQ, including the agricultural/fishing surtax, under
+    the rate effective 2026-01-01) is applied automatically. For overseas
+    stocks (USD), Korea's annual capital gains tax on foreign stock trading
+    (22–27.5% on net gains over 2.5M KRW/year, aggregated across all your
+    foreign-stock trades for the year) is <strong>not</strong> included —
+    that's an annual, portfolio-wide tax, which doesn't fit the scope of a
+    single-position averaging tool. Swap in your actual broker's commission
+    rate. The simulation assumes you buy the same number of shares each
+    round — whether to keep averaging down (or cut your losses) should
+    depend on the stock's fundamentals and your own capital, not just this
+    arithmetic.
+  </div>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>I entered a target average and it says "not achievable" — why?</summary>
+      <p>
+        Your average cost is always a value <strong>between your existing
+        average and the price you're buying at (the current price)</strong>
+        — by the nature of a weighted average, buying more shares at the
+        current price only pulls your average closer to the current price,
+        never past it or equal to it (you'd need infinite shares to even
+        get arbitrarily close). For example, if your existing average is
+        150 and the current price is 100, entering a target of 90 is
+        impossible no matter how many shares you buy — so it's marked "not
+        achievable." Enter a target that's higher than the current price
+        and lower than your existing average.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is the breakeven price different from the average cost?</summary>
+      <p>
+        Selling at exactly your average cost is actually a loss once you
+        account for transaction costs (commission on both the buy and the
+        sell, plus securities transaction tax on the sell for domestic
+        stocks). So the price that's truly "breakeven" is a bit higher than
+        your raw average — this calculator shows that separately as the
+        "breakeven price." The formula is <code
+          >average cost ÷ (1 − commission×2 − transaction tax rate)</code
+        > (commission applies twice — buy and sell — while the tax applies
+        once, on the sell).
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does the transaction tax only apply to KRW (domestic stocks)?</summary>
+      <p>
+        Every sale of a domestic Korean stock automatically incurs a
+        securities transaction tax (0.20% on both KOSPI and KOSDAQ,
+        including the agricultural/fishing surtax, under the rate effective
+        2026-01-01). Overseas stocks have no Korean-side sell tax, but
+        instead have an annual capital gains tax (22–27.5% on net gains
+        over 2.5M KRW per year) that's assessed on your <strong>entire
+        year's foreign-stock trading</strong>, not a single position. That's
+        out of scope for a tool that calculates one position's averaging
+        (it would need your full year of trades to compute) — keep this in
+        mind when working in USD.
+      </p>
+    </details>
+
+    <details>
+      <summary>What does the simulation table show?</summary>
+      <p>
+        It shows what happens if you don't stop at one round of averaging
+        down — if the price keeps falling and you keep buying the same
+        number of shares each time. Your average cost keeps dropping, but
+        so does the capital required — which is the real risk of averaging
+        down that a single calculation hides. Whether you'd actually have
+        the capital to keep buying, and whether the stock is even worth
+        holding that long, are separate judgment calls this table doesn't
+        make for you.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why do I have to enter the brokerage commission rate myself?</summary>
+      <p>
+        Unlike the securities transaction tax, commission isn't set by law
+        — it's whatever your broker charges. Many online no-fee accounts
+        are close to 0%, while full-service branch trading can be much
+        higher. Enter your actual broker's rate for an accurate result.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  /* is:global is required here: the simulation table's <tr> rows are
+     created at runtime via document.createElement (see the script below),
+     and Astro's scoped-style attribute is only applied to elements written
+     in this file's static template — never to elements created dynamically
+     in client JS. See loan-calculator.astro for the same pattern. */
+  #stock-form ~ .result-box .schedule-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  #stock-form ~ .result-box table.schedule {
+    margin-top: 0;
+    font-size: 0.85rem;
+  }
+  #stock-form ~ .result-box table.schedule caption {
+    padding: 8px 8px 0;
+  }
+  #stock-form ~ .result-box table.schedule th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-soft);
+    z-index: 1;
+  }
+  #stock-form ~ .result-box table.breakdown.schedule td,
+  #stock-form ~ .result-box table.breakdown.schedule th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 8px 10px;
+  }
+  #stock-form ~ .result-box table.breakdown.schedule td:first-child,
+  #stock-form ~ .result-box table.breakdown.schedule th:first-child {
+    text-align: center;
+  }
+</style>
+
+<style>
+  .method-toggle label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  .method-toggle input {
+    font: inherit;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    width: 100%;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .infeasible-message {
+    color: #b91c1c;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left !important;
+    padding: 10px 8px;
+    background: #fef2f2;
+    border-radius: 6px;
+  }
+</style>
+
+<script>
+  import { calculateStockAveraging } from '../../../lib/stockAveragingCalculator';
+  import type { StockCurrency, StockAveragingMode } from '../../../lib/stockAveragingCalculator';
+
+  const form = document.getElementById('stock-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const additionalSharesField = document.getElementById('additionalShares-field') as HTMLLabelElement;
+  const targetAvgPriceField = document.getElementById('targetAvgPrice-field') as HTMLLabelElement;
+  const additionalSharesInput = document.getElementById('additionalShares') as HTMLInputElement;
+  const targetAvgPriceInput = document.getElementById('targetAvgPrice') as HTMLInputElement;
+
+  const updateModeFields = () => {
+    const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement).value;
+    const isAdditional = mode === '추가매수';
+    additionalSharesField.classList.toggle('hidden', !isAdditional);
+    targetAvgPriceField.classList.toggle('hidden', isAdditional);
+    additionalSharesInput.required = isAdditional;
+    targetAvgPriceInput.required = !isAdditional;
+  };
+  document
+    .querySelectorAll('input[name="mode"]')
+    .forEach((el) => el.addEventListener('change', updateModeFields));
+  updateModeFields();
+
+  const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  const formatMoney = (value: number, currency: StockCurrency) => {
+    if (currency === 'KRW') {
+      return `₩${Math.round(value).toLocaleString('en-US')}`;
+    }
+    return `$${value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+  const formatShares = (value: number) => `${Math.round(value).toLocaleString('en-US')} sh`;
+  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+
+  const simulationBody = document.getElementById('simulation-body') as HTMLTableSectionElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const currency = (document.querySelector('input[name="currency"]:checked') as HTMLInputElement)
+      .value as StockCurrency;
+    const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement)
+      .value as StockAveragingMode;
+
+    const existingShares = getNum('existingShares');
+    const existingAvgPrice = getNum('existingAvgPrice');
+    const currentPrice = getNum('currentPrice');
+    const commissionRatePercent = getNum('commissionRatePercent');
+
+    if (!existingShares || existingShares <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid number of existing shares.';
+      return;
+    }
+    if (!existingAvgPrice || existingAvgPrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid existing average cost.';
+      return;
+    }
+    if (!currentPrice || currentPrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid current price.';
+      return;
+    }
+    if (commissionRatePercent === null || commissionRatePercent < 0 || Number.isNaN(commissionRatePercent)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid commission rate.';
+      return;
+    }
+
+    const additionalShares = mode === '추가매수' ? getNum('additionalShares') : undefined;
+    const targetAvgPrice = mode === '목표평단가' ? getNum('targetAvgPrice') : undefined;
+
+    if (mode === '추가매수' && (!additionalShares || additionalShares <= 0)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid number of additional shares.';
+      return;
+    }
+    if (mode === '목표평단가' && (!targetAvgPrice || targetAvgPrice <= 0)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid target average cost.';
+      return;
+    }
+
+    const r = calculateStockAveraging({
+      currency,
+      existingShares,
+      existingAvgPrice,
+      currentPrice,
+      mode,
+      additionalShares,
+      targetAvgPrice,
+      commissionRatePercent,
+    });
+
+    const infeasibleRow = document.getElementById('infeasible-row') as HTMLTableRowElement;
+    if (mode === '목표평단가' && !r.targetFeasible) {
+      infeasibleRow.classList.remove('hidden');
+      setText(
+        'infeasible-message',
+        `A target average is only achievable between the current price (${formatMoney(currentPrice, currency)}) and your existing average (${formatMoney(existingAvgPrice, currency)}). This target can't be reached, so the calculation below assumes no additional purchase (0 shares).`,
+      );
+    } else {
+      infeasibleRow.classList.add('hidden');
+    }
+
+    setText('breakeven-return-before', formatPercent(r.breakevenReturnBeforePercent));
+    setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+
+    setText('existing-summary', formatMoney(r.existingInvested, currency));
+    setText(
+      'existing-summary-formula',
+      `= ${formatShares(existingShares)} × ${formatMoney(existingAvgPrice, currency)}`,
+    );
+
+    if (mode === '목표평단가') {
+      setText(
+        'additional-shares-formula-line',
+        '= existing shares × (existing average − target average) ÷ (target average − current price), rounded up',
+      );
+      setText(
+        'additional-shares-formula',
+        r.targetFeasible
+          ? `= ${formatShares(existingShares)} × (${formatMoney(existingAvgPrice, currency)} − ${formatMoney(targetAvgPrice!, currency)}) ÷ (${formatMoney(targetAvgPrice!, currency)} − ${formatMoney(currentPrice, currency)})`
+          : '= target average not achievable',
+      );
+    } else {
+      setText('additional-shares-formula-line', '= entered value');
+      setText('additional-shares-formula', `= ${formatShares(r.additionalShares)}`);
+    }
+    setText('additional-shares', formatShares(r.additionalShares));
+
+    setText('additional-cost', formatMoney(r.additionalCost, currency));
+    setText(
+      'additional-cost-formula',
+      `= ${formatShares(r.additionalShares)} × ${formatMoney(currentPrice, currency)}`,
+    );
+
+    setText('new-shares', formatShares(r.newShares));
+    setText(
+      'new-shares-formula',
+      `= ${formatShares(existingShares)} + ${formatShares(r.additionalShares)}`,
+    );
+
+    setText('total-invested', formatMoney(r.totalInvested, currency));
+    setText(
+      'total-invested-formula',
+      `= ${formatMoney(r.existingInvested, currency)} + ${formatMoney(r.additionalCost, currency)}`,
+    );
+
+    setText('new-avg-price', formatMoney(r.newAvgPrice, currency));
+    setText(
+      'new-avg-price-formula',
+      `= ${formatMoney(r.totalInvested, currency)} ÷ ${formatShares(r.newShares)}`,
+    );
+
+    const taxNote =
+      currency === 'KRW'
+        ? `(commission ${commissionRatePercent}%×2 + transaction tax ${r.securitiesTaxRatePercent}%)`
+        : `(commission ${commissionRatePercent}%×2, no Korean sell tax on overseas stocks)`;
+    setText('tax-note-before', taxNote);
+    setText('tax-note-after', taxNote);
+
+    setText('breakeven-price-before', formatMoney(r.breakevenPriceBefore, currency));
+    setText(
+      'breakeven-price-before-formula',
+      `= ${formatMoney(existingAvgPrice, currency)} ÷ (1 − ${commissionRatePercent}%×2 − ${r.securitiesTaxRatePercent}%)`,
+    );
+    setText('breakeven-price-after', formatMoney(r.breakevenPriceAfter, currency));
+    setText(
+      'breakeven-price-after-formula',
+      `= ${formatMoney(r.newAvgPrice, currency)} ÷ (1 − ${commissionRatePercent}%×2 − ${r.securitiesTaxRatePercent}%)`,
+    );
+
+    simulationBody.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (const row of r.simulation) {
+      const tr = document.createElement('tr');
+      const dropCell = document.createElement('td');
+      dropCell.textContent = row.dropPercent === 0 ? 'Current' : `−${row.dropPercent}%`;
+      const priceCell = document.createElement('td');
+      priceCell.textContent = formatMoney(row.priceAtDrop, currency);
+      const avgCell = document.createElement('td');
+      avgCell.textContent = formatMoney(row.cumulativeAvgPrice, currency);
+      const investedCell = document.createElement('td');
+      investedCell.textContent = formatMoney(row.cumulativeInvested, currency);
+      const breakevenCell = document.createElement('td');
+      breakevenCell.textContent = formatPercent(row.breakevenReturnPercent);
+      tr.append(dropCell, priceCell, avgCell, investedCell, breakevenCell);
+      fragment.appendChild(tr);
+    }
+    simulationBody.appendChild(fragment);
+
+    result.classList.remove('hidden');
+  });
+</script>

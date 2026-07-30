@@ -1,0 +1,608 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
+---
+
+<BaseLayout
+  title={meta.title}
+  description={meta.description}
+  path={`/calculators/${meta.slug}`}
+>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    기존 보유 주식수·평단가·현재가를 입력하면 추가 매수 후 새 평균단가와
+    손익분기(본전)에 필요한 수익률을 계산합니다. 몇 주를 살지 정하지 않았다면
+    "목표 평단가로 역산"을 선택해 원하는 평단가에 맞는 매수 수량을 거꾸로
+    계산할 수 있습니다. 원화(국내주식)·달러(해외주식) 어느 쪽이든 통화만
+    바꿔서 그대로 쓸 수 있습니다.
+  </p>
+
+  <form class="calc-form" id="stock-form">
+    <fieldset class="method-toggle">
+      <legend>통화</legend>
+      <label class="method-option">
+        <input type="radio" name="currency" value="KRW" checked />
+        <span>원화(₩) — 국내주식</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="currency" value="USD" />
+        <span>달러($) — 해외주식</span>
+      </label>
+    </fieldset>
+
+    <label>
+      기존 보유 주식수
+      <input type="number" id="existingShares" min="0" step="1" placeholder="예: 100" required />
+    </label>
+
+    <label>
+      기존 평균 매입단가
+      <input
+        type="number"
+        id="existingAvgPrice"
+        min="0"
+        step="any"
+        placeholder="예: 15000"
+        required
+      />
+    </label>
+
+    <label>
+      현재가
+      <span class="hint">추가 매수를 가정하는 가격입니다.</span>
+      <input type="number" id="currentPrice" min="0" step="any" placeholder="예: 10000" required />
+    </label>
+
+    <fieldset class="method-toggle">
+      <legend>계산 방식</legend>
+      <label class="method-option">
+        <input type="radio" name="mode" value="추가매수" checked />
+        <span>추가 매수 수량 입력</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="mode" value="목표평단가" />
+        <span>목표 평단가로 역산</span>
+      </label>
+    </fieldset>
+
+    <label id="additionalShares-field">
+      추가 매수 주식수
+      <input
+        type="number"
+        id="additionalShares"
+        min="0"
+        step="1"
+        placeholder="예: 100"
+        required
+      />
+    </label>
+
+    <label id="targetAvgPrice-field" class="hidden">
+      목표 평균단가
+      <span class="hint"
+        >현재가와 기존 평단가 "사이"의 값만 가능합니다 — 아무리 많이 사도
+        평단가가 현재가를 넘어설 수는 없습니다.</span
+      >
+      <input type="number" id="targetAvgPrice" min="0" step="any" placeholder="예: 12000" />
+    </label>
+
+    <label>
+      증권사 매매수수료율 (%)
+      <span class="hint"
+        >매수·매도 동일 요율로 가정합니다. 증권사·상품마다 다르니 실제
+        이용하시는 증권사 요율로 바꿔보세요.
+        <strong>참고 — 온라인(비대면) 거래 기준 대표 요율:</strong> 키움증권
+        영웅문 0.015%, 토스증권 0.015%(넥스트레이드 체결 시 0.014%). 신규
+        계좌 개설 이벤트로 한시적 0%를 제공하는 증권사도 흔하니, 본인
+        계좌의 실제 요율을 확인해서 입력하는 것이 정확합니다.</span
+      >
+      <input
+        type="number"
+        id="commissionRatePercent"
+        min="0"
+        step="0.001"
+        value="0.015"
+        required
+      />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">물타기 전 필요수익률</span>
+        <span class="value"><span id="breakeven-return-before">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">물타기 후 필요수익률</span>
+        <span class="value"><span id="breakeven-return-after">-</span></span>
+      </div>
+    </div>
+
+    <p class="note">
+      "필요수익률"은 현재가에서 얼마나 더 올라야 거래비용(수수료·세금)까지
+      감안한 손익분기(본전)에 도달하는지를 나타냅니다. 숫자가 작을수록,
+      또는 마이너스(이미 손익분기를 넘어 수익 중)일수록 유리합니다. 물타기
+      후 이 숫자가 줄었다면, 그만큼 본전까지 덜 올라도 된다는 뜻입니다.
+    </p>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        매수 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>
+            기존 보유 <span class="hint">(참고용)</span>
+            <span class="formula-line">= 기존 보유 주식수 × 기존 평균 매입단가</span>
+            <span class="formula-actual" id="existing-summary-formula">-</span>
+          </td>
+          <td id="existing-summary">-</td>
+        </tr>
+        <tr id="infeasible-row" class="hidden">
+          <td colspan="2" id="infeasible-message" class="infeasible-message"></td>
+        </tr>
+        <tr>
+          <td>
+            추가 매수 주식수
+            <span class="formula-line" id="additional-shares-formula-line">-</span>
+            <span class="formula-actual" id="additional-shares-formula">-</span>
+          </td>
+          <td id="additional-shares">-</td>
+        </tr>
+        <tr>
+          <td>
+            추가 매수금액
+            <span class="formula-line">= 추가 매수 주식수 × 현재가</span>
+            <span class="formula-actual" id="additional-cost-formula">-</span>
+          </td>
+          <td id="additional-cost">-</td>
+        </tr>
+        <tr>
+          <td>
+            총 보유 주식수
+            <span class="formula-line">= 기존 보유 주식수 + 추가 매수 주식수</span>
+            <span class="formula-actual" id="new-shares-formula">-</span>
+          </td>
+          <td id="new-shares">-</td>
+        </tr>
+        <tr>
+          <td>
+            총 투자금액
+            <span class="formula-line">= 기존 보유 금액 + 추가 매수금액</span>
+            <span class="formula-actual" id="total-invested-formula">-</span>
+          </td>
+          <td id="total-invested">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            새 평균 매입단가
+            <span class="formula-line">= 총 투자금액 ÷ 총 보유 주식수</span>
+            <span class="formula-actual" id="new-avg-price-formula">-</span>
+          </td>
+          <td id="new-avg-price">-</td>
+        </tr>
+        <tr>
+          <td>
+            물타기 전 손익분기가
+            <span class="hint" id="tax-note-before">(거래비용 포함)</span>
+            <span class="formula-line">= 기존 평단가 ÷ (1 − 수수료율×2 − 증권거래세율)</span>
+            <span class="formula-actual" id="breakeven-price-before-formula">-</span>
+          </td>
+          <td id="breakeven-price-before">-</td>
+        </tr>
+        <tr>
+          <td>
+            물타기 후 손익분기가
+            <span class="hint" id="tax-note-after">(거래비용 포함)</span>
+            <span class="formula-line">= 새 평단가 ÷ (1 − 수수료율×2 − 증권거래세율)</span>
+            <span class="formula-actual" id="breakeven-price-after-formula">-</span>
+          </td>
+          <td id="breakeven-price-after">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="schedule-scroll">
+      <table class="breakdown schedule" id="simulation-table">
+        <caption class="note" style="text-align:left;margin-bottom:6px;">
+          추가 하락 시나리오 시뮬레이션 <span class="hint"
+            >(매 회차 같은 수량을 계속 추가 매수한다고 가정)</span
+          >
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">현재가 대비</th>
+            <th scope="col">매수가</th>
+            <th scope="col">누적 평단가</th>
+            <th scope="col">누적 투자금액</th>
+            <th scope="col">필요수익률</th>
+          </tr>
+        </thead>
+        <tbody id="simulation-body">
+          <!-- rows injected by client script -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 국내주식(원화)은
+    매도 시 증권거래세(코스피·코스닥 공통 0.20%, 농어촌특별세 포함,
+    2026-01-01 시행 세율 기준)를 자동 반영하지만, 해외주식(달러)의 한 해
+    전체 매매손익을 합산해 매기는 양도소득세(연 250만원 공제 초과분
+    22~27.5%)는 종목 하나를 다루는 이 계산기의 범위를 벗어나 반영하지
+    않습니다. 증권사 수수료율은 실제 이용 중인 증권사 요율로 바꿔서
+    확인하세요. 시뮬레이션은 매 회차 동일 수량을 매수한다는 가정이며, 실제
+    투자 판단(계속 물타기할지, 손절할지)은 종목의 펀더멘털과 본인의 자금
+    사정을 함께 고려해야 합니다.
+  </div>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>목표 평단가를 입력했는데 "불가능"이라고 나와요, 왜 그런가요?</summary>
+      <p>
+        평균 매입단가는 항상 <strong>기존 평단가와 매수 가격(현재가) 사이의
+        값</strong>이 됩니다 — 가중평균의 성질상, 아무리 많은 주식을 현재가에
+        사도 평단가는 현재가 쪽으로 점점 가까워질 뿐, 현재가를 넘어서거나
+        똑같아질 수는 없습니다(무한대로 사야 겨우 현재가에 근접). 예를 들어
+        기존 평단가 15,000원, 현재가 10,000원인데 목표를 9,000원으로
+        입력하면, 아무리 많이 사도 평단가를 9,000원까지 낮출 수 없으므로
+        "불가능"으로 표시됩니다. 목표 평단가는 현재가보다는 높고 기존
+        평단가보다는 낮게 입력하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>손익분기가는 왜 평단가와 다른가요?</summary>
+      <p>
+        평단가 그대로 팔면 거래비용(매수·매도 수수료, 국내주식은 매도 시
+        증권거래세까지) 때문에 실제로는 손해입니다. 그래서 "진짜 본전"이
+        되는 가격은 평단가보다 조금 더 높습니다 — 이 계산기는 그 가격을
+        "손익분기가"로 따로 보여줍니다. 계산식은 <code
+          >평단가 ÷ (1 − 수수료율×2 − 증권거래세율)</code
+        >입니다(수수료는 매수·매도 두 번 부담, 세금은 매도 시 한 번만 부담).
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 국내주식(원화)에만 증권거래세가 붙나요?</summary>
+      <p>
+        국내 상장주식은 매도할 때마다 증권거래세(코스피·코스닥 공통 0.20%,
+        농어촌특별세 포함, 2026-01-01 시행 세율 기준)가 자동으로 붙습니다.
+        해외주식은 한국 측 매도세는 없지만, 대신 종목 하나가 아니라 그 해
+        전체 해외주식 매매손익을 합산해서 매기는 양도소득세(연 250만원
+        공제를 초과하는 순이익에 22~27.5%)가 별도로 있습니다. 이건 종목
+        하나의 물타기를 계산하는 이 도구의 범위를 벗어나므로(1년 전체 거래
+        내역이 있어야 계산 가능) 반영하지 않았습니다 — 달러로 계산할 때는
+        이 점을 참고하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>시뮬레이션 표는 어떤 상황을 보여주나요?</summary>
+      <p>
+        "물타기를 한 번으로 끝내지 않고, 주가가 계속 떨어질 때마다 같은
+        수량을 계속 사들인다면" 어떻게 되는지 보여줍니다. 하락폭이 커질수록
+        평단가는 계속 낮아지지만, 그만큼 투자금도 계속 늘어난다는
+        점(추가로 필요한 자금이 눈덩이처럼 불어나는 물타기의 실제 위험)을
+        한눈에 확인할 수 있습니다. 실제로 이렇게 계속 매수할 자금 여력이
+        있는지, 그리고 애초에 이 종목을 계속 들고 갈 이유가 있는지는 별개로
+        판단해야 합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>증권사 수수료율은 왜 직접 입력해야 하나요?</summary>
+      <p>
+        증권거래세와 달리 매매수수료는 법으로 정해진 세율이 아니라 증권사가
+        자율적으로 정하는 요율입니다. 온라인 비대면 계좌는 0%에 가까운 무료
+        이벤트도 흔하고, 영업점 거래는 훨씬 높을 수도 있습니다. 실제
+        이용하시는 증권사·상품의 수수료율로 바꿔서 확인하는 것이 정확합니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  /* is:global is required here: the simulation table's <tr> rows are
+     created at runtime via document.createElement (see the script below),
+     and Astro's scoped-style attribute is only applied to elements written
+     in this file's static template — never to elements created dynamically
+     in client JS. See loan-calculator.astro for the same pattern. */
+  #stock-form ~ .result-box .schedule-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  #stock-form ~ .result-box table.schedule {
+    margin-top: 0;
+    font-size: 0.85rem;
+  }
+  #stock-form ~ .result-box table.schedule caption {
+    padding: 8px 8px 0;
+  }
+  #stock-form ~ .result-box table.schedule th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-soft);
+    z-index: 1;
+  }
+  #stock-form ~ .result-box table.breakdown.schedule td,
+  #stock-form ~ .result-box table.breakdown.schedule th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 8px 10px;
+  }
+  #stock-form ~ .result-box table.breakdown.schedule td:first-child,
+  #stock-form ~ .result-box table.breakdown.schedule th:first-child {
+    text-align: center;
+  }
+</style>
+
+<style>
+  .method-toggle label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  .method-toggle input {
+    font: inherit;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    width: 100%;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .infeasible-message {
+    color: #b91c1c;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left !important;
+    padding: 10px 8px;
+    background: #fef2f2;
+    border-radius: 6px;
+  }
+</style>
+
+<script>
+  import { calculateStockAveraging } from '../../lib/stockAveragingCalculator';
+  import type { StockCurrency, StockAveragingMode } from '../../lib/stockAveragingCalculator';
+
+  const form = document.getElementById('stock-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const additionalSharesField = document.getElementById('additionalShares-field') as HTMLLabelElement;
+  const targetAvgPriceField = document.getElementById('targetAvgPrice-field') as HTMLLabelElement;
+  const additionalSharesInput = document.getElementById('additionalShares') as HTMLInputElement;
+  const targetAvgPriceInput = document.getElementById('targetAvgPrice') as HTMLInputElement;
+
+  const updateModeFields = () => {
+    const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement).value;
+    const isAdditional = mode === '추가매수';
+    additionalSharesField.classList.toggle('hidden', !isAdditional);
+    targetAvgPriceField.classList.toggle('hidden', isAdditional);
+    additionalSharesInput.required = isAdditional;
+    targetAvgPriceInput.required = !isAdditional;
+  };
+  document
+    .querySelectorAll('input[name="mode"]')
+    .forEach((el) => el.addEventListener('change', updateModeFields));
+  updateModeFields();
+
+  const getNum = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  const formatMoney = (value: number, currency: StockCurrency) => {
+    if (currency === 'KRW') {
+      return `₩${Math.round(value).toLocaleString('ko-KR')}`;
+    }
+    return `$${value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+  const formatShares = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}주`;
+  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+
+  const simulationBody = document.getElementById('simulation-body') as HTMLTableSectionElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const currency = (document.querySelector('input[name="currency"]:checked') as HTMLInputElement)
+      .value as StockCurrency;
+    const mode = (document.querySelector('input[name="mode"]:checked') as HTMLInputElement)
+      .value as StockAveragingMode;
+
+    const existingShares = getNum('existingShares');
+    const existingAvgPrice = getNum('existingAvgPrice');
+    const currentPrice = getNum('currentPrice');
+    const commissionRatePercent = getNum('commissionRatePercent');
+
+    if (!existingShares || existingShares <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '기존 보유 주식수를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!existingAvgPrice || existingAvgPrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '기존 평균 매입단가를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!currentPrice || currentPrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '현재가를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (commissionRatePercent === null || commissionRatePercent < 0 || Number.isNaN(commissionRatePercent)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '증권사 매매수수료율을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const additionalShares = mode === '추가매수' ? getNum('additionalShares') : undefined;
+    const targetAvgPrice = mode === '목표평단가' ? getNum('targetAvgPrice') : undefined;
+
+    if (mode === '추가매수' && (!additionalShares || additionalShares <= 0)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '추가 매수 주식수를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (mode === '목표평단가' && (!targetAvgPrice || targetAvgPrice <= 0)) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '목표 평균단가를 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const r = calculateStockAveraging({
+      currency,
+      existingShares,
+      existingAvgPrice,
+      currentPrice,
+      mode,
+      additionalShares,
+      targetAvgPrice,
+      commissionRatePercent,
+    });
+
+    const infeasibleRow = document.getElementById('infeasible-row') as HTMLTableRowElement;
+    if (mode === '목표평단가' && !r.targetFeasible) {
+      infeasibleRow.classList.remove('hidden');
+      setText(
+        'infeasible-message',
+        `목표 평단가는 현재가(${formatMoney(currentPrice, currency)})와 기존 평단가(${formatMoney(existingAvgPrice, currency)}) 사이의 값만 가능합니다. 입력한 목표 평단가로는 도달할 수 없어 아래 계산에서 추가 매수 없이(0주) 처리했습니다.`,
+      );
+    } else {
+      infeasibleRow.classList.add('hidden');
+    }
+
+    setText('breakeven-return-before', formatPercent(r.breakevenReturnBeforePercent));
+    setText('breakeven-return-after', formatPercent(r.breakevenReturnAfterPercent));
+
+    setText('existing-summary', formatMoney(r.existingInvested, currency));
+    setText(
+      'existing-summary-formula',
+      `= ${formatShares(existingShares)} × ${formatMoney(existingAvgPrice, currency)}`,
+    );
+
+    if (mode === '목표평단가') {
+      setText(
+        'additional-shares-formula-line',
+        '= 기존 주식수 × (기존 평단가 − 목표 평단가) ÷ (목표 평단가 − 현재가), 올림',
+      );
+      setText(
+        'additional-shares-formula',
+        r.targetFeasible
+          ? `= ${formatShares(existingShares)} × (${formatMoney(existingAvgPrice, currency)} − ${formatMoney(targetAvgPrice!, currency)}) ÷ (${formatMoney(targetAvgPrice!, currency)} − ${formatMoney(currentPrice, currency)})`
+          : '= 목표 평단가 도달 불가',
+      );
+    } else {
+      setText('additional-shares-formula-line', '= 입력값');
+      setText('additional-shares-formula', `= ${formatShares(r.additionalShares)}`);
+    }
+    setText('additional-shares', formatShares(r.additionalShares));
+
+    setText('additional-cost', formatMoney(r.additionalCost, currency));
+    setText(
+      'additional-cost-formula',
+      `= ${formatShares(r.additionalShares)} × ${formatMoney(currentPrice, currency)}`,
+    );
+
+    setText('new-shares', formatShares(r.newShares));
+    setText(
+      'new-shares-formula',
+      `= ${formatShares(existingShares)} + ${formatShares(r.additionalShares)}`,
+    );
+
+    setText('total-invested', formatMoney(r.totalInvested, currency));
+    setText(
+      'total-invested-formula',
+      `= ${formatMoney(r.existingInvested, currency)} + ${formatMoney(r.additionalCost, currency)}`,
+    );
+
+    setText('new-avg-price', formatMoney(r.newAvgPrice, currency));
+    setText(
+      'new-avg-price-formula',
+      `= ${formatMoney(r.totalInvested, currency)} ÷ ${formatShares(r.newShares)}`,
+    );
+
+    const taxNote =
+      currency === 'KRW'
+        ? `(수수료 ${commissionRatePercent}%×2 + 증권거래세 ${r.securitiesTaxRatePercent}%)`
+        : `(수수료 ${commissionRatePercent}%×2, 해외주식은 국내 매도세 없음)`;
+    setText('tax-note-before', taxNote);
+    setText('tax-note-after', taxNote);
+
+    setText('breakeven-price-before', formatMoney(r.breakevenPriceBefore, currency));
+    setText(
+      'breakeven-price-before-formula',
+      `= ${formatMoney(existingAvgPrice, currency)} ÷ (1 − ${commissionRatePercent}%×2 − ${r.securitiesTaxRatePercent}%)`,
+    );
+    setText('breakeven-price-after', formatMoney(r.breakevenPriceAfter, currency));
+    setText(
+      'breakeven-price-after-formula',
+      `= ${formatMoney(r.newAvgPrice, currency)} ÷ (1 − ${commissionRatePercent}%×2 − ${r.securitiesTaxRatePercent}%)`,
+    );
+
+    simulationBody.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (const row of r.simulation) {
+      const tr = document.createElement('tr');
+      const dropCell = document.createElement('td');
+      dropCell.textContent = row.dropPercent === 0 ? '현재가' : `−${row.dropPercent}%`;
+      const priceCell = document.createElement('td');
+      priceCell.textContent = formatMoney(row.priceAtDrop, currency);
+      const avgCell = document.createElement('td');
+      avgCell.textContent = formatMoney(row.cumulativeAvgPrice, currency);
+      const investedCell = document.createElement('td');
+      investedCell.textContent = formatMoney(row.cumulativeInvested, currency);
+      const breakevenCell = document.createElement('td');
+      breakevenCell.textContent = formatPercent(row.breakevenReturnPercent);
+      tr.append(dropCell, priceCell, avgCell, investedCell, breakevenCell);
+      fragment.appendChild(tr);
+    }
+    simulationBody.appendChild(fragment);
+
+    result.classList.remove('hidden');
+  });
+</script>
