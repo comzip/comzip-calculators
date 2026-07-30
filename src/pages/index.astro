@@ -56,7 +56,9 @@ import { calculators, categoryOrder, categoryLabels } from '../data/calculators'
   .filter-bar select,
   .filter-bar input[type='search'] {
     font: inherit;
-    font-size: 0.92rem;
+    /* iOS Safari auto-zooms on focus when a form control's font-size is
+       below 16px — keep this at 1rem (not smaller) to avoid that. */
+    font-size: 1rem;
     padding: 9px 12px;
     border: 1px solid var(--border);
     border-radius: 8px;

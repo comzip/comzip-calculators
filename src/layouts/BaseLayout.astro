@@ -270,6 +270,10 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       .calc-form input,
       .calc-form select {
         font: inherit;
+        /* iOS Safari auto-zooms on focus when a form control's font-size is
+           below 16px — override the inherited label font-size (0.95rem) to
+           stay above that threshold. */
+        font-size: 1rem;
         padding: 10px 12px;
         border: 1px solid var(--border);
         border-radius: 8px;
