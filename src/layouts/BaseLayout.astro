@@ -1,5 +1,4 @@
 ---
-import { categoryOrder, calculatorsByCategory, categoryLabels } from '../data/calculators';
 import { ui, type Lang } from '../i18n/ui';
 
 export interface Props {
@@ -103,24 +102,6 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
     <header class="site-header">
       <div class="container header-inner">
         <a href={localePrefix || '/'} class="brand">{siteName}</a>
-        <nav class="site-nav" aria-label={t.navLabel}>
-          {
-            categoryOrder.map((category) => (
-              <details class="nav-dropdown">
-                <summary>{categoryLabels[category][lang]}</summary>
-                <ul>
-                  {calculatorsByCategory(category).map((c) => (
-                    <li>
-                      <a href={`${localePrefix}/calculators/${c.slug}`}>
-                        {lang === 'en' ? c.navLabelEn : c.navLabel}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ))
-          }
-        </nav>
         <a href={langSwitchHref} class="lang-switch" hreflang={lang === 'ko' ? 'en' : 'ko'}>
           {t.langSwitchLabel}
         </a>
@@ -203,52 +184,32 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         color: var(--text);
       }
 
-      /* Header */
       .site-header {
         border-bottom: 1px solid var(--border);
         background: var(--bg);
       }
-      /* Two-row header: row 1 is brand + lang-switch (fixed grid cells, can
-         never wrap into each other); row 2 is the category nav, given the
-         full container width so it doesn't have to compete with the other
-         two for space. DOM order (brand, nav, lang-switch) is unchanged —
-         grid placement alone moves lang-switch up to row 1, so reading/tab
-         order stays brand → categories → language, which is still sensible
-         for screen readers. This replaced a single-row flex layout that
-         wrapped messily once the category count grew (English labels in
-         particular): categories would split mid-row and the lang-switch
-         button would drop onto its own orphan line below everything. */
+      /* Header — a single row (brand left, language switch right). Category
+         browsing used to live here as a set of per-category dropdown menus,
+         but that broke down once the category count grew (English labels
+         wrapped mid-row, especially on mobile). It's now the home page's
+         job instead (category select + search, filtering the card grid) —
+         see index.astro — so the header only ever has these two items and
+         never needs to wrap. */
       .header-inner {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        column-gap: 16px;
-        padding-top: 10px;
-        padding-bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 12px;
+        padding-bottom: 12px;
       }
       .brand {
-        grid-column: 1;
-        grid-row: 1;
-        align-self: center;
         font-weight: 700;
         font-size: 1.15rem;
         color: var(--accent-dark);
         text-decoration: none;
       }
-      .site-nav {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 8px;
-        border-top: 1px solid var(--border);
-        padding-top: 6px;
-        padding-bottom: 10px;
-        margin-top: 8px;
-      }
       .lang-switch {
-        grid-column: 3;
-        grid-row: 1;
-        align-self: center;
         padding: 6px 10px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -261,98 +222,6 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
       .lang-switch:hover {
         color: var(--accent);
         background: var(--bg-soft);
-      }
-      .nav-dropdown {
-        position: relative;
-      }
-      .nav-dropdown > summary {
-        list-style: none;
-        cursor: pointer;
-        padding: 6px 10px;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--text-muted);
-        white-space: nowrap;
-        user-select: none;
-      }
-      /* Hide the native disclosure triangle across engines. */
-      .nav-dropdown > summary::-webkit-details-marker {
-        display: none;
-      }
-      .nav-dropdown > summary::after {
-        content: '▾';
-        font-size: 0.7em;
-        margin-left: 5px;
-        color: var(--text-muted);
-      }
-      .nav-dropdown > summary:hover {
-        color: var(--accent);
-        background: var(--bg-soft);
-      }
-      .nav-dropdown[open] > summary {
-        color: var(--accent);
-        background: var(--bg-soft);
-      }
-      .nav-dropdown[open] > summary::after {
-        content: '▴';
-      }
-      .nav-dropdown > ul {
-        position: absolute;
-        top: calc(100% + 6px);
-        left: 0;
-        z-index: 20;
-        list-style: none;
-        margin: 0;
-        padding: 6px;
-        min-width: 180px;
-        max-width: calc(100vw - 32px);
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-      }
-      /* Applied by script below at open-time when the panel would overflow
-         the right edge of the viewport, regardless of which category or how
-         many there are. */
-      .nav-dropdown.flip-left > ul {
-        left: auto;
-        right: 0;
-      }
-      .nav-dropdown > ul li {
-        margin: 0;
-      }
-      .nav-dropdown > ul a {
-        display: block;
-        padding: 8px 10px;
-        border-radius: 8px;
-        color: var(--text);
-        text-decoration: none;
-        font-size: 0.9rem;
-        /* Labels are kept short (see `navLabel`/`navLabelEn` in
-           data/calculators.ts) so this rarely wraps, but allowing it to wrap
-           instead of overflowing the panel is a safety net for any label
-           that's still too wide for a narrow mobile viewport. */
-        white-space: normal;
-      }
-      .nav-dropdown > ul a:hover {
-        color: var(--accent);
-        background: var(--bg-soft);
-      }
-
-      @media (max-width: 480px) {
-        .header-inner {
-          column-gap: 8px;
-        }
-        .site-nav {
-          gap: 2px 4px;
-        }
-        .nav-dropdown > summary {
-          /* Bumped from 6px 8px: that padding gave ~35px touch targets,
-             under the 44px WCAG 2.5.5 minimum for touch interaction. */
-          padding: 10px 8px;
-          font-size: 0.85rem;
-        }
       }
 
       /* Footer */
@@ -596,51 +465,5 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
         display: none;
       }
     </style>
-
-    <script>
-      // Header nav dropdown behavior: only one open at a time, close on
-      // outside click, close on Escape.
-      const dropdowns = Array.from(
-        document.querySelectorAll<HTMLDetailsElement>('.nav-dropdown')
-      );
-
-      dropdowns.forEach((dropdown) => {
-        const panel = dropdown.querySelector('ul');
-        dropdown.addEventListener('toggle', () => {
-          if (!dropdown.open) return;
-          dropdowns.forEach((other) => {
-            if (other !== dropdown) other.open = false;
-          });
-
-          // Open leftward instead of rightward if the panel would overflow
-          // the viewport's right edge. Measured at open-time so it works
-          // regardless of category count/order or viewport width, instead
-          // of assuming a fixed trigger is the one near the edge.
-          dropdown.classList.remove('flip-left');
-          if (panel && panel.getBoundingClientRect().right > window.innerWidth) {
-            dropdown.classList.add('flip-left');
-          }
-        });
-      });
-
-      document.addEventListener('click', (event) => {
-        const target = event.target as Node;
-        dropdowns.forEach((dropdown) => {
-          if (dropdown.open && !dropdown.contains(target)) {
-            dropdown.open = false;
-          }
-        });
-      });
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape') return;
-        dropdowns.forEach((dropdown) => {
-          if (dropdown.open) {
-            dropdown.open = false;
-            dropdown.querySelector('summary')?.focus();
-          }
-        });
-      });
-    </script>
   </body>
 </html>

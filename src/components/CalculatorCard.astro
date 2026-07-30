@@ -1,5 +1,6 @@
 ---
 import type { Calculator } from '../data/calculators';
+import { categoryLabels } from '../data/calculators';
 import type { Lang } from '../i18n/ui';
 
 export interface Props {
@@ -11,9 +12,15 @@ const { calculator, lang = 'ko' } = Astro.props;
 const href = lang === 'en' ? `/en/calculators/${calculator.slug}` : `/calculators/${calculator.slug}`;
 const title = lang === 'en' ? calculator.titleEn : calculator.title;
 const description = lang === 'en' ? calculator.descriptionEn : calculator.description;
+const categoryLabel = categoryLabels[calculator.category][lang];
+// Used by the home page's client-side category/search filter — see
+// index.astro. Kept in lowercase so the filter script can match a search
+// term against it with a plain substring check, no per-render normalizing.
+const searchText = `${title} ${description}`.toLowerCase();
 ---
 
-<a class="calc-card" href={href}>
+<a class="calc-card" href={href} data-category={calculator.category} data-search={searchText}>
+  <span class="cat">{categoryLabel}</span>
   <h3>{title}</h3>
   <p>{description}</p>
 </a>
@@ -34,6 +41,17 @@ const description = lang === 'en' ? calculator.descriptionEn : calculator.descri
   .calc-card:hover {
     border-color: var(--accent);
     transform: translateY(-2px);
+  }
+  .calc-card .cat {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--accent-dark);
+    background: var(--bg-soft);
+    border-radius: 5px;
+    padding: 2px 7px;
+    margin-bottom: 8px;
   }
   .calc-card h3 {
     margin: 0 0 6px;
