@@ -587,6 +587,10 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       const changePercent =
         existingAvgPrice > 0 ? ((r.newAvgPrice - existingAvgPrice) / existingAvgPrice) * 100 : 0;
       primaryCaption.textContent = `${formatMoney(existingAvgPrice, currency)} → ${formatMoney(r.newAvgPrice, currency)} (${formatPercent(changePercent)})`;
+    } else if (r.targetAlreadyAchieved) {
+      primaryLabel.textContent = 'Shares needed';
+      primaryValue.textContent = 'Already there';
+      primaryCaption.textContent = 'Target average equals your existing average, so no additional purchase is needed.';
     } else if (!r.targetFeasible) {
       primaryLabel.textContent = 'Shares needed';
       primaryValue.textContent = 'Not achievable';
@@ -597,10 +601,11 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       primaryCaption.textContent = `Costs approx. ${formatMoney(r.additionalCost, currency)}`;
     }
 
-    // When the target average isn't reachable (0 additional shares), the
-    // "after" figures are identical to the "before" ones, which reads as
-    // misleading rather than informative — hide that whole row instead.
-    const secondaryFeasible = mode === '추가매수' || r.targetFeasible;
+    // When no additional shares are needed (whether unreachable or already
+    // at target), the "after" figures are identical to the "before" ones,
+    // which reads as misleading rather than informative — hide that whole
+    // row instead.
+    const secondaryFeasible = mode === '추가매수' || r.additionalShares > 0;
     secondaryGrid.classList.toggle('hidden', !secondaryFeasible);
     if (secondaryFeasible) {
       setText('loss-rate-after', formatPercent(r.lossRateAfterPercent));

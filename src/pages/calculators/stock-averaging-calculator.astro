@@ -578,6 +578,10 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       const changePercent =
         existingAvgPrice > 0 ? ((r.newAvgPrice - existingAvgPrice) / existingAvgPrice) * 100 : 0;
       primaryCaption.textContent = `기존 ${formatMoney(existingAvgPrice, currency)} → 새 ${formatMoney(r.newAvgPrice, currency)} (${formatPercent(changePercent)})`;
+    } else if (r.targetAlreadyAchieved) {
+      primaryLabel.textContent = '필요 매수 수량';
+      primaryValue.textContent = '이미 도달함';
+      primaryCaption.textContent = '목표 평단가가 기존 평단가와 같아 추가 매수가 필요 없습니다.';
     } else if (!r.targetFeasible) {
       primaryLabel.textContent = '필요 매수 수량';
       primaryValue.textContent = '도달 불가';
@@ -588,10 +592,10 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
       primaryCaption.textContent = `추가 매수금액 약 ${formatMoney(r.additionalCost, currency)}`;
     }
 
-    // 목표 평단가에 도달할 수 없으면(0주 추가 기준) "물타기 후" 지표들이
-    // 물타기 전과 완전히 같은 값이 되어 오해를 준다 — 그 경우 이 줄
-    // 전체를 숨긴다.
-    const secondaryFeasible = mode === '추가매수' || r.targetFeasible;
+    // 추가 매수가 0주면(도달 불가이든, 이미 목표에 도달했든) "물타기 후"
+    // 지표들이 물타기 전과 완전히 같은 값이 되어 오해를 준다 — 그 경우
+    // 이 줄 전체를 숨긴다.
+    const secondaryFeasible = mode === '추가매수' || r.additionalShares > 0;
     secondaryGrid.classList.toggle('hidden', !secondaryFeasible);
     if (secondaryFeasible) {
       setText('loss-rate-after', formatPercent(r.lossRateAfterPercent));

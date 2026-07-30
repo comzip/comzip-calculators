@@ -74,6 +74,13 @@ export interface StockAveragingSimulationRow {
 export interface StockAveragingResult {
   /** [mode='목표평단가']에서 목표가가 산술적으로 도달 가능한 범위 안에 있는지. */
   targetFeasible: boolean;
+  /**
+   * [mode='목표평단가']에서 목표 평단가가 기존 평단가와 정확히 같아서,
+   * 추가 매수 없이(0주) 이미 충족된 경우. `targetFeasible`은 이 경우도
+   * true지만, "불가능"이 아니라 "이미 그 상태"라는 걸 구분해서 보여주기
+   * 위한 별도 플래그다.
+   */
+  targetAlreadyAchieved: boolean;
   /** 실제 반영된 추가 매수 주식수(목표평단가 모드는 올림 계산된 값). */
   additionalShares: number;
   /** 추가 매수에 드는 금액. */
@@ -136,6 +143,7 @@ export function calculateStockAveraging(input: StockAveragingInput): StockAverag
 
   let additionalShares = 0;
   let targetFeasible = true;
+  let targetAlreadyAchieved = false;
 
   if (input.mode === '목표평단가') {
     const targetAvgPrice = Math.max(0, input.targetAvgPrice || 0);
@@ -150,7 +158,12 @@ export function calculateStockAveraging(input: StockAveragingInput): StockAverag
       targetAvgPrice < currentPrice &&
       targetAvgPrice > existingAvgPrice;
 
-    if (existingShares <= 0 || !(inDownwardRange || inUpwardRange)) {
+    if (existingShares > 0 && targetAvgPrice === existingAvgPrice) {
+      // 목표가 기존 평단가와 완전히 같다 — "도달 불가능"이 아니라 이미
+      // 추가 매수 없이(0주) 충족된 상태다. 위 두 range 체크는 부등호가
+      // 엄격(strict)해서 이 경계값을 놓치므로 따로 잡아준다.
+      targetAlreadyAchieved = true;
+    } else if (existingShares <= 0 || !(inDownwardRange || inUpwardRange)) {
       targetFeasible = false;
     } else {
       const exact =
@@ -208,6 +221,7 @@ export function calculateStockAveraging(input: StockAveragingInput): StockAverag
 
   return {
     targetFeasible,
+    targetAlreadyAchieved,
     additionalShares,
     additionalCost,
     existingInvested,
