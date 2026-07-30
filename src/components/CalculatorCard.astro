@@ -42,6 +42,17 @@ const searchText = `${title} ${description}`.toLowerCase();
     border-color: var(--accent);
     transform: translateY(-2px);
   }
+  /* `.calc-card` above sets `display: block` at specificity (0,1,0), but
+     Astro's scoped-style attribute bumps its effective specificity to
+     (0,2,0), which silently beats the global `.hidden { display: none }`
+     (0,1,0) used by the home page's category/search filter — cards stayed
+     in the layout (and in the grid's flow) even after being marked hidden.
+     Same root cause as the `.calc-form label.hidden` fix in
+     BaseLayout.astro; the fix is the same shape: a more specific rule,
+     scoped here so it also gets the attribute bump. */
+  .calc-card.hidden {
+    display: none;
+  }
   .calc-card .cat {
     display: inline-block;
     font-size: 0.7rem;
