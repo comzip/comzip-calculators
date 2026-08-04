@@ -178,6 +178,18 @@ export const calculators: Calculator[] = [
       'Enter the officially assessed value to estimate property tax (housing, land, buildings) and comprehensive real estate tax together — accounting for the fair market value ratio, progressive rates, local education tax, and urban area tax.',
   },
   {
+    slug: 'comprehensive-tax-reform-calculator',
+    title: '종부세 개편안 미리보기 계산기 (2026 세제개편안·미시행)',
+    titleEn: 'Comprehensive Real Estate Tax Reform Preview (2026 Proposal — Not Yet Law)',
+    navLabel: '종부세 개편안 미리보기',
+    navLabelEn: 'Tax Reform Preview',
+    category: '부동산',
+    description:
+      '2026년 8월 기획재정부가 발표한 세제개편안의 종합부동산세 개편 방향(기본공제·공정시장가액비율·세율)을 2026~2029년 연도별로 미리 계산합니다. 아직 국회를 통과하지 않은 미확정 법안입니다.',
+    descriptionEn:
+      "Preview how comprehensive real estate tax could change year by year (2026-2029) under Korea's proposed 2026 tax reform. This proposal has not passed the National Assembly and is not current law.",
+  },
+  {
     slug: 'buy-vs-jeonse-calculator',
     title: '전세 vs 매매 비교 계산기',
     titleEn: 'Korea Jeonse vs. Buying Comparison Calculator',

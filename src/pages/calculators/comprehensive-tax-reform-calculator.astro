@@ -1,0 +1,548 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calculator')!;
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <div class="proposal-banner">
+    <p class="lead">⚠️ 이 계산기는 아직 법이 아닙니다</p>
+    <p>
+      2026년 8월 3일 기획재정부가 발표한 <strong>'2026년 세제개편안'</strong>의 종합부동산세
+      개편 방향을 미리 계산해보는 도구입니다. 입법예고 → 국무회의 의결 → 국회 제출·심의·통과 →
+      공포 절차가 남아 있으며, 국회 심의 과정에서 내용이 달라지거나 폐기될 수 있습니다.
+    </p>
+    <ol class="progress-steps">
+      <li>입법예고</li>
+      <li>국무회의</li>
+      <li>국회 통과</li>
+      <li>시행</li>
+    </ol>
+    <p class="banner-link">
+      확정된 현행 세법으로 계산하려면 →
+      <a href="/calculators/property-tax-calculator">보유세 계산기</a>
+    </p>
+  </div>
+
+  <h1>{meta.title}</h1>
+  <p class="note">
+    이 계산기는 <strong>종합부동산세만</strong> 다룹니다 — 이번 개편안에서 재산세(지방세)가
+    바뀐다는 근거는 확인되지 않았습니다. 재산세는 기존
+    <a href="/calculators/property-tax-calculator">보유세 계산기</a>를 이용하세요.
+  </p>
+
+  <form class="calc-form" id="reform-form">
+    <fieldset class="method-toggle stacked-options">
+      <legend>연도 선택 (개편안 시행 단계)</legend>
+      <label class="method-option">
+        <input type="radio" name="year" value="2026" checked />
+        <span>2026년<br /><small class="hint">현행법 (개편안 미적용)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2027" />
+        <span>2027년<br /><small class="hint">1단계: 공제·비율 변경</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2028" />
+        <span>2028년<br /><small class="hint">2단계: 가액기준 단일세율</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2029" />
+        <span>2029년<br /><small class="hint">3단계: 보유기간공제 폐지</small></span>
+      </label>
+    </fieldset>
+
+    <label>
+      보유 주택 공시가격 합계 (원)
+      <span class="hint">보유한 모든 주택의 공시가격을 더한 금액. 예: 2000000000</span>
+      <input
+        type="number"
+        id="totalPublicPrice"
+        name="totalPublicPrice"
+        min="0"
+        step="any"
+        placeholder="예: 2000000000"
+        required
+      />
+      <span class="amount-preview" id="totalPublicPrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      주택 수
+      <select id="houseCount">
+        <option value="1주택">1주택 (1세대 1주택)</option>
+        <option value="2주택">2주택</option>
+        <option value="3주택이상">3주택 이상</option>
+      </select>
+    </label>
+
+    <fieldset class="method-toggle" id="residency-options">
+      <legend>실거주 여부 <span class="hint">(1세대1주택 공제금액에 반영)</span></legend>
+      <label class="method-option">
+        <input type="radio" name="residency" value="실거주" checked />
+        <span>실거주</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="residency" value="비거주" />
+        <span>비거주</span>
+      </label>
+    </fieldset>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>조정대상지역 소재 (2028년 이후 공정시장가액비율에 반영)</span>
+    </label>
+    <p class="note hidden" id="regulated-area-note"></p>
+
+    <label>
+      만 나이 <span class="hint">(선택, 1세대1주택자 고령자 세액공제용)</span>
+      <input type="number" id="age" name="age" min="0" step="1" placeholder="예: 68" />
+    </label>
+    <label>
+      보유기간 (년)
+      <span class="hint">
+        (선택) 2026년(현행법) 결과에만 반영됩니다 — 2027년 이후는 장기보유공제 자체가 개편
+        대상이라 이 계산기에 반영하지 않습니다.
+      </span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="예: 12" />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="reform-error" role="alert"></p>
+
+  <div class="result-box hidden" id="reform-result" aria-live="polite">
+    <p class="note hidden" id="floor-warning"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        선택한 연도 산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>공제금액</td>
+          <td id="rt-deduction">-</td>
+        </tr>
+        <tr>
+          <td>공정시장가액비율</td>
+          <td id="rt-fmv">-</td>
+        </tr>
+        <tr>
+          <td>과세표준</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>산출세액 <span class="hint" id="rt-status-badge"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr id="rt-credit-row" class="hidden">
+          <td>세액공제 <span class="hint" id="rt-credit-label"></span></td>
+          <td id="rt-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>결정세액</td>
+          <td id="rt-final">-</td>
+        </tr>
+        <tr>
+          <td>농어촌특별세 <span class="hint">(결정세액의 20%)</span></td>
+          <td id="rt-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>합계</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" style="text-align:left;margin-bottom:6px;">연도별 비교 (동일 입력 기준)</p>
+    <div class="table-scroll">
+    <table class="breakdown" id="year-compare-table">
+      <thead>
+        <tr>
+          <th>연도</th>
+          <th>2026</th>
+          <th>2027</th>
+          <th>2028</th>
+          <th>2029</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>공제금액</td>
+          <td id="cmp-deduction-2026">-</td>
+          <td id="cmp-deduction-2027">-</td>
+          <td id="cmp-deduction-2028">-</td>
+          <td id="cmp-deduction-2029">-</td>
+        </tr>
+        <tr>
+          <td>공정시장가액비율</td>
+          <td id="cmp-fmv-2026">-</td>
+          <td id="cmp-fmv-2027">-</td>
+          <td id="cmp-fmv-2028">-</td>
+          <td id="cmp-fmv-2029">-</td>
+        </tr>
+        <tr class="total">
+          <td>결정세액</td>
+          <td id="cmp-final-2026">-</td>
+          <td id="cmp-final-2027">-</td>
+          <td id="cmp-final-2028">-</td>
+          <td id="cmp-final-2029">-</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>이 계산기의 한계</strong>
+      <ul>
+        <li>
+          <strong>재산세액공제(이중과세 조정)</strong>는 반영하지 않습니다 — 개편안에서도
+          유지되는지 확인되지 않았습니다.
+        </li>
+        <li>
+          <strong>세부담상한</strong>(150%→200%로 상향 예정)은 반영하지 않습니다 — 기존
+          보유세 계산기와 같은 이유로, 전년도 실 납부세액 정보가 없어 계산할 수 없습니다.
+        </li>
+        <li>2027년은 과세표준 12억원 초과 구간의 정확한 세율이 보도되지 않아 최솟값으로만 표시됩니다.</li>
+      </ul>
+      <strong>발견됐지만 반영하지 않은 항목(단일 매체 보도, 교차검증 필요)</strong>
+      <ul>
+        <li>
+          다주택자 공제금액을 "4억원 + 거주비중별 최대 5억원"으로 재설계하는 방안 —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >뉴스핌</a
+          >
+        </li>
+        <li>
+          2027년 보유기간(10/20/25%)·거주기간(20/40/50%) 이원화 공제 —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >뉴스핌</a
+          >
+        </li>
+        <li>
+          2028년 이후 세액공제 상한 600만원 캡 —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >뉴스핌</a
+          >
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>아직 시행되지 않은 정부 발표안</strong>을 기준으로 한 시뮬레이션이며,
+    실제 결과와 다를 수 있습니다. 국회 통과 여부와 최종 조문을 반드시 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>근거 자료 (언론 보도 — 법령 아님)</h2>
+    <ul>
+      <li>
+        <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+          >뉴스핌 — [2026 세제개편] 종부세, '주택 수' 대신 '가액' 기준으로</a
+        >
+      </li>
+      <li>
+        <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
+          >경인일보 — '주택 수' 아닌 '주택 가액' 종부세 세율</a
+        >
+      </li>
+      <li>
+        <a href="https://www.tfmedia.co.kr/news/article.html?no=206140" target="_blank" rel="noopener noreferrer"
+          >조세금융신문 — [2026 세제개편안] 실거주 1주택 종부세 공제 14억…비거주는 9억</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>이 계산기는 법으로 확정된 건가요?</summary>
+      <p>
+        아니요. 2026년 8월 3일 기획재정부가 발표한 세제개편안 단계이며, 아직 입법예고·국무회의·국회
+        심의·통과 절차가 남아 있습니다. 국회 심의 과정에서 세부 수치가 바뀌거나 개편안 자체가
+        폐기될 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 2026년은 현행법과 똑같이 나오나요?</summary>
+      <p>
+        종합부동산세는 매년 6월 1일 기준 주택 보유 현황으로 과세하는데, 이번 개편안은 그 이후인
+        2026년 8월 3일에 발표됐습니다. 따라서 2026년분 종부세는 이번 개편안의 영향을 받지 않고
+        현행법 그대로 계산됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 2027년만 "최소" 금액으로 표시되나요?</summary>
+      <p>
+        2027년은 과세표준 12억원 이하 구간(0.5%/0.7%/1.3%)의 세율만 언론에 구체적으로 보도됐고,
+        12억원을 초과하는 구간은 "0.5~3.5%"라는 범위만 확인됐습니다. 정확한 구간별 세율을 알 수
+        없어, 과세표준이 12억원을 넘으면 12억원까지만 세율을 적용한 값을 최솟값으로 표시합니다 —
+        실제 2027년 세액은 이보다 높을 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>재산세도 이 개편안의 영향을 받나요?</summary>
+      <p>
+        이번 개편안 보도에서 재산세(지방세)가 바뀐다는 근거는 확인되지 않았습니다. 이 계산기는
+        종합부동산세(국세)만 다루며, 재산세는 기존
+        <a href="/calculators/property-tax-calculator">보유세 계산기</a>를 그대로 이용하시면 됩니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .proposal-banner {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .proposal-banner .lead {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #b91c1c;
+  }
+  .proposal-banner p {
+    margin: 6px 0;
+    font-size: 0.92rem;
+  }
+  .progress-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b91c1c;
+  }
+  .progress-steps li {
+    background: #fff;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .progress-steps li:not(:last-child)::after {
+    content: '→';
+    margin-left: 8px;
+    color: #b91c1c;
+  }
+  .banner-link {
+    font-weight: 600;
+  }
+
+  .calc-form .method-toggle.stacked-options .method-option small {
+    font-weight: 400;
+  }
+
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .table-scroll {
+    overflow-x: auto;
+  }
+  #year-compare-table {
+    min-width: 480px;
+  }
+  #year-compare-table td:not(:first-child),
+  #year-compare-table th:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  import {
+    calculateReformTax,
+    calculateReformTaxAllYears,
+  } from '../../lib/comprehensiveTaxReformCalculator';
+  import type { ReformYear, ResidencyStatus } from '../../lib/comprehensiveTaxReformCalculator';
+  import type { HouseCount } from '../../lib/propertyTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('reform-form') as HTMLFormElement;
+  const resultBox = document.getElementById('reform-result') as HTMLDivElement;
+  const errorEl = document.getElementById('reform-error') as HTMLParagraphElement;
+
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const residencyOptions = document.getElementById('residency-options') as HTMLFieldSetElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const regulatedAreaNote = document.getElementById('regulated-area-note') as HTMLParagraphElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+
+  // 실거주 여부는 1주택, 조정대상지역 여부는 2주택일 때만 의미가 있다 —
+  // 나머지는 항상 정해진 트랙(1주택=A, 3주택이상=B)이 적용되므로 안내
+  // 문구로 대체하고 입력란은 숨긴다.
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as HouseCount;
+    residencyOptions.classList.toggle('hidden', houseCount !== '1주택');
+    regulatedAreaOptions.classList.toggle('hidden', houseCount !== '2주택');
+    if (houseCount === '1주택') {
+      regulatedAreaNote.classList.add('hidden');
+    } else if (houseCount === '3주택이상') {
+      regulatedAreaNote.textContent = '3주택 이상은 지역과 무관하게 2028년 이후 공정시장가액비율 80%가 적용됩니다.';
+      regulatedAreaNote.classList.remove('hidden');
+    } else {
+      regulatedAreaNote.classList.add('hidden');
+    }
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  const currentYear = (): ReformYear =>
+    Number(
+      (form.querySelector('input[name="year"]:checked') as HTMLInputElement).value,
+    ) as ReformYear;
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const totalPublicPrice = Number(
+      (document.getElementById('totalPublicPrice') as HTMLInputElement).value,
+    );
+    if (!totalPublicPrice || totalPublicPrice <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = '보유 주택 공시가격 합계를 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as HouseCount;
+    const residency = (
+      form.querySelector('input[name="residency"]:checked') as HTMLInputElement | null
+    )?.value as ResidencyStatus | undefined;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const holdingYears = Number(
+      (document.getElementById('holdingYears') as HTMLInputElement).value,
+    );
+    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+
+    const commonInput = {
+      totalPublicPrice,
+      houseCount,
+      residency,
+      isRegulatedArea,
+      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
+    };
+
+    const year = currentYear();
+    const result = calculateReformTax({ ...commonInput, year });
+
+    setWon('rt-deduction', result.deduction);
+    setText('rt-fmv', pct(result.fairMarketRatio));
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.bracket.calculatedTax);
+
+    const statusBadge =
+      result.bracket.status === 'delegated'
+        ? '(현행법 위임)'
+        : result.bracket.status === 'computed-floor'
+          ? '⚠️ 최소 예상 (12억원 초과 구간 세율 미확정)'
+          : '(확정 구간 기준)';
+    setText('rt-status-badge', statusBadge);
+
+    const floorWarning = document.getElementById('floor-warning') as HTMLParagraphElement;
+    if (result.bracket.status === 'computed-floor') {
+      floorWarning.textContent =
+        '⚠️ 과세표준 12억원 초과분에 적용될 2027년 세율 구간이 보도에서 확인되지 않아, 12억원까지만 세율을 반영한 최소 예상 세액입니다. 실제 세액은 이보다 높습니다.';
+      floorWarning.classList.remove('hidden');
+    } else {
+      floorWarning.classList.add('hidden');
+    }
+
+    const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
+    creditRow.classList.toggle('hidden', result.creditAmount <= 0);
+    if (result.creditAmount > 0) {
+      setWon('rt-credit', result.creditAmount);
+      const creditLabel =
+        result.year === 2026 ? '고령자·장기보유 세액공제, 현행법' : '고령자 세액공제만 반영, 개편안';
+      setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
+    }
+
+    const finalPrefix = result.bracket.status === 'computed-floor' ? '최소 ' : '';
+    setText('rt-final', finalPrefix + won.format(Math.round(result.finalTax)));
+    setWon('rt-rural', result.ruralSpecialTax);
+    setText('rt-total', finalPrefix + won.format(Math.round(result.totalWithSurtax)));
+
+    const allYears = calculateReformTaxAllYears(commonInput);
+    for (const y of [2026, 2027, 2028, 2029] as const) {
+      const r = allYears[y];
+      const prefix = r.bracket.status === 'computed-floor' ? '최소 ' : '';
+      setWon(`cmp-deduction-${y}`, r.deduction);
+      setText(`cmp-fmv-${y}`, pct(r.fairMarketRatio));
+      setText(`cmp-final-${y}`, prefix + won.format(Math.round(r.finalTax)));
+    }
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>

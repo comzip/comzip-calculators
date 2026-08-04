@@ -1,0 +1,564 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <div class="proposal-banner">
+    <p class="lead">⚠️ This calculator is not law yet</p>
+    <p>
+      This tool previews the comprehensive real estate tax reform direction announced by Korea's
+      Ministry of Economy and Finance on August 3, 2026 (the <strong>"2026 Tax Reform
+      Proposal"</strong>). It still needs to go through pre-announcement, cabinet approval,
+      submission to and passage by the National Assembly, and promulgation — the details may
+      change or the proposal may be scrapped entirely during legislative review.
+    </p>
+    <ol class="progress-steps">
+      <li>Pre-announcement</li>
+      <li>Cabinet meeting</li>
+      <li>National Assembly</li>
+      <li>Enactment</li>
+    </ol>
+    <p class="banner-link">
+      To calculate under confirmed current law instead →
+      <a href="/en/calculators/property-tax-calculator">Property Holding Tax Calculator</a>
+    </p>
+  </div>
+
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    This calculator covers <strong>comprehensive real estate tax only</strong> — no evidence was
+    found that property tax (local tax) changes under this proposal. For property tax, use the
+    existing <a href="/en/calculators/property-tax-calculator">Property Holding Tax
+    Calculator</a>.
+  </p>
+
+  <form class="calc-form" id="reform-form">
+    <fieldset class="method-toggle stacked-options">
+      <legend>Select Year (Reform Implementation Stage)</legend>
+      <label class="method-option">
+        <input type="radio" name="year" value="2026" checked />
+        <span>2026<br /><small class="hint">Current law (proposal not yet applied)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2027" />
+        <span>2027<br /><small class="hint">Stage 1: deduction &amp; ratio changes</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2028" />
+        <span>2028<br /><small class="hint">Stage 2: unified value-based rates</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2029" />
+        <span>2029<br /><small class="hint">Stage 3: holding-period credit abolished</small></span>
+      </label>
+    </fieldset>
+
+    <label>
+      Total Announced Value of All Homes Held (KRW)
+      <span class="hint">Sum of announced values for all homes you own. e.g. 2000000000</span>
+      <input
+        type="number"
+        id="totalPublicPrice"
+        name="totalPublicPrice"
+        min="0"
+        step="any"
+        placeholder="e.g. 2000000000"
+        required
+      />
+      <span class="amount-preview" id="totalPublicPrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Number of Homes
+      <select id="houseCount">
+        <option value="1주택">1 home (1 household, 1 home)</option>
+        <option value="2주택">2 homes</option>
+        <option value="3주택이상">3+ homes</option>
+      </select>
+    </label>
+
+    <fieldset class="method-toggle" id="residency-options">
+      <legend>Owner-Occupied? <span class="hint">(affects the 1-household-1-home deduction)</span></legend>
+      <label class="method-option">
+        <input type="radio" name="residency" value="실거주" checked />
+        <span>Owner-occupied</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="residency" value="비거주" />
+        <span>Not owner-occupied</span>
+      </label>
+    </fieldset>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>Located in a regulated area (affects fair market value ratio from 2028 onward)</span>
+    </label>
+    <p class="note hidden" id="regulated-area-note"></p>
+
+    <label>
+      Age (years) <span class="hint">(optional, for elderly tax credit — 1 household, 1 home only)</span>
+      <input type="number" id="age" name="age" min="0" step="1" placeholder="e.g. 68" />
+    </label>
+    <label>
+      Holding Period (years)
+      <span class="hint">
+        (optional) Only affects the 2026 (current law) result — from 2027 onward, the long-term
+        holding credit itself is being reformed, so this calculator does not apply it.
+      </span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="e.g. 12" />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="reform-error" role="alert"></p>
+
+  <div class="result-box hidden" id="reform-result" aria-live="polite">
+    <p class="note hidden" id="floor-warning"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Breakdown for Selected Year
+      </caption>
+      <tbody>
+        <tr>
+          <td>Deduction</td>
+          <td id="rt-deduction">-</td>
+        </tr>
+        <tr>
+          <td>Fair Market Value Ratio</td>
+          <td id="rt-fmv">-</td>
+        </tr>
+        <tr>
+          <td>Tax Base</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>Calculated Tax <span class="hint" id="rt-status-badge"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr id="rt-credit-row" class="hidden">
+          <td>Tax Credit <span class="hint" id="rt-credit-label"></span></td>
+          <td id="rt-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>Final Tax</td>
+          <td id="rt-final">-</td>
+        </tr>
+        <tr>
+          <td>Special Rural Development Tax <span class="hint">(20% of final tax)</span></td>
+          <td id="rt-rural">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" style="text-align:left;margin-bottom:6px;">Year-by-Year Comparison (same inputs)</p>
+    <div class="table-scroll">
+    <table class="breakdown" id="year-compare-table">
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>2026</th>
+          <th>2027</th>
+          <th>2028</th>
+          <th>2029</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Deduction</td>
+          <td id="cmp-deduction-2026">-</td>
+          <td id="cmp-deduction-2027">-</td>
+          <td id="cmp-deduction-2028">-</td>
+          <td id="cmp-deduction-2029">-</td>
+        </tr>
+        <tr>
+          <td>Fair Market Value Ratio</td>
+          <td id="cmp-fmv-2026">-</td>
+          <td id="cmp-fmv-2027">-</td>
+          <td id="cmp-fmv-2028">-</td>
+          <td id="cmp-fmv-2029">-</td>
+        </tr>
+        <tr class="total">
+          <td>Final Tax</td>
+          <td id="cmp-final-2026">-</td>
+          <td id="cmp-final-2027">-</td>
+          <td id="cmp-final-2028">-</td>
+          <td id="cmp-final-2029">-</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>Limitations of this calculator</strong>
+      <ul>
+        <li>
+          <strong>Property tax credit (double taxation adjustment)</strong> is not reflected — it
+          is unclear whether it survives under the proposal.
+        </li>
+        <li>
+          <strong>Tax burden ceiling</strong> (proposed to rise from 150% to 200%) is not
+          reflected — same reason as the existing calculator: no prior-year paid-tax data is
+          available.
+        </li>
+        <li>For 2027, the exact rate for the portion of the tax base above ₩1.2 billion has not been reported, so only a minimum estimate is shown.</li>
+      </ul>
+      <strong>Found but not implemented (single-outlet reporting, needs cross-verification)</strong>
+      <ul>
+        <li>
+          A redesigned multi-home deduction of "₩400 million + up to ₩500 million based on
+          residency share" —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >Newspim</a
+          >
+        </li>
+        <li>
+          A 2027 dual-track credit split between holding period (10/20/25%) and residency period
+          (20/40/50%) —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >Newspim</a
+          >
+        </li>
+        <li>
+          A ₩6 million cap on tax credits from 2028 onward —
+          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+            >Newspim</a
+          >
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result is a simulation based on <strong>a government proposal that has not yet been
+    enacted</strong>, and may differ from the actual outcome. Always verify whether the bill
+    passed the National Assembly and check its final text.
+  </div>
+
+  <section class="law-refs">
+    <h2>Sources (News Coverage — Not Statute)</h2>
+    <ul>
+      <li>
+        <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+          >Newspim — [2026 Tax Reform] Comprehensive tax shifts from "number of homes" to "home value"</a
+        >
+      </li>
+      <li>
+        <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
+          >Kyeongin Ilbo — Comprehensive tax rates based on "home value," not "number of homes"</a
+        >
+      </li>
+      <li>
+        <a href="https://www.tfmedia.co.kr/news/article.html?no=206140" target="_blank" rel="noopener noreferrer"
+          >Tax & Finance Media — [2026 Tax Reform] Owner-occupied 1-home deduction ₩1.4B, non-occupied ₩900M</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Is this calculator based on enacted law?</summary>
+      <p>
+        No. This reflects a tax reform proposal announced by Korea's Ministry of Economy and
+        Finance on August 3, 2026. It still needs to go through pre-announcement, cabinet
+        approval, and National Assembly review and passage. Specific figures may change, or the
+        proposal itself may be scrapped, during legislative review.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does 2026 come out identical to current law?</summary>
+      <p>
+        Comprehensive real estate tax is assessed based on home ownership as of June 1 each year,
+        and this proposal was announced afterward, on August 3, 2026. So the 2026 tax year is
+        unaffected by this proposal and is calculated exactly as under current law.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is 2027 shown as a "minimum" amount only?</summary>
+      <p>
+        For 2027, only the rates for the portion of the tax base up to ₩1.2 billion (0.5% / 0.7%
+        / 1.3%) have been specifically reported; for the portion above ₩1.2 billion, only a range
+        of "0.5–3.5%" has been confirmed. Since the exact bracket rates aren't known, this
+        calculator applies the confirmed rates only up to ₩1.2 billion and shows that as a
+        minimum — the actual 2027 tax could be higher.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does this proposal also affect property tax?</summary>
+      <p>
+        No evidence was found in reporting on this proposal that property tax (local tax)
+        changes. This calculator covers comprehensive real estate tax (national tax) only —
+        for property tax, continue using the existing
+        <a href="/en/calculators/property-tax-calculator">Property Holding Tax Calculator</a>.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .proposal-banner {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .proposal-banner .lead {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #b91c1c;
+  }
+  .proposal-banner p {
+    margin: 6px 0;
+    font-size: 0.92rem;
+  }
+  .progress-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b91c1c;
+  }
+  .progress-steps li {
+    background: #fff;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .progress-steps li:not(:last-child)::after {
+    content: '→';
+    margin-left: 8px;
+    color: #b91c1c;
+  }
+  .banner-link {
+    font-weight: 600;
+  }
+
+  .calc-form .method-toggle.stacked-options .method-option small {
+    font-weight: 400;
+  }
+
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .table-scroll {
+    overflow-x: auto;
+  }
+  #year-compare-table {
+    min-width: 480px;
+  }
+  #year-compare-table td:not(:first-child),
+  #year-compare-table th:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  import {
+    calculateReformTax,
+    calculateReformTaxAllYears,
+  } from '../../../lib/comprehensiveTaxReformCalculator';
+  import type { ReformYear, ResidencyStatus } from '../../../lib/comprehensiveTaxReformCalculator';
+  import type { HouseCount } from '../../../lib/propertyTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('reform-form') as HTMLFormElement;
+  const resultBox = document.getElementById('reform-result') as HTMLDivElement;
+  const errorEl = document.getElementById('reform-error') as HTMLParagraphElement;
+
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const residencyOptions = document.getElementById('residency-options') as HTMLFieldSetElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const regulatedAreaNote = document.getElementById('regulated-area-note') as HTMLParagraphElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+
+  // Residency only matters for 1 home; regulated-area status only matters
+  // for 2 homes — the other cases always use a fixed track (1 home = A,
+  // 3+ homes = B), so show an explanatory note instead of the input.
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as HouseCount;
+    residencyOptions.classList.toggle('hidden', houseCount !== '1주택');
+    regulatedAreaOptions.classList.toggle('hidden', houseCount !== '2주택');
+    if (houseCount === '1주택') {
+      regulatedAreaNote.classList.add('hidden');
+    } else if (houseCount === '3주택이상') {
+      regulatedAreaNote.textContent =
+        '3+ homes always use the higher fair market value ratio (80% from 2028) regardless of area.';
+      regulatedAreaNote.classList.remove('hidden');
+    } else {
+      regulatedAreaNote.classList.add('hidden');
+    }
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  const currentYear = (): ReformYear =>
+    Number(
+      (form.querySelector('input[name="year"]:checked') as HTMLInputElement).value,
+    ) as ReformYear;
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const totalPublicPrice = Number(
+      (document.getElementById('totalPublicPrice') as HTMLInputElement).value,
+    );
+    if (!totalPublicPrice || totalPublicPrice <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = 'Please enter a valid total announced value for your homes.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as HouseCount;
+    const residency = (
+      form.querySelector('input[name="residency"]:checked') as HTMLInputElement | null
+    )?.value as ResidencyStatus | undefined;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const age = Number((document.getElementById('age') as HTMLInputElement).value);
+    const holdingYears = Number(
+      (document.getElementById('holdingYears') as HTMLInputElement).value,
+    );
+    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+
+    const commonInput = {
+      totalPublicPrice,
+      houseCount,
+      residency,
+      isRegulatedArea,
+      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
+    };
+
+    const year = currentYear();
+    const result = calculateReformTax({ ...commonInput, year });
+
+    setWon('rt-deduction', result.deduction);
+    setText('rt-fmv', pct(result.fairMarketRatio));
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.bracket.calculatedTax);
+
+    const statusBadge =
+      result.bracket.status === 'delegated'
+        ? '(delegated to current law)'
+        : result.bracket.status === 'computed-floor'
+          ? '⚠️ minimum estimate (rate above ₩1.2B unconfirmed)'
+          : '(confirmed bracket)';
+    setText('rt-status-badge', statusBadge);
+
+    const floorWarning = document.getElementById('floor-warning') as HTMLParagraphElement;
+    if (result.bracket.status === 'computed-floor') {
+      floorWarning.textContent =
+        '⚠️ The exact 2027 rate for the portion of the tax base above ₩1.2 billion has not been reported, so this reflects rates only up to ₩1.2 billion as a minimum estimate. The actual tax could be higher.';
+      floorWarning.classList.remove('hidden');
+    } else {
+      floorWarning.classList.add('hidden');
+    }
+
+    const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
+    creditRow.classList.toggle('hidden', result.creditAmount <= 0);
+    if (result.creditAmount > 0) {
+      setWon('rt-credit', result.creditAmount);
+      const creditLabel =
+        result.year === 2026 ? 'elderly/long-term holding credit, current law' : 'elderly credit only, proposal';
+      setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
+    }
+
+    const finalPrefix = result.bracket.status === 'computed-floor' ? 'At least ' : '';
+    setText('rt-final', finalPrefix + won.format(Math.round(result.finalTax)));
+    setWon('rt-rural', result.ruralSpecialTax);
+    setText('rt-total', finalPrefix + won.format(Math.round(result.totalWithSurtax)));
+
+    const allYears = calculateReformTaxAllYears(commonInput);
+    for (const y of [2026, 2027, 2028, 2029] as const) {
+      const r = allYears[y];
+      const prefix = r.bracket.status === 'computed-floor' ? 'At least ' : '';
+      setWon(`cmp-deduction-${y}`, r.deduction);
+      setText(`cmp-fmv-${y}`, pct(r.fairMarketRatio));
+      setText(`cmp-final-${y}`, prefix + won.format(Math.round(r.finalTax)));
+    }
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>
