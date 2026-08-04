@@ -425,11 +425,14 @@ const [titleMain, titleSub] = meta.title.split(' (');
   #year-compare-table {
     min-width: 480px;
   }
+  #year-compare-table td,
+  #year-compare-table th {
+    white-space: nowrap;
+  }
   #year-compare-table td:not(:first-child),
   #year-compare-table th:not(:first-child) {
     text-align: right;
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
 </style>
 
