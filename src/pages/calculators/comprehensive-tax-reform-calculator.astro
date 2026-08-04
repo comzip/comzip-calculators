@@ -4,6 +4,10 @@ import AdSlot from '../../components/AdSlot.astro';
 import { calculators } from '../../data/calculators';
 
 const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calculator')!;
+// h1이 좁은 화면에서 애매한 지점에 줄바꿈되지 않도록, "본제목 (부제)" 형태인
+// title을 괄호 앞에서 명시적으로 끊어 표시한다. title 문자열 자체는 그대로
+// 두고(SSOT — <title> 태그 등은 원문 그대로 씀) h1에서만 표시 방식을 나눈다.
+const [titleMain, titleSub] = meta.title.split(' (');
 ---
 
 <BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
@@ -26,7 +30,7 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     </p>
   </div>
 
-  <h1>{meta.title}</h1>
+  <h1>{titleMain}<br />({titleSub}</h1>
   <p class="note">
     이 계산기는 <strong>종합부동산세만</strong> 다룹니다 — 이번 개편안에서 재산세(지방세)가
     바뀐다는 근거는 확인되지 않았습니다. 재산세는 기존
@@ -42,15 +46,15 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2027" />
-        <span>2027년<br /><small class="hint">1단계: 공제·비율 변경</small></span>
+        <span>2027년<br /><small class="hint">1단계: 공제·비율 변경 (주택수 구분은 유지)</small></span>
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2028" />
-        <span>2028년<br /><small class="hint">2단계: 가액기준 단일세율</small></span>
+        <span>2028년<br /><small class="hint">2단계: 가액기준 단일세율로 통합</small></span>
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2029" />
-        <span>2029년<br /><small class="hint">3단계: 보유기간공제 폐지</small></span>
+        <span>2029년<br /><small class="hint">2028년과 동일 (세율·비율 변경 없음)</small></span>
       </label>
     </fieldset>
 
@@ -115,7 +119,6 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
   <p class="note" id="reform-error" role="alert"></p>
 
   <div class="result-box hidden" id="reform-result" aria-live="polite">
-    <p class="note hidden" id="floor-warning"></p>
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
         선택한 연도 산출 내역
@@ -205,26 +208,29 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
           <strong>세부담상한</strong>(150%→200%로 상향 예정)은 반영하지 않습니다 — 기존
           보유세 계산기와 같은 이유로, 전년도 실 납부세액 정보가 없어 계산할 수 없습니다.
         </li>
-        <li>2027년은 과세표준 12억원 초과 구간의 정확한 세율이 보도되지 않아 최솟값으로만 표시됩니다.</li>
       </ul>
-      <strong>발견됐지만 반영하지 않은 항목(단일 매체 보도, 교차검증 필요)</strong>
+      <strong>발견됐지만 반영하지 않은 항목(교차검증됐지만 시행 시점·세부 구간이 불명확)</strong>
       <ul>
         <li>
-          다주택자 공제금액을 "4억원 + 거주비중별 최대 5억원"으로 재설계하는 방안 —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-            >뉴스핌</a
+          다주택자(2·3주택) 공제금액을 "4억원 + 거주비중별 최대 5억원"으로 재설계하는 방안 —
+          4개 매체로 교차확인됐지만 시행 시점(2027년 vs 2028년)과 필요 입력값(거주주택 가액 비중)이
+          불명확해 미반영 —
+          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+            >조세금융신문</a
+          >,
+          <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
+            >MTN</a
           >
         </li>
         <li>
-          2027년 보유기간(10/20/25%)·거주기간(20/40/50%) 이원화 공제 —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+          1세대1주택 세액공제를 보유기간 기준에서 거주기간 기준으로 전환(2027년 과도기, 2028년부터
+          거주공제만 인정·상한 600만원) — 2개 매체로 교차확인됐지만 정확한 구간별 공제율이 확인되지
+          않아 미반영 —
+          <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
             >뉴스핌</a
-          >
-        </li>
-        <li>
-          2028년 이후 세액공제 상한 600만원 캡 —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-            >뉴스핌</a
+          >,
+          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+            >조세금융신문</a
           >
         </li>
       </ul>
@@ -245,13 +251,28 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
         >
       </li>
       <li>
+        <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
+          >뉴스핌 — 종부세 2028년 단일세율·양도세 2029년 거주공제로 (연도별 시행 단계)</a
+        >
+      </li>
+      <li>
         <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
           >경인일보 — '주택 수' 아닌 '주택 가액' 종부세 세율</a
         >
       </li>
       <li>
-        <a href="https://www.tfmedia.co.kr/news/article.html?no=206140" target="_blank" rel="noopener noreferrer"
-          >조세금융신문 — [2026 세제개편안] 실거주 1주택 종부세 공제 14억…비거주는 9억</a
+        <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+          >조세금융신문 — 2027년·2028년 세율·세액공제 단계별 변화</a
+        >
+      </li>
+      <li>
+        <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
+          >MTN — 조정대상지역 2주택자 공정시장가액비율 80%</a
+        >
+      </li>
+      <li>
+        <a href="https://www.segye.com/newsView/20260803518188" target="_blank" rel="noopener noreferrer"
+          >세계일보 — 2028년 종부세 세율표 전 구간</a
         >
       </li>
     </ul>
@@ -281,12 +302,12 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     </details>
 
     <details>
-      <summary>왜 2027년만 "최소" 금액으로 표시되나요?</summary>
+      <summary>2027년에는 왜 3주택 이상만 다른 세율표를 쓰나요?</summary>
       <p>
-        2027년은 과세표준 12억원 이하 구간(0.5%/0.7%/1.3%)의 세율만 언론에 구체적으로 보도됐고,
-        12억원을 초과하는 구간은 "0.5~3.5%"라는 범위만 확인됐습니다. 정확한 구간별 세율을 알 수
-        없어, 과세표준이 12억원을 넘으면 12억원까지만 세율을 적용한 값을 최솟값으로 표시합니다 —
-        실제 2027년 세액은 이보다 높을 수 있습니다.
+        주택 수에 따라 세율표를 나누던 방식은 2028년에야 완전히 사라집니다. 2027년에는 1·2주택만
+        새 세율표(0.5%~3.5%)를 적용받고, 3주택 이상은 2027년에도 현행법과 같은 세율표(6~12억원
+        구간 1.0% 등)를 그대로 적용받습니다. 이 계산기는 이 차이를 반영해 3주택 이상을 선택하면
+        2027년에도 현행 세율표로 계산합니다.
       </p>
     </details>
 
@@ -480,14 +501,17 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     const holdingYears = Number(
       (document.getElementById('holdingYears') as HTMLInputElement).value,
     );
-    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+    // 고령자 세액공제는 나이만 있으면 적용된다 — 보유기간은 2026년(현행법)
+    // 결과에만 쓰이므로, 2027년 이후를 보는 사용자가 보유기간을 비워둬도
+    // (본문 안내대로 정상 행동) 나이 공제가 사라지면 안 된다.
+    const ageAndHolding = age > 0 ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0 } : undefined;
 
     const commonInput = {
       totalPublicPrice,
       houseCount,
       residency,
       isRegulatedArea,
-      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
+      ageAndHolding,
     };
 
     const year = currentYear();
@@ -498,22 +522,8 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     setWon('rt-taxbase', result.taxBase);
     setWon('rt-tax', result.bracket.calculatedTax);
 
-    const statusBadge =
-      result.bracket.status === 'delegated'
-        ? '(현행법 위임)'
-        : result.bracket.status === 'computed-floor'
-          ? '⚠️ 최소 예상 (12억원 초과 구간 세율 미확정)'
-          : '(확정 구간 기준)';
+    const statusBadge = result.bracket.status === 'delegated' ? '(현행법 위임)' : '(확정 구간 기준)';
     setText('rt-status-badge', statusBadge);
-
-    const floorWarning = document.getElementById('floor-warning') as HTMLParagraphElement;
-    if (result.bracket.status === 'computed-floor') {
-      floorWarning.textContent =
-        '⚠️ 과세표준 12억원 초과분에 적용될 2027년 세율 구간이 보도에서 확인되지 않아, 12억원까지만 세율을 반영한 최소 예상 세액입니다. 실제 세액은 이보다 높습니다.';
-      floorWarning.classList.remove('hidden');
-    } else {
-      floorWarning.classList.add('hidden');
-    }
 
     const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
     creditRow.classList.toggle('hidden', result.creditAmount <= 0);
@@ -524,18 +534,16 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
     }
 
-    const finalPrefix = result.bracket.status === 'computed-floor' ? '최소 ' : '';
-    setText('rt-final', finalPrefix + won.format(Math.round(result.finalTax)));
+    setWon('rt-final', result.finalTax);
     setWon('rt-rural', result.ruralSpecialTax);
-    setText('rt-total', finalPrefix + won.format(Math.round(result.totalWithSurtax)));
+    setWon('rt-total', result.totalWithSurtax);
 
     const allYears = calculateReformTaxAllYears(commonInput);
     for (const y of [2026, 2027, 2028, 2029] as const) {
       const r = allYears[y];
-      const prefix = r.bracket.status === 'computed-floor' ? '최소 ' : '';
       setWon(`cmp-deduction-${y}`, r.deduction);
       setText(`cmp-fmv-${y}`, pct(r.fairMarketRatio));
-      setText(`cmp-final-${y}`, prefix + won.format(Math.round(r.finalTax)));
+      setWon(`cmp-final-${y}`, r.finalTax);
     }
 
     resultBox.classList.remove('hidden');

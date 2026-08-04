@@ -77,8 +77,8 @@ function seniorCreditRate(age: number): number {
 }
 
 /**
- * 2027~2029년 공통: 과세표준 0~12억원 구간(주택수 구분 없이 일원화됨,
- * 경인일보·뉴스핌 교차확인).
+ * 2027~2029년 공통: 과세표준 0~12억원 구간(주택수 구분 없이 이미 일원화됨,
+ * 경인일보·뉴스핌·세계일보 등 교차확인).
  */
 const REFORM_LOW_BRACKETS: TaxBracket[] = [
   { upTo: 300_000_000, rate: 0.005 }, // 3억원 이하 0.5%
@@ -87,8 +87,39 @@ const REFORM_LOW_BRACKETS: TaxBracket[] = [
 ];
 
 /**
- * 2028년 이후: 과세표준 12억원 초과 구간. 2027년은 이 구간의 정확한
- * 세율표가 보도되지 않아("0.5~3.5%" 범위만 확인) 사용하지 않는다.
+ * 2027년 1·2주택 전용, 과세표준 12억원 초과 구간(뉴스핌·MTN·세계일보·
+ * 세계타임즈 교차확인 — "0.5~3.5%"로만 알려졌던 범위의 정확한 구간표).
+ * 2028년부터는 이 구간도 REFORM_HIGH_BRACKETS_2028로 대체된다.
+ */
+const REFORM_2027_HIGH_BRACKETS: TaxBracket[] = [
+  { upTo: 2_500_000_000, rate: 0.015 }, // ~25억원 1.5%
+  { upTo: 5_000_000_000, rate: 0.02 }, // ~50억원 2.0%
+  { upTo: 9_400_000_000, rate: 0.027 }, // ~94억원 2.7%
+  { upTo: Infinity, rate: 0.035 }, // 94억원 초과 3.5%
+];
+
+/** 2027년 1·2주택 전체 세율표(0~12억 공통 구간 + 12억 초과 2027 전용 구간). */
+const REFORM_2027_LOW_HOUSE_BRACKETS: TaxBracket[] = [...REFORM_LOW_BRACKETS, ...REFORM_2027_HIGH_BRACKETS];
+
+/**
+ * 2027년 3주택이상 전용 — 뉴스핌·한국세정신문·세계타임즈 교차확인: 주택수
+ * 구분은 2027년에도 유지되고 2028년에야 사라진다. 3주택이상은 2027년에도
+ * 현행법(propertyTaxCalculator.ts의 비공개 COMPREHENSIVE_HIGH_BRACKETS와
+ * 완전히 동일)을 그대로 적용받는다 — 원본이 비공개 export라 재사용할 수
+ * 없어(원본 변경 금지 원칙) 값만 그대로 다시 선언한다.
+ */
+const CURRENT_HIGH_HOUSE_BRACKETS: TaxBracket[] = [
+  { upTo: 300_000_000, rate: 0.005 }, // 3억원 이하 0.5%
+  { upTo: 600_000_000, rate: 0.007 }, // ~6억원 0.7%
+  { upTo: 1_200_000_000, rate: 0.01 }, // ~12억원 1.0%
+  { upTo: 2_500_000_000, rate: 0.02 }, // ~25억원 2.0%
+  { upTo: 5_000_000_000, rate: 0.03 }, // ~50억원 3.0%
+  { upTo: Infinity, rate: 0.05 }, // 50억원 초과 5.0%
+];
+
+/**
+ * 2028년 이후: 과세표준 12억원 초과 구간(모든 주택수 공통 — 2028년부터는
+ * 주택수 구분 자체가 사라진다).
  */
 const REFORM_HIGH_BRACKETS_2028: TaxBracket[] = [
   { upTo: 2_500_000_000, rate: 0.02 }, // ~25억원 2.0%
@@ -124,14 +155,12 @@ export interface ReformTaxInput {
 }
 
 /**
- * 세율 적용 결과의 세 가지 상태. 이 값을 UI에 어떻게 설명할지(문구, 배지 등)는
- * 각 로케일 페이지가 직접 담당한다 — 이 모듈은 propertyTaxCalculator.ts와
- * 같은 관례를 따라 숫자·상태값만 반환하고 언어가 있는 문구는 만들지 않는다
- * (ko/en 페이지가 그대로 재사용하면 번역이 깨지기 때문).
+ * 세율 적용 결과의 상태. 이 값을 UI에 어떻게 설명할지(문구, 배지 등)는 각
+ * 로케일 페이지가 직접 담당한다 — 이 모듈은 propertyTaxCalculator.ts와 같은
+ * 관례를 따라 숫자·상태값만 반환하고 언어가 있는 문구는 만들지 않는다.
  */
 export type BracketOutcome =
   | { status: 'computed'; calculatedTax: number }
-  | { status: 'computed-floor'; calculatedTax: number }
   | { status: 'delegated'; calculatedTax: number };
 
 export interface ReformTaxResult {
@@ -140,17 +169,21 @@ export interface ReformTaxResult {
   deduction: number;
   /** 적용된 공정시장가액비율. */
   fairMarketRatio: number;
-  /** 적용된 공정시장가액비율 트랙(2026·2027은 트랙 구분이 없어 null). */
+  /**
+   * 적용된 공정시장가액비율 트랙. 2026년(현행법)과 2027년(트랙 구분 없이
+   * 70% 단일)은 트랙 개념 자체가 없어 null — 2028년부터만 A/B 트랙이 실제로
+   * 비율에 영향을 준다.
+   */
   fmvTrack: 'A' | 'B' | null;
   /** 과세표준 = max(0, 공시가격합계 − 공제금액) × 공정시장가액비율. */
   taxBase: number;
-  /** 세율 적용 결과(확정/최소값/현행법 위임). */
+  /** 세율 적용 결과(확정/현행법 위임). */
   bracket: BracketOutcome;
   /** 적용된 세액공제율(고령자 공제만; 장기보유·거주기간 공제는 개편 연도에 미반영). */
   creditRate: number;
   /** 세액공제 금액. */
   creditAmount: number;
-  /** 결정세액 = max(0, 산출세액 − 세액공제). 2027년 초과구간 미확정 시 최솟값. */
+  /** 결정세액 = max(0, 산출세액 − 세액공제). */
   finalTax: number;
   /** 농어촌특별세 = 결정세액 × 20%. */
   ruralSpecialTax: number;
@@ -166,9 +199,11 @@ function resolveDeduction(houseCount: HouseCount, residency: ResidencyStatus | u
   if (houseCount === '1주택') {
     return residency === '비거주' ? DEDUCTION_SINGLE_NONRESIDING : DEDUCTION_SINGLE_RESIDING;
   }
-  // 다주택자 기본공제 개편 방식(예: "4억원 + 거주비중별 최대 5억원 가산")은 단일
-  // 매체 보도만 확인되어 교차검증 전까지 반영하지 않는다 — 현행과 동일한 9억원을
-  // 적용한다. (UI 안내 문구는 각 로케일 페이지의 정적 disclaimer가 담당한다.)
+  // 다주택자 기본공제 개편 방식(예: "4억원 + 거주비중별 최대 5억원 가산")은 이제
+  // 4개 매체로 교차확인됐지만, 시행 시점(2027 vs 2028)과 필요 입력값(거주주택
+  // 가액 비중 — 이 계산기가 수집하지 않는 값)이 불명확해 아직 반영하지 않는다
+  // — 현행과 동일한 9억원을 적용한다. (UI 안내 문구는 각 로케일 페이지의 정적
+  // disclaimer가 담당한다.)
   return DEDUCTION_MULTI_HOUSE;
 }
 
@@ -183,16 +218,12 @@ function resolveFmvRatio(year: 2027 | 2028 | 2029, track: 'A' | 'B'): number {
   return track === 'A' ? FMV_TRACK_A_2028 : FMV_TRACK_B_2028;
 }
 
-function resolveBracketOutcome(year: 2027 | 2028 | 2029, taxBase: number): BracketOutcome {
+function resolveBracketOutcome(year: 2027 | 2028 | 2029, taxBase: number, houseCount: HouseCount): BracketOutcome {
   if (year === 2027) {
-    const floorCap = 1_200_000_000;
-    if (taxBase <= floorCap) {
-      return { status: 'computed', calculatedTax: progressiveTax(taxBase, REFORM_LOW_BRACKETS) };
-    }
-    // 과세표준 12억원 초과분에 적용될 2027년 세율 구간이 보도에서 확인되지
-    // 않아, 12억원까지만 세율을 반영한 최솟값을 반환한다. UI에서는 이
-    // 'computed-floor' 상태를 보고 각 로케일에 맞는 경고 문구를 직접 붙인다.
-    return { status: 'computed-floor', calculatedTax: progressiveTax(floorCap, REFORM_LOW_BRACKETS) };
+    // 주택수 구분은 2027년에도 유지되고 2028년에야 사라진다 — 3주택이상은
+    // 2027년에도 현행법 세율표를 그대로 적용받는다.
+    const brackets = houseCount === '3주택이상' ? CURRENT_HIGH_HOUSE_BRACKETS : REFORM_2027_LOW_HOUSE_BRACKETS;
+    return { status: 'computed', calculatedTax: progressiveTax(taxBase, brackets) };
   }
   return { status: 'computed', calculatedTax: progressiveTax(taxBase, REFORM_FULL_BRACKETS_2028) };
 }
@@ -234,7 +265,7 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
   const track = resolveFmvTrack(input.houseCount, input.isRegulatedArea);
   const fairMarketRatio = resolveFmvRatio(input.year, track);
   const taxBase = Math.max(0, totalPublicPrice - deduction) * fairMarketRatio;
-  const bracket = resolveBracketOutcome(input.year, taxBase);
+  const bracket = resolveBracketOutcome(input.year, taxBase, input.houseCount);
 
   const creditRate =
     input.houseCount === '1주택' && input.ageAndHolding ? seniorCreditRate(input.ageAndHolding.age) : 0;
@@ -247,7 +278,10 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
     year: input.year,
     deduction,
     fairMarketRatio,
-    fmvTrack: track,
+    // 2027년은 FMV 비율이 트랙과 무관하게 70% 단일이라(resolveFmvRatio 참고)
+    // 트랙 자체가 의미 없으므로 null로 보고한다 — resolveFmvTrack의 반환값을
+    // 그대로 노출하면 "2027은 트랙 구분 없음"이라는 위 문서 주석과 어긋난다.
+    fmvTrack: input.year === 2027 ? null : track,
     taxBase,
     bracket,
     creditRate,

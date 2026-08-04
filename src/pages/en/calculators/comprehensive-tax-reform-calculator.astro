@@ -50,7 +50,7 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2027" />
-        <span>2027<br /><small class="hint">Stage 1: deduction &amp; ratio changes</small></span>
+        <span>2027<br /><small class="hint">Stage 1: deduction &amp; ratio changes (house-count tiers remain)</small></span>
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2028" />
@@ -58,7 +58,7 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       </label>
       <label class="method-option">
         <input type="radio" name="year" value="2029" />
-        <span>2029<br /><small class="hint">Stage 3: holding-period credit abolished</small></span>
+        <span>2029<br /><small class="hint">Same as 2028 (no rate/ratio change)</small></span>
       </label>
     </fieldset>
 
@@ -123,7 +123,6 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
   <p class="note" id="reform-error" role="alert"></p>
 
   <div class="result-box hidden" id="reform-result" aria-live="polite">
-    <p class="note hidden" id="floor-warning"></p>
     <table class="breakdown">
       <caption class="note" style="text-align:left;margin-bottom:6px;">
         Breakdown for Selected Year
@@ -214,28 +213,29 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
           reflected — same reason as the existing calculator: no prior-year paid-tax data is
           available.
         </li>
-        <li>For 2027, the exact rate for the portion of the tax base above ₩1.2 billion has not been reported, so only a minimum estimate is shown.</li>
       </ul>
-      <strong>Found but not implemented (single-outlet reporting, needs cross-verification)</strong>
+      <strong>Found but not implemented (cross-verified, but timing or exact brackets remain unclear)</strong>
       <ul>
         <li>
-          A redesigned multi-home deduction of "₩400 million + up to ₩500 million based on
-          residency share" —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-            >Newspim</a
+          A redesigned multi-home (2/3+ homes) deduction of "₩400 million + up to ₩500 million
+          based on residency share" — cross-verified by 4 outlets, but the effective year (2027 vs
+          2028) and a required input (share of home value that is owner-occupied) remain unclear —
+          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+            >Tax & Finance Media</a
+          >,
+          <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
+            >MTN</a
           >
         </li>
         <li>
-          A 2027 dual-track credit split between holding period (10/20/25%) and residency period
-          (20/40/50%) —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
+          The 1-household-1-home tax credit shifting from a holding-period basis to a
+          residency-period basis (2027 transition, residency-only credit with a ₩6 million cap
+          from 2028) — cross-verified by 2 outlets, but the exact bracket rates are not confirmed —
+          <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
             >Newspim</a
-          >
-        </li>
-        <li>
-          A ₩6 million cap on tax credits from 2028 onward —
-          <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-            >Newspim</a
+          >,
+          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+            >Tax & Finance Media</a
           >
         </li>
       </ul>
@@ -257,13 +257,28 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
         >
       </li>
       <li>
+        <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
+          >Newspim — Comprehensive tax unified by 2028, capital gains tax residency credit by 2029 (staging)</a
+        >
+      </li>
+      <li>
         <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
           >Kyeongin Ilbo — Comprehensive tax rates based on "home value," not "number of homes"</a
         >
       </li>
       <li>
-        <a href="https://www.tfmedia.co.kr/news/article.html?no=206140" target="_blank" rel="noopener noreferrer"
-          >Tax & Finance Media — [2026 Tax Reform] Owner-occupied 1-home deduction ₩1.4B, non-occupied ₩900M</a
+        <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
+          >Tax & Finance Media — Staged 2027/2028 rate and tax-credit changes</a
+        >
+      </li>
+      <li>
+        <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
+          >MTN — 80% fair market value ratio for regulated-area 2-home owners</a
+        >
+      </li>
+      <li>
+        <a href="https://www.segye.com/newsView/20260803518188" target="_blank" rel="noopener noreferrer"
+          >Segye Ilbo — Full 2028 comprehensive tax rate table</a
         >
       </li>
     </ul>
@@ -294,13 +309,13 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     </details>
 
     <details>
-      <summary>Why is 2027 shown as a "minimum" amount only?</summary>
+      <summary>Why does 2027 use a different rate table for 3+ homes?</summary>
       <p>
-        For 2027, only the rates for the portion of the tax base up to ₩1.2 billion (0.5% / 0.7%
-        / 1.3%) have been specifically reported; for the portion above ₩1.2 billion, only a range
-        of "0.5–3.5%" has been confirmed. Since the exact bracket rates aren't known, this
-        calculator applies the confirmed rates only up to ₩1.2 billion and shows that as a
-        minimum — the actual 2027 tax could be higher.
+        The house-count-based rate tiers don't fully disappear until 2028. In 2027, only 1- and
+        2-home owners get the new rate table (0.5%–3.5%); owners of 3 or more homes are still
+        taxed under the current-law rate table (e.g. 1.0% for the ₩600M–₩1.2B band) even in 2027.
+        This calculator reflects that distinction — selecting 3+ homes uses the current-law table
+        for 2027 as well.
       </p>
     </details>
 
@@ -496,14 +511,17 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     const holdingYears = Number(
       (document.getElementById('holdingYears') as HTMLInputElement).value,
     );
-    const hasAgeAndHolding = age > 0 && holdingYears > 0;
+    // The elderly credit only needs age — holding period only matters for the
+    // 2026 (current-law) result, so a user who correctly leaves it blank for
+    // 2027+ (per the hint above) must not lose the age-based credit.
+    const ageAndHolding = age > 0 ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0 } : undefined;
 
     const commonInput = {
       totalPublicPrice,
       houseCount,
       residency,
       isRegulatedArea,
-      ageAndHolding: hasAgeAndHolding ? { age, holdingYears } : undefined,
+      ageAndHolding,
     };
 
     const year = currentYear();
@@ -514,22 +532,8 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     setWon('rt-taxbase', result.taxBase);
     setWon('rt-tax', result.bracket.calculatedTax);
 
-    const statusBadge =
-      result.bracket.status === 'delegated'
-        ? '(delegated to current law)'
-        : result.bracket.status === 'computed-floor'
-          ? '⚠️ minimum estimate (rate above ₩1.2B unconfirmed)'
-          : '(confirmed bracket)';
+    const statusBadge = result.bracket.status === 'delegated' ? '(delegated to current law)' : '(confirmed bracket)';
     setText('rt-status-badge', statusBadge);
-
-    const floorWarning = document.getElementById('floor-warning') as HTMLParagraphElement;
-    if (result.bracket.status === 'computed-floor') {
-      floorWarning.textContent =
-        '⚠️ The exact 2027 rate for the portion of the tax base above ₩1.2 billion has not been reported, so this reflects rates only up to ₩1.2 billion as a minimum estimate. The actual tax could be higher.';
-      floorWarning.classList.remove('hidden');
-    } else {
-      floorWarning.classList.add('hidden');
-    }
 
     const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
     creditRow.classList.toggle('hidden', result.creditAmount <= 0);
@@ -540,18 +544,16 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
     }
 
-    const finalPrefix = result.bracket.status === 'computed-floor' ? 'At least ' : '';
-    setText('rt-final', finalPrefix + won.format(Math.round(result.finalTax)));
+    setWon('rt-final', result.finalTax);
     setWon('rt-rural', result.ruralSpecialTax);
-    setText('rt-total', finalPrefix + won.format(Math.round(result.totalWithSurtax)));
+    setWon('rt-total', result.totalWithSurtax);
 
     const allYears = calculateReformTaxAllYears(commonInput);
     for (const y of [2026, 2027, 2028, 2029] as const) {
       const r = allYears[y];
-      const prefix = r.bracket.status === 'computed-floor' ? 'At least ' : '';
       setWon(`cmp-deduction-${y}`, r.deduction);
       setText(`cmp-fmv-${y}`, pct(r.fairMarketRatio));
-      setText(`cmp-final-${y}`, prefix + won.format(Math.round(r.finalTax)));
+      setWon(`cmp-final-${y}`, r.finalTax);
     }
 
     resultBox.classList.remove('hidden');
