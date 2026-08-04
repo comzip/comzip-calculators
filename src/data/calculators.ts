@@ -190,6 +190,18 @@ export const calculators: Calculator[] = [
       "Preview how comprehensive real estate tax could change year by year (2026-2029) under Korea's proposed 2026 tax reform. This proposal has not passed the National Assembly and is not current law.",
   },
   {
+    slug: 'capital-gains-tax-reform-calculator',
+    title: '양도세 개편안 미리보기 계산기 (2026 세제개편안·미시행)',
+    titleEn: 'Capital Gains Tax Reform Preview (2026 Proposal — Not Yet Law)',
+    navLabel: '양도세 개편안 미리보기',
+    navLabelEn: 'Capital Gains Reform Preview',
+    category: '부동산',
+    description:
+      '2026년 8월 기획재정부가 발표한 세제개편안의 주택 양도소득세 개편 방향(장기보유특별공제·기본공제·다주택자 중과)을 2026~2029년 연도별로 미리 계산합니다. 아직 국회를 통과하지 않은 미확정 법안입니다.',
+    descriptionEn:
+      "Preview how capital gains tax on home sales could change year by year (2026-2029) under Korea's proposed 2026 tax reform. This proposal has not passed the National Assembly and is not current law.",
+  },
+  {
     slug: 'buy-vs-jeonse-calculator',
     title: '전세 vs 매매 비교 계산기',
     titleEn: 'Korea Jeonse vs. Buying Comparison Calculator',

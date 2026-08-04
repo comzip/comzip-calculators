@@ -1,0 +1,511 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calculator')!;
+const [titleMain, titleSub] = meta.title.split(' (');
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <div class="proposal-banner">
+    <p class="lead">⚠️ 이 계산기는 아직 법이 아닙니다</p>
+    <p>
+      2026년 8월 3일 재정경제부(구 기획재정부)가 발표한 <strong>'2026년 세제개편안'</strong>의
+      주택 양도소득세 개편 방향을 미리 계산해보는 도구입니다. 입법예고 → 국무회의 의결 → 국회
+      제출·심의·통과 → 공포 절차가 남아 있으며, 국회 심의 과정에서 내용이 달라지거나 폐기될 수
+      있습니다.
+    </p>
+    <ol class="progress-steps">
+      <li>입법예고</li>
+      <li>국무회의</li>
+      <li>국회 통과</li>
+      <li>시행</li>
+    </ol>
+    <p class="banner-link">
+      종부세 개편안이 궁금하다면 →
+      <a href="/calculators/comprehensive-tax-reform-calculator">종부세 개편안 미리보기</a>
+    </p>
+  </div>
+
+  <h1>{titleMain}<br />({titleSub}</h1>
+  <p class="note">
+    이 계산기는 <strong>1세대1주택·다주택자의 주택 양도소득세</strong>만 다룹니다. 취득세·재산세·
+    종합부동산세는 기존
+    <a href="/calculators/acquisition-tax-calculator">취득세 계산기</a>,
+    <a href="/calculators/property-tax-calculator">보유세 계산기</a>를 이용하세요.
+  </p>
+
+  <form class="calc-form" id="reform-form">
+    <fieldset class="method-toggle stacked-options">
+      <legend>연도 선택 (개편안 시행 단계)</legend>
+      <label class="method-option">
+        <input type="radio" name="year" value="2026" checked />
+        <span>2026년<br /><small class="hint">현행법 (개편안 미적용)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2027" />
+        <span>2027년<br /><small class="hint">기본공제 확대·중과 한시완화 (장특공제는 현행 유지)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2028" />
+        <span>2028년<br /><small class="hint">장특공제 1단계 개편 + 공제한도 신설</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2029" />
+        <span>2029년<br /><small class="hint">장특공제 최종(거주공제만) + 중과완화 종료</small></span>
+      </label>
+    </fieldset>
+
+    <label>
+      양도가액 (원)
+      <span class="hint">
+        판 금액. 1세대1주택 비과세(12억원 이하)와 장기거주 기본공제 확대(30억원 이하) 판정에
+        쓰입니다. 예: 2000000000
+      </span>
+      <input
+        type="number"
+        id="saleValue"
+        name="saleValue"
+        min="0"
+        step="any"
+        placeholder="예: 2000000000"
+        required
+      />
+      <span class="amount-preview" id="saleValue-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      양도차익 (원)
+      <span class="hint">
+        양도가액에서 취득가액·필요경비 등을 뺀 금액을 직접 계산해 입력하세요. 예: 500000000
+      </span>
+      <input type="number" id="gain" name="gain" min="0" step="any" placeholder="예: 500000000" required />
+      <span class="amount-preview" id="gain-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      주택 수
+      <select id="houseCount">
+        <option value="1주택">1주택 (1세대 1주택)</option>
+        <option value="2주택">2주택</option>
+        <option value="3주택이상">3주택 이상</option>
+      </select>
+    </label>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>조정대상지역 소재 (다주택자 중과 여부에 반영)</span>
+    </label>
+
+    <label>
+      보유기간 (년)
+      <span class="hint">장기보유특별공제(장기거주소득공제)·중과 여부 판정에 쓰입니다.</span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="예: 10" />
+    </label>
+    <label>
+      거주기간 (년)
+      <span class="hint">
+        장기거주소득공제·장기거주 1주택 기본공제 확대(10년 이상) 판정에 쓰입니다.
+      </span>
+      <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="예: 10" />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="reform-error" role="alert"></p>
+
+  <div class="result-box hidden" id="reform-result" aria-live="polite">
+    <p class="note hidden" id="exempt-note"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        선택한 연도 산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>과세대상 양도차익 <span class="hint" id="taxable-gain-hint"></span></td>
+          <td id="rt-taxable-gain">-</td>
+        </tr>
+        <tr>
+          <td>장기보유특별공제 <span class="hint" id="rt-lt-rate"></span></td>
+          <td id="rt-lt-amount">-</td>
+        </tr>
+        <tr>
+          <td>기본공제</td>
+          <td id="rt-basic">-</td>
+        </tr>
+        <tr class="total">
+          <td>과세표준</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>산출세액 <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr>
+          <td>지방소득세 <span class="hint">(산출세액의 10%)</span></td>
+          <td id="rt-local">-</td>
+        </tr>
+        <tr class="total">
+          <td>합계</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" style="text-align:left;margin-bottom:6px;">연도별 비교 (동일 입력 기준)</p>
+    <div class="table-scroll">
+    <table class="breakdown" id="year-compare-table">
+      <thead>
+        <tr>
+          <th>연도</th>
+          <th>2026</th>
+          <th>2027</th>
+          <th>2028</th>
+          <th>2029</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>장특공제율</td>
+          <td id="cmp-ltrate-2026">-</td>
+          <td id="cmp-ltrate-2027">-</td>
+          <td id="cmp-ltrate-2028">-</td>
+          <td id="cmp-ltrate-2029">-</td>
+        </tr>
+        <tr>
+          <td>기본공제</td>
+          <td id="cmp-basic-2026">-</td>
+          <td id="cmp-basic-2027">-</td>
+          <td id="cmp-basic-2028">-</td>
+          <td id="cmp-basic-2029">-</td>
+        </tr>
+        <tr class="total">
+          <td>합계세액</td>
+          <td id="cmp-total-2026">-</td>
+          <td id="cmp-total-2027">-</td>
+          <td id="cmp-total-2028">-</td>
+          <td id="cmp-total-2029">-</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>이 계산기의 한계</strong>
+      <ul>
+        <li>
+          공제한도(2028년 20억원, 2029년 10억원)는 <strong>양도물건별 한도만</strong> 반영합니다 —
+          같은 해에 다른 부동산을 함께 양도했을 때 적용되는 <strong>인별 연간 한도</strong>는
+          다른 양도 건 정보가 없어 반영하지 않습니다.
+        </li>
+        <li>
+          <strong>지방 세컨드홈 특례, 상생임대주택 특례, 일시적 2주택 특례, 조정대상지역
+          매입임대아파트 중과배제·특례</strong> 등 세부 조정 조항은 반영하지 않습니다 — 해당되는
+          경우 실제 세액이 이 계산 결과보다 낮을 수 있습니다.
+        </li>
+        <li>취득가액·필요경비 계산은 반영하지 않습니다 — 양도차익을 직접 계산해 입력해야 합니다.</li>
+        <li>다주택자 조정대상지역 중과는 <strong>2년 이상 보유</strong>한 경우에만 적용됩니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>아직 시행되지 않은 정부 발표안</strong>을 기준으로 한 시뮬레이션이며,
+    실제 결과와 다를 수 있습니다. 국회 통과 여부와 최종 조문을 반드시 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>근거 자료 (정부 발표안 — 법령 아님)</h2>
+    <ul>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000078809&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">재정경제부(구 기획재정부) — "2026 세제개편안" 상세본(조문 대비표), 1차 출처</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
+          target="_blank"
+          rel="noopener noreferrer">재정경제부 — "2026 세제개편안" 공식 인포그래픽</a
+        >
+      </li>
+    </ul>
+    <p class="note">
+      기본세율표(6~45%)는 이번 개편과 무관한 현행 <strong>소득세법 제55조</strong>입니다 —
+      <a
+        href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+        target="_blank"
+        rel="noopener noreferrer">법령 본문 보기</a
+      >
+    </p>
+  </section>
+
+  <AdSlot />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>이 계산기는 법으로 확정된 건가요?</summary>
+      <p>
+        아니요. 2026년 8월 3일 재정경제부가 발표한 세제개편안 단계이며, 아직 입법예고·국무회의·
+        국회 심의·통과 절차가 남아 있습니다. 국회 심의 과정에서 세부 수치가 바뀌거나 개편안
+        자체가 폐기될 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 2026년과 2027년은 장기보유특별공제가 같게 나오나요?</summary>
+      <p>
+        양도세 개편안은 항목마다 시행일이 다릅니다. 기본공제 확대(연 2,500만원)와 다주택자 중과
+        한시완화는 2027년 1월 1일부터 적용되지만, 장기보유특별공제(장기거주소득공제) 개편은
+        2028년 1월 1일부터 적용됩니다. 그래서 2027년까지는 장특공제만 현행 그대로이고, 나머지
+        항목은 이미 개편안이 반영됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 양도가액 12억원 이하 1주택은 세금이 0원인가요?</summary>
+      <p>
+        1세대1주택자는 양도가액 12억원 이하분에 대해 비과세입니다(이번 개편안과 무관한 현행
+        제도). 12억원을 초과하는 주택만 그 초과 비중에 해당하는 양도차익에 대해 과세됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>1주택자와 다주택자의 장기보유특별공제 계산 방식이 어떻게 다른가요?</summary>
+      <p>
+        1세대1주택자는 거주공제와 보유공제를 <strong>더해서</strong> 적용합니다(예: 2027년까지는
+        거주 최대 40% + 보유 최대 40% = 최대 80%). 다주택자는 두 공제 중 <strong>유리한 쪽 하나만</strong>
+        선택해 적용합니다(2028년부터 거주공제가 도입되면 거주·보유 중 높은 쪽, 상한도 30%로
+        1주택자보다 낮습니다).
+      </p>
+    </details>
+
+    <details>
+      <summary>다주택자 중과는 언제 적용되나요?</summary>
+      <p>
+        2주택 이상을 보유하고, 그중 <strong>조정대상지역에 소재한 주택</strong>을 2년 이상 보유
+        후 양도할 때만 적용됩니다. 세율 가산폭은 2026년(현행 +20%p/+30%p)에서 2027년(+5%p/+10%p)
+        →2028년(+10%p/+15%p)까지 한시적으로 줄었다가, 2029년부터 현행 수준으로 되돌아갑니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .proposal-banner {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .proposal-banner .lead {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #b91c1c;
+  }
+  .proposal-banner p {
+    margin: 6px 0;
+    font-size: 0.92rem;
+  }
+  .progress-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b91c1c;
+  }
+  .progress-steps li {
+    background: #fff;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .progress-steps li:not(:last-child)::after {
+    content: '→';
+    margin-left: 8px;
+    color: #b91c1c;
+  }
+  .banner-link {
+    font-weight: 600;
+  }
+  .calc-form .method-toggle.stacked-options .method-option small {
+    font-weight: 400;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .table-scroll {
+    overflow-x: auto;
+  }
+  #year-compare-table {
+    min-width: 480px;
+  }
+  #year-compare-table td,
+  #year-compare-table th {
+    white-space: nowrap;
+  }
+  #year-compare-table td:not(:first-child),
+  #year-compare-table th:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  import {
+    calculateCapitalGainsReformTax,
+    calculateCapitalGainsReformTaxAllYears,
+  } from '../../lib/capitalGainsTaxReformCalculator';
+  import type { CgtReformYear, CgtHouseCount } from '../../lib/capitalGainsTaxReformCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('saleValue', 'saleValue-preview');
+  bindAmountPreview('gain', 'gain-preview');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('reform-form') as HTMLFormElement;
+  const resultBox = document.getElementById('reform-result') as HTMLDivElement;
+  const errorEl = document.getElementById('reform-error') as HTMLParagraphElement;
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+
+  // 조정대상지역 여부는 다주택자에게만 의미가 있다 — 1세대1주택은 중과 대상이
+  // 아니므로 입력란을 숨긴다.
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  const currentYear = (): CgtReformYear =>
+    Number(
+      (form.querySelector('input[name="year"]:checked') as HTMLInputElement).value,
+    ) as CgtReformYear;
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+    const gain = Number((document.getElementById('gain') as HTMLInputElement).value);
+    if (!saleValue || saleValue <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = '양도가액을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (gain < 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = '양도차익을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
+    const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
+
+    const commonInput = { saleValue, gain, houseCount, isRegulatedArea, holdingYears, residencyYears };
+    const year = currentYear();
+    const result = calculateCapitalGainsReformTax({ ...commonInput, year });
+
+    const exemptNote = document.getElementById('exempt-note') as HTMLParagraphElement;
+    if (result.isExempt) {
+      exemptNote.textContent = '✓ 1세대1주택 비과세 대상입니다 (양도가액 12억원 이하) — 양도소득세가 발생하지 않습니다.';
+      exemptNote.classList.remove('hidden');
+    } else {
+      exemptNote.classList.add('hidden');
+    }
+
+    setWon('rt-taxable-gain', result.taxableGain);
+    setText(
+      'taxable-gain-hint',
+      houseCount === '1주택' ? '(양도가액 12억원 초과 비중만 과세)' : '',
+    );
+    setWon('rt-lt-amount', result.longTermDeductionAmount);
+    setText('rt-lt-rate', `(공제율 ${pct(result.longTermDeductionRate)})`);
+    setWon('rt-basic', result.basicDeduction);
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.calculatedTax);
+    setText(
+      'rt-surcharge-hint',
+      result.surchargeRate > 0 ? `(다주택자 중과 +${pct(result.surchargeRate)}p 반영)` : '',
+    );
+    setWon('rt-local', result.localIncomeTax);
+    setWon('rt-total', result.totalWithSurtax);
+
+    const allYears = calculateCapitalGainsReformTaxAllYears(commonInput);
+    for (const y of [2026, 2027, 2028, 2029] as const) {
+      const r = allYears[y];
+      setText(`cmp-ltrate-${y}`, pct(r.longTermDeductionRate));
+      setWon(`cmp-basic-${y}`, r.basicDeduction);
+      setWon(`cmp-total-${y}`, r.totalWithSurtax);
+    }
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>

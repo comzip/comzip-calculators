@@ -1,0 +1,528 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <div class="proposal-banner">
+    <p class="lead">⚠️ This calculator is not law yet</p>
+    <p>
+      This tool previews the capital gains tax reform direction announced by Korea's Ministry of
+      Economy and Finance on August 3, 2026 (the <strong>"2026 Tax Reform Proposal"</strong>). It
+      still needs to go through pre-announcement, cabinet approval, submission to and passage by
+      the National Assembly, and promulgation — the details may change or the proposal may be
+      scrapped entirely during legislative review.
+    </p>
+    <ol class="progress-steps">
+      <li>Pre-announcement</li>
+      <li>Cabinet meeting</li>
+      <li>National Assembly</li>
+      <li>Enactment</li>
+    </ol>
+    <p class="banner-link">
+      Curious about the comprehensive real estate tax reform too? →
+      <a href="/en/calculators/comprehensive-tax-reform-calculator">Comprehensive Tax Reform Preview</a>
+    </p>
+  </div>
+
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    This calculator covers <strong>capital gains tax on home sales for single- and multi-home
+    owners only</strong>. For acquisition tax, property tax, and comprehensive real estate tax,
+    use the existing <a href="/en/calculators/acquisition-tax-calculator">Acquisition Tax
+    Calculator</a> and <a href="/en/calculators/property-tax-calculator">Property Holding Tax
+    Calculator</a>.
+  </p>
+
+  <form class="calc-form" id="reform-form">
+    <fieldset class="method-toggle stacked-options">
+      <legend>Select Year (Reform Implementation Stage)</legend>
+      <label class="method-option">
+        <input type="radio" name="year" value="2026" checked />
+        <span>2026<br /><small class="hint">Current law (proposal not yet applied)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2027" />
+        <span>2027<br /><small class="hint">Basic deduction expanded, surcharge relief begins (long-term deduction still current law)</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2028" />
+        <span>2028<br /><small class="hint">Long-term deduction stage 1 + new deduction cap</small></span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="year" value="2029" />
+        <span>2029<br /><small class="hint">Long-term deduction final (residency only) + surcharge relief ends</small></span>
+      </label>
+    </fieldset>
+
+    <label>
+      Sale Price (KRW)
+      <span class="hint">
+        The price you sold for. Used to determine the 1-home exemption (≤₩1.2B) and the expanded
+        long-residence basic deduction (≤₩3B). e.g. 2000000000
+      </span>
+      <input
+        type="number"
+        id="saleValue"
+        name="saleValue"
+        min="0"
+        step="any"
+        placeholder="e.g. 2000000000"
+        required
+      />
+      <span class="amount-preview" id="saleValue-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Capital Gain (KRW)
+      <span class="hint">
+        Sale price minus acquisition cost, necessary expenses, etc. — calculate this yourself and
+        enter it directly. e.g. 500000000
+      </span>
+      <input type="number" id="gain" name="gain" min="0" step="any" placeholder="e.g. 500000000" required />
+      <span class="amount-preview" id="gain-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Number of Homes
+      <select id="houseCount">
+        <option value="1주택">1 home (1 household, 1 home)</option>
+        <option value="2주택">2 homes</option>
+        <option value="3주택이상">3+ homes</option>
+      </select>
+    </label>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>Located in a regulated area (affects multi-home surcharge)</span>
+    </label>
+
+    <label>
+      Holding Period (years)
+      <span class="hint">Used for the long-term deduction (long-residence income deduction) and surcharge eligibility.</span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="e.g. 10" />
+    </label>
+    <label>
+      Residency Period (years)
+      <span class="hint">
+        Used for the long-term residence deduction and the expanded basic deduction (10+ years).
+      </span>
+      <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="e.g. 10" />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="reform-error" role="alert"></p>
+
+  <div class="result-box hidden" id="reform-result" aria-live="polite">
+    <p class="note hidden" id="exempt-note"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Breakdown for Selected Year
+      </caption>
+      <tbody>
+        <tr>
+          <td>Taxable Gain <span class="hint" id="taxable-gain-hint"></span></td>
+          <td id="rt-taxable-gain">-</td>
+        </tr>
+        <tr>
+          <td>Long-Term Deduction <span class="hint" id="rt-lt-rate"></span></td>
+          <td id="rt-lt-amount">-</td>
+        </tr>
+        <tr>
+          <td>Basic Deduction</td>
+          <td id="rt-basic">-</td>
+        </tr>
+        <tr class="total">
+          <td>Tax Base</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>Calculated Tax <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr>
+          <td>Local Income Tax <span class="hint">(10% of calculated tax)</span></td>
+          <td id="rt-local">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" style="text-align:left;margin-bottom:6px;">Year-by-Year Comparison (same inputs)</p>
+    <div class="table-scroll">
+    <table class="breakdown" id="year-compare-table">
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>2026</th>
+          <th>2027</th>
+          <th>2028</th>
+          <th>2029</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Long-term deduction rate</td>
+          <td id="cmp-ltrate-2026">-</td>
+          <td id="cmp-ltrate-2027">-</td>
+          <td id="cmp-ltrate-2028">-</td>
+          <td id="cmp-ltrate-2029">-</td>
+        </tr>
+        <tr>
+          <td>Basic deduction</td>
+          <td id="cmp-basic-2026">-</td>
+          <td id="cmp-basic-2027">-</td>
+          <td id="cmp-basic-2028">-</td>
+          <td id="cmp-basic-2029">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total tax</td>
+          <td id="cmp-total-2026">-</td>
+          <td id="cmp-total-2027">-</td>
+          <td id="cmp-total-2028">-</td>
+          <td id="cmp-total-2029">-</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>Limitations of this calculator</strong>
+      <ul>
+        <li>
+          The deduction cap (₩2B in 2028, ₩1B in 2029) reflects <strong>only the per-property
+          cap</strong> — the separate <strong>per-person annual cap</strong> that applies when
+          you sell multiple properties in the same year is not reflected, since we don't have
+          information about your other sales.
+        </li>
+        <li>
+          <strong>Regional second-home relief, win-win lease special treatment, temporary 2-home
+          exemptions, and regulated-area rental-apartment surcharge exemptions</strong> are not
+          reflected — if you qualify for any of these, your actual tax may be lower than shown
+          here.
+        </li>
+        <li>Acquisition cost and necessary-expense calculations are not handled — calculate your capital gain yourself and enter it directly.</li>
+        <li>The multi-home regulated-area surcharge only applies with <strong>2+ years of holding</strong>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    This result is a simulation based on <strong>a government proposal that has not yet been
+    enacted</strong>, and may differ from the actual outcome. Always verify whether the bill
+    passed the National Assembly and check its final text.
+  </div>
+
+  <section class="law-refs">
+    <h2>Sources (Government Proposal — Not Statute)</h2>
+    <ul>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000078809&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">Korea's Ministry of Economy and Finance — "2026 Tax Reform" detailed article-comparison document (primary source)</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
+          target="_blank"
+          rel="noopener noreferrer">Ministry of Economy and Finance — official "2026 Tax Reform" infographic</a
+        >
+      </li>
+    </ul>
+    <p class="note">
+      The base income tax rate table (6–45%) is Korea's current, stable
+      <strong>Income Tax Act Article 55</strong>, unrelated to this reform proposal —
+      <a
+        href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+        target="_blank"
+        rel="noopener noreferrer">View full statute</a
+      >
+    </p>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Is this calculator based on enacted law?</summary>
+      <p>
+        No. This reflects a tax reform proposal announced by Korea's Ministry of Economy and
+        Finance on August 3, 2026. It still needs to go through pre-announcement, cabinet
+        approval, and National Assembly review and passage. Specific figures may change, or the
+        proposal itself may be scrapped, during legislative review.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why do 2026 and 2027 show the same long-term deduction?</summary>
+      <p>
+        Different provisions of this reform take effect on different dates. The expanded basic
+        deduction and the multi-home surcharge relief take effect January 1, 2027, but the
+        long-term deduction (long-residence income deduction) reform takes effect January 1,
+        2028. So through 2027, the long-term deduction stays exactly as under current law, while
+        the other provisions already reflect the proposal.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is a home sold for ₩1.2 billion or less tax-free for a 1-home owner?</summary>
+      <p>
+        Single-household, single-home owners are exempt on the portion of the sale price up to
+        ₩1.2 billion (this is current law, unrelated to the reform proposal). Only homes sold
+        above that threshold are taxed, and only on the gain proportional to the excess.
+      </p>
+    </details>
+
+    <details>
+      <summary>How does the long-term deduction differ between 1-home and multi-home owners?</summary>
+      <p>
+        Single-household, single-home owners <strong>add</strong> the residency deduction and
+        holding deduction together (e.g. through 2027: up to 40% residency + up to 40% holding =
+        up to 80%). Multi-home owners choose <strong>only whichever is larger</strong> between the
+        two (once the residency option is introduced in 2028) — better of holding vs. residency —
+        with a lower combined cap of 30%.
+      </p>
+    </details>
+
+    <details>
+      <summary>When does the multi-home surcharge apply?</summary>
+      <p>
+        Only when you own 2+ homes and sell one located in a <strong>regulated area</strong> that
+        you've held for at least 2 years. The surcharge temporarily drops from the current level
+        (+20%p / +30%p) to +5%p / +10%p in 2027, then +10%p / +15%p in 2028, before returning to
+        the current level in 2029.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .proposal-banner {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .proposal-banner .lead {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #b91c1c;
+  }
+  .proposal-banner p {
+    margin: 6px 0;
+    font-size: 0.92rem;
+  }
+  .progress-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b91c1c;
+  }
+  .progress-steps li {
+    background: #fff;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .progress-steps li:not(:last-child)::after {
+    content: '→';
+    margin-left: 8px;
+    color: #b91c1c;
+  }
+  .banner-link {
+    font-weight: 600;
+  }
+  .calc-form .method-toggle.stacked-options .method-option small {
+    font-weight: 400;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+  .table-scroll {
+    overflow-x: auto;
+  }
+  #year-compare-table {
+    min-width: 480px;
+  }
+  #year-compare-table td,
+  #year-compare-table th {
+    white-space: nowrap;
+  }
+  #year-compare-table td:not(:first-child),
+  #year-compare-table th:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  import {
+    calculateCapitalGainsReformTax,
+    calculateCapitalGainsReformTaxAllYears,
+  } from '../../../lib/capitalGainsTaxReformCalculator';
+  import type { CgtReformYear, CgtHouseCount } from '../../../lib/capitalGainsTaxReformCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('saleValue', 'saleValue-preview');
+  bindAmountPreview('gain', 'gain-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('reform-form') as HTMLFormElement;
+  const resultBox = document.getElementById('reform-result') as HTMLDivElement;
+  const errorEl = document.getElementById('reform-error') as HTMLParagraphElement;
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+
+  // Regulated-area status only matters for multi-home owners — a single
+  // household's one home is never subject to the surcharge.
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  const currentYear = (): CgtReformYear =>
+    Number(
+      (form.querySelector('input[name="year"]:checked') as HTMLInputElement).value,
+    ) as CgtReformYear;
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+    const gain = Number((document.getElementById('gain') as HTMLInputElement).value);
+    if (!saleValue || saleValue <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = 'Please enter a valid sale price.';
+      return;
+    }
+    if (gain < 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = 'Please enter a valid capital gain.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
+    const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
+
+    const commonInput = { saleValue, gain, houseCount, isRegulatedArea, holdingYears, residencyYears };
+    const year = currentYear();
+    const result = calculateCapitalGainsReformTax({ ...commonInput, year });
+
+    const exemptNote = document.getElementById('exempt-note') as HTMLParagraphElement;
+    if (result.isExempt) {
+      exemptNote.textContent =
+        '✓ Exempt as a single-household, single-home sale (sale price ≤ ₩1.2 billion) — no capital gains tax applies.';
+      exemptNote.classList.remove('hidden');
+    } else {
+      exemptNote.classList.add('hidden');
+    }
+
+    setWon('rt-taxable-gain', result.taxableGain);
+    setText(
+      'taxable-gain-hint',
+      houseCount === '1주택' ? '(only the portion above ₩1.2B is taxed)' : '',
+    );
+    setWon('rt-lt-amount', result.longTermDeductionAmount);
+    setText('rt-lt-rate', `(rate ${pct(result.longTermDeductionRate)})`);
+    setWon('rt-basic', result.basicDeduction);
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.calculatedTax);
+    setText(
+      'rt-surcharge-hint',
+      result.surchargeRate > 0 ? `(multi-home surcharge +${pct(result.surchargeRate)}p applied)` : '',
+    );
+    setWon('rt-local', result.localIncomeTax);
+    setWon('rt-total', result.totalWithSurtax);
+
+    const allYears = calculateCapitalGainsReformTaxAllYears(commonInput);
+    for (const y of [2026, 2027, 2028, 2029] as const) {
+      const r = allYears[y];
+      setText(`cmp-ltrate-${y}`, pct(r.longTermDeductionRate));
+      setWon(`cmp-basic-${y}`, r.basicDeduction);
+      setWon(`cmp-total-${y}`, r.totalWithSurtax);
+    }
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>
