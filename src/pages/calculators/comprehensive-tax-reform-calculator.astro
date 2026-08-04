@@ -100,18 +100,44 @@ const [titleMain, titleSub] = meta.title.split(' (');
     </label>
     <p class="note hidden" id="regulated-area-note"></p>
 
-    <label>
-      만 나이 <span class="hint">(선택, 1세대1주택자 고령자 세액공제용)</span>
-      <input type="number" id="age" name="age" min="0" step="1" placeholder="예: 68" />
-    </label>
-    <label>
-      보유기간 (년)
+    <label id="residential-home-value-options">
+      이 중 실거주하는 주택의 공시가격 (원)
       <span class="hint">
-        (선택) 2026년(현행법) 결과에만 반영됩니다 — 2027년 이후는 장기보유공제 자체가 개편
-        대상이라 이 계산기에 반영하지 않습니다.
+        (선택) 2·3주택 중 실제로 거주하는 주택이 있다면 그 공시가격. 없으면 비워두세요 — 다주택자
+        기본공제는 "4억원 + 5억원 × 거주주택가액/공시가격합계"로 계산되며, 거주 주택이 없으면
+        4억원만 적용됩니다.
       </span>
-      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="예: 12" />
+      <input
+        type="number"
+        id="residentialHomeValue"
+        name="residentialHomeValue"
+        min="0"
+        step="any"
+        placeholder="예: 800000000"
+      />
+      <span class="amount-preview" id="residentialHomeValue-preview" aria-live="polite"></span>
     </label>
+
+    <div id="senior-longterm-options">
+      <label>
+        만 나이 <span class="hint">(선택, 1세대1주택자 고령자 세액공제용)</span>
+        <input type="number" id="age" name="age" min="0" step="1" placeholder="예: 68" />
+      </label>
+      <label>
+        보유기간 (년)
+        <span class="hint">
+          (선택) 2026년(현행법)과 2027년(보유공제·거주공제 중 유리한 쪽 자동 적용)에 반영됩니다.
+        </span>
+        <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="예: 12" />
+      </label>
+      <label>
+        거주기간 (년)
+        <span class="hint">
+          (선택) 2027년(보유공제와 비교 후 유리한 쪽)과 2028년 이후(거주공제만 인정)에 반영됩니다.
+        </span>
+        <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="예: 8" />
+      </label>
+    </div>
 
     <button class="btn" type="submit">계산하기</button>
   </form>
@@ -208,30 +234,9 @@ const [titleMain, titleSub] = meta.title.split(' (');
           <strong>세부담상한</strong>(150%→200%로 상향 예정)은 반영하지 않습니다 — 기존
           보유세 계산기와 같은 이유로, 전년도 실 납부세액 정보가 없어 계산할 수 없습니다.
         </li>
-      </ul>
-      <strong>발견됐지만 반영하지 않은 항목(교차검증됐지만 시행 시점·세부 구간이 불명확)</strong>
-      <ul>
         <li>
-          다주택자(2·3주택) 공제금액을 "4억원 + 거주비중별 최대 5억원"으로 재설계하는 방안 —
-          4개 매체로 교차확인됐지만 시행 시점(2027년 vs 2028년)과 필요 입력값(거주주택 가액 비중)이
-          불명확해 미반영 —
-          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-            >조세금융신문</a
-          >,
-          <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
-            >MTN</a
-          >
-        </li>
-        <li>
-          1세대1주택 세액공제를 보유기간 기준에서 거주기간 기준으로 전환(2027년 과도기, 2028년부터
-          거주공제만 인정·상한 600만원) — 2개 매체로 교차확인됐지만 정확한 구간별 공제율이 확인되지
-          않아 미반영 —
-          <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
-            >뉴스핌</a
-          >,
-          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-            >조세금융신문</a
-          >
+          세액공제(연령·보유·거주공제)는 <strong>1세대1주택자에게만</strong> 적용됩니다. 다주택자
+          세액공제는 개편안에 별도 언급이 없습니다.
         </li>
       </ul>
     </div>
@@ -243,36 +248,30 @@ const [titleMain, titleSub] = meta.title.split(' (');
   </div>
 
   <section class="law-refs">
-    <h2>근거 자료 (언론 보도 — 법령 아님)</h2>
+    <h2>근거 자료 (정부 발표안 — 법령 아님)</h2>
     <ul>
       <li>
-        <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-          >뉴스핌 — [2026 세제개편] 종부세, '주택 수' 대신 '가액' 기준으로</a
+        <a
+          href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
+          target="_blank"
+          rel="noopener noreferrer">재정경제부(구 기획재정부) — "2026 세제개편안" 공식 인포그래픽 (1차 출처)</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000078809&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">재정경제부 — "2026 세제개편안" 보도자료 및 상세본 PDF</a
         >
       </li>
       <li>
         <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
-          >뉴스핌 — 종부세 2028년 단일세율·양도세 2029년 거주공제로 (연도별 시행 단계)</a
-        >
-      </li>
-      <li>
-        <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
-          >경인일보 — '주택 수' 아닌 '주택 가액' 종부세 세율</a
+          >뉴스핌 — 종부세 2028년 단일세율·양도세 2029년 거주공제로 (연도별 시행 단계, 교차검증용)</a
         >
       </li>
       <li>
         <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-          >조세금융신문 — 2027년·2028년 세율·세액공제 단계별 변화</a
-        >
-      </li>
-      <li>
-        <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
-          >MTN — 조정대상지역 2주택자 공정시장가액비율 80%</a
-        >
-      </li>
-      <li>
-        <a href="https://www.segye.com/newsView/20260803518188" target="_blank" rel="noopener noreferrer"
-          >세계일보 — 2028년 종부세 세율표 전 구간</a
+          >조세금융신문 — 2027년·2028년 세율·세액공제 단계별 변화 (교차검증용)</a
         >
       </li>
     </ul>
@@ -308,6 +307,24 @@ const [titleMain, titleSub] = meta.title.split(' (');
         새 세율표(0.5%~3.5%)를 적용받고, 3주택 이상은 2027년에도 현행법과 같은 세율표(6~12억원
         구간 1.0% 등)를 그대로 적용받습니다. 이 계산기는 이 차이를 반영해 3주택 이상을 선택하면
         2027년에도 현행 세율표로 계산합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>다주택자 기본공제는 어떻게 계산되나요?</summary>
+      <p>
+        4억원에, 5억원에 "거주하는 주택의 공시가격 ÷ 전체 공시가격 합계" 비율을 곱한 금액을 더합니다.
+        즉 거주 주택이 없으면 4억원만 적용되고, 보유한 모든 주택의 가치가 사실상 한 채(거주 중인
+        집)에 몰려 있다면 최대 9억원(현행 다주택자 공제와 동일한 금액)까지 늘어날 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>1세대1주택 세액공제의 금액 한도는 얼마인가요?</summary>
+      <p>
+        연령공제와 보유·거주공제를 더한 공제율은 지금처럼 최대 80%까지지만, 여기에 더해 2027년에는
+        800만원, 2028년 이후에는 600만원이라는 금액 상한이 새로 생깁니다. 계산된 공제액이 이 금액을
+        넘으면 상한선까지만 적용됩니다.
       </p>
     </details>
 
@@ -368,6 +385,10 @@ const [titleMain, titleSub] = meta.title.split(' (');
 
   .calc-form .method-toggle.stacked-options .method-option small {
     font-weight: 400;
+  }
+  #senior-longterm-options {
+    display: grid;
+    gap: 16px;
   }
 
   .law-refs {
@@ -430,6 +451,7 @@ const [titleMain, titleSub] = meta.title.split(' (');
     });
   };
   bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
+  bindAmountPreview('residentialHomeValue', 'residentialHomeValue-preview');
 
   const won = new Intl.NumberFormat('ko-KR', {
     style: 'currency',
@@ -455,13 +477,20 @@ const [titleMain, titleSub] = meta.title.split(' (');
   const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
   const regulatedAreaNote = document.getElementById('regulated-area-note') as HTMLParagraphElement;
   const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const residentialHomeValueOptions = document.getElementById(
+    'residential-home-value-options',
+  ) as HTMLLabelElement;
+  const seniorLongtermOptions = document.getElementById('senior-longterm-options') as HTMLDivElement;
 
-  // 실거주 여부는 1주택, 조정대상지역 여부는 2주택일 때만 의미가 있다 —
-  // 나머지는 항상 정해진 트랙(1주택=A, 3주택이상=B)이 적용되므로 안내
-  // 문구로 대체하고 입력란은 숨긴다.
+  // 실거주 여부·세액공제(연령/보유/거주)는 1세대1주택자 전용, 거주용주택가액은
+  // 다주택자 전용, 조정대상지역 여부는 2주택일 때만 의미가 있다 — 나머지는
+  // 항상 정해진 트랙(1주택=A, 3주택이상=B)이 적용되므로 안내 문구로 대체하고
+  // 입력란은 숨긴다.
   const syncHouseCountOptions = () => {
     const houseCount = houseCountSelect.value as HouseCount;
     residencyOptions.classList.toggle('hidden', houseCount !== '1주택');
+    seniorLongtermOptions.classList.toggle('hidden', houseCount !== '1주택');
+    residentialHomeValueOptions.classList.toggle('hidden', houseCount === '1주택');
     regulatedAreaOptions.classList.toggle('hidden', houseCount !== '2주택');
     if (houseCount === '1주택') {
       regulatedAreaNote.classList.add('hidden');
@@ -497,20 +526,28 @@ const [titleMain, titleSub] = meta.title.split(' (');
       form.querySelector('input[name="residency"]:checked') as HTMLInputElement | null
     )?.value as ResidencyStatus | undefined;
     const isRegulatedArea = isRegulatedAreaInput.checked;
+    const residentialHomeValue = Number(
+      (document.getElementById('residentialHomeValue') as HTMLInputElement).value,
+    );
     const age = Number((document.getElementById('age') as HTMLInputElement).value);
     const holdingYears = Number(
       (document.getElementById('holdingYears') as HTMLInputElement).value,
     );
-    // 고령자 세액공제는 나이만 있으면 적용된다 — 보유기간은 2026년(현행법)
-    // 결과에만 쓰이므로, 2027년 이후를 보는 사용자가 보유기간을 비워둬도
-    // (본문 안내대로 정상 행동) 나이 공제가 사라지면 안 된다.
-    const ageAndHolding = age > 0 ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0 } : undefined;
+    const residencyYears = Number(
+      (document.getElementById('residencyYears') as HTMLInputElement).value,
+    );
+    // 고령자 세액공제는 나이만 있으면 적용된다 — 보유기간·거주기간은 입력하지
+    // 않아도(해당 연도에 안 쓰이는 값이라도) 나이 공제가 사라지면 안 된다.
+    const ageAndHolding = age > 0
+      ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0, residencyYears: residencyYears > 0 ? residencyYears : 0 }
+      : undefined;
 
     const commonInput = {
       totalPublicPrice,
       houseCount,
       residency,
       isRegulatedArea,
+      residentialHomeValue: residentialHomeValue > 0 ? residentialHomeValue : undefined,
       ageAndHolding,
     };
 
@@ -530,8 +567,12 @@ const [titleMain, titleSub] = meta.title.split(' (');
     if (result.creditAmount > 0) {
       setWon('rt-credit', result.creditAmount);
       const creditLabel =
-        result.year === 2026 ? '고령자·장기보유 세액공제, 현행법' : '고령자 세액공제만 반영, 개편안';
-      setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
+        result.year === 2026
+          ? '연령·장기보유 세액공제, 현행법'
+          : result.year === 2027
+            ? '연령공제 + 보유/거주공제 중 유리한 쪽, 개편안(한도 800만원)'
+            : '연령·거주 세액공제, 개편안(한도 600만원)';
+      setText('rt-credit-label', `(${creditLabel}, 명목 ${pct(result.creditRate)})`);
     }
 
     setWon('rt-final', result.finalTax);

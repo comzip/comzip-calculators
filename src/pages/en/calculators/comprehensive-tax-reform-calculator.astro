@@ -104,18 +104,47 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     </label>
     <p class="note hidden" id="regulated-area-note"></p>
 
-    <label>
-      Age (years) <span class="hint">(optional, for elderly tax credit — 1 household, 1 home only)</span>
-      <input type="number" id="age" name="age" min="0" step="1" placeholder="e.g. 68" />
-    </label>
-    <label>
-      Holding Period (years)
+    <label id="residential-home-value-options">
+      Announced Value of the Home You Actually Live In (KRW)
       <span class="hint">
-        (optional) Only affects the 2026 (current law) result — from 2027 onward, the long-term
-        holding credit itself is being reformed, so this calculator does not apply it.
+        (optional) If you own 2+ homes and live in one of them, its announced value. Leave blank if
+        you don't live in any of them — the multi-home deduction is "₩400 million + ₩500 million ×
+        (value of the home you live in ÷ total announced value)"; with none, only ₩400 million
+        applies.
       </span>
-      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="e.g. 12" />
+      <input
+        type="number"
+        id="residentialHomeValue"
+        name="residentialHomeValue"
+        min="0"
+        step="any"
+        placeholder="e.g. 800000000"
+      />
+      <span class="amount-preview" id="residentialHomeValue-preview" aria-live="polite"></span>
     </label>
+
+    <div id="senior-longterm-options">
+      <label>
+        Age (years) <span class="hint">(optional, for elderly tax credit — 1 household, 1 home only)</span>
+        <input type="number" id="age" name="age" min="0" step="1" placeholder="e.g. 68" />
+      </label>
+      <label>
+        Holding Period (years)
+        <span class="hint">
+          (optional) Applies to the 2026 (current law) result and to 2027 (compared against
+          residency period — whichever gives the larger credit is used).
+        </span>
+        <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="e.g. 12" />
+      </label>
+      <label>
+        Residency Period (years)
+        <span class="hint">
+          (optional) Applies to 2027 (compared against holding period) and from 2028 onward (only
+          the residency credit is recognized).
+        </span>
+        <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="e.g. 8" />
+      </label>
+    </div>
 
     <button class="btn" type="submit">Calculate</button>
   </form>
@@ -213,30 +242,9 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
           reflected — same reason as the existing calculator: no prior-year paid-tax data is
           available.
         </li>
-      </ul>
-      <strong>Found but not implemented (cross-verified, but timing or exact brackets remain unclear)</strong>
-      <ul>
         <li>
-          A redesigned multi-home (2/3+ homes) deduction of "₩400 million + up to ₩500 million
-          based on residency share" — cross-verified by 4 outlets, but the effective year (2027 vs
-          2028) and a required input (share of home value that is owner-occupied) remain unclear —
-          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-            >Tax & Finance Media</a
-          >,
-          <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
-            >MTN</a
-          >
-        </li>
-        <li>
-          The 1-household-1-home tax credit shifting from a holding-period basis to a
-          residency-period basis (2027 transition, residency-only credit with a ₩6 million cap
-          from 2028) — cross-verified by 2 outlets, but the exact bracket rates are not confirmed —
-          <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
-            >Newspim</a
-          >,
-          <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-            >Tax & Finance Media</a
-          >
+          Tax credits (age / holding / residency) apply <strong>only to 1-household-1-home
+          owners</strong>. The proposal doesn't mention a separate credit for multi-home owners.
         </li>
       </ul>
     </div>
@@ -249,36 +257,30 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
   </div>
 
   <section class="law-refs">
-    <h2>Sources (News Coverage — Not Statute)</h2>
+    <h2>Sources (Government Proposal — Not Statute)</h2>
     <ul>
       <li>
-        <a href="https://www.newspim.com/news/view/20260801000120" target="_blank" rel="noopener noreferrer"
-          >Newspim — [2026 Tax Reform] Comprehensive tax shifts from "number of homes" to "home value"</a
+        <a
+          href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
+          target="_blank"
+          rel="noopener noreferrer">Korea's Ministry of Economy and Finance — official "2026 Tax Reform" infographic (primary source)</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000078809&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">Ministry of Economy and Finance — "2026 Tax Reform" press release and detailed PDF</a
         >
       </li>
       <li>
         <a href="https://www.newspim.com/news/view/20260803001172" target="_blank" rel="noopener noreferrer"
-          >Newspim — Comprehensive tax unified by 2028, capital gains tax residency credit by 2029 (staging)</a
-        >
-      </li>
-      <li>
-        <a href="https://www.kyeongin.com/article/1768389" target="_blank" rel="noopener noreferrer"
-          >Kyeongin Ilbo — Comprehensive tax rates based on "home value," not "number of homes"</a
+          >Newspim — Comprehensive tax unified by 2028, capital gains tax residency credit by 2029 (staging, cross-check)</a
         >
       </li>
       <li>
         <a href="https://www.tfmedia.co.kr/news/article.html?no=206204" target="_blank" rel="noopener noreferrer"
-          >Tax & Finance Media — Staged 2027/2028 rate and tax-credit changes</a
-        >
-      </li>
-      <li>
-        <a href="https://news.mtn.co.kr/news-detail/2026080308021314983" target="_blank" rel="noopener noreferrer"
-          >MTN — 80% fair market value ratio for regulated-area 2-home owners</a
-        >
-      </li>
-      <li>
-        <a href="https://www.segye.com/newsView/20260803518188" target="_blank" rel="noopener noreferrer"
-          >Segye Ilbo — Full 2028 comprehensive tax rate table</a
+          >Tax & Finance Media — Staged 2027/2028 rate and tax-credit changes (cross-check)</a
         >
       </li>
     </ul>
@@ -316,6 +318,26 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
         taxed under the current-law rate table (e.g. 1.0% for the ₩600M–₩1.2B band) even in 2027.
         This calculator reflects that distinction — selecting 3+ homes uses the current-law table
         for 2027 as well.
+      </p>
+    </details>
+
+    <details>
+      <summary>How is the multi-home deduction calculated?</summary>
+      <p>
+        ₩400 million, plus ₩500 million multiplied by "announced value of the home you live in ÷
+        total announced value of all your homes." So if you don't live in any of your homes, only
+        ₩400 million applies; if effectively all your property value is concentrated in the one
+        home you live in, it can rise to as much as ₩900 million (the same amount as today's flat
+        multi-home deduction).
+      </p>
+    </details>
+
+    <details>
+      <summary>What's the dollar cap on the 1-household-1-home tax credit?</summary>
+      <p>
+        The combined age + holding/residency credit rate is still capped at 80%, same as today, but
+        a new absolute cap is added on top: ₩8 million in 2027, and ₩6 million from 2028 onward. If
+        the calculated credit exceeds that amount, only the cap applies.
       </p>
     </details>
 
@@ -378,6 +400,10 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
   .calc-form .method-toggle.stacked-options .method-option small {
     font-weight: 400;
   }
+  #senior-longterm-options {
+    display: grid;
+    gap: 16px;
+  }
 
   .law-refs {
     margin: 24px 0;
@@ -439,6 +465,7 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     });
   };
   bindAmountPreview('totalPublicPrice', 'totalPublicPrice-preview');
+  bindAmountPreview('residentialHomeValue', 'residentialHomeValue-preview');
 
   const won = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -464,13 +491,21 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
   const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
   const regulatedAreaNote = document.getElementById('regulated-area-note') as HTMLParagraphElement;
   const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const residentialHomeValueOptions = document.getElementById(
+    'residential-home-value-options',
+  ) as HTMLLabelElement;
+  const seniorLongtermOptions = document.getElementById('senior-longterm-options') as HTMLDivElement;
 
-  // Residency only matters for 1 home; regulated-area status only matters
-  // for 2 homes — the other cases always use a fixed track (1 home = A,
-  // 3+ homes = B), so show an explanatory note instead of the input.
+  // Residency and the age/holding/residency tax credit inputs only matter for
+  // 1 home; the residential-home-value input only matters for multi-home
+  // owners; regulated-area status only matters for 2 homes — the other cases
+  // always use a fixed track (1 home = A, 3+ homes = B), so show an
+  // explanatory note instead of the input.
   const syncHouseCountOptions = () => {
     const houseCount = houseCountSelect.value as HouseCount;
     residencyOptions.classList.toggle('hidden', houseCount !== '1주택');
+    seniorLongtermOptions.classList.toggle('hidden', houseCount !== '1주택');
+    residentialHomeValueOptions.classList.toggle('hidden', houseCount === '1주택');
     regulatedAreaOptions.classList.toggle('hidden', houseCount !== '2주택');
     if (houseCount === '1주택') {
       regulatedAreaNote.classList.add('hidden');
@@ -507,20 +542,29 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       form.querySelector('input[name="residency"]:checked') as HTMLInputElement | null
     )?.value as ResidencyStatus | undefined;
     const isRegulatedArea = isRegulatedAreaInput.checked;
+    const residentialHomeValue = Number(
+      (document.getElementById('residentialHomeValue') as HTMLInputElement).value,
+    );
     const age = Number((document.getElementById('age') as HTMLInputElement).value);
     const holdingYears = Number(
       (document.getElementById('holdingYears') as HTMLInputElement).value,
     );
-    // The elderly credit only needs age — holding period only matters for the
-    // 2026 (current-law) result, so a user who correctly leaves it blank for
-    // 2027+ (per the hint above) must not lose the age-based credit.
-    const ageAndHolding = age > 0 ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0 } : undefined;
+    const residencyYears = Number(
+      (document.getElementById('residencyYears') as HTMLInputElement).value,
+    );
+    // The elderly credit only needs age — holding/residency period only
+    // matter for years that use them, so leaving either blank must not drop
+    // the age-based credit.
+    const ageAndHolding = age > 0
+      ? { age, holdingYears: holdingYears > 0 ? holdingYears : 0, residencyYears: residencyYears > 0 ? residencyYears : 0 }
+      : undefined;
 
     const commonInput = {
       totalPublicPrice,
       houseCount,
       residency,
       isRegulatedArea,
+      residentialHomeValue: residentialHomeValue > 0 ? residentialHomeValue : undefined,
       ageAndHolding,
     };
 
@@ -540,8 +584,12 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     if (result.creditAmount > 0) {
       setWon('rt-credit', result.creditAmount);
       const creditLabel =
-        result.year === 2026 ? 'elderly/long-term holding credit, current law' : 'elderly credit only, proposal';
-      setText('rt-credit-label', `(${creditLabel}, ${pct(result.creditRate)})`);
+        result.year === 2026
+          ? 'age + long-term holding credit, current law'
+          : result.year === 2027
+            ? 'age credit + better of holding/residency credit, proposal (₩8M cap)'
+            : 'age + residency credit, proposal (₩6M cap)';
+      setText('rt-credit-label', `(${creditLabel}, nominal ${pct(result.creditRate)})`);
     }
 
     setWon('rt-final', result.finalTax);

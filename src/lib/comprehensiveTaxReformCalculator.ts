@@ -2,12 +2,12 @@
  * 종합부동산세 "2026년 세제개편안" 미리보기 계산 모듈.
  *
  * ======================== ⚠️ 이 모듈은 법령이 아닙니다 ========================
- * 기획재정부가 2026-08-03 발표한 "2026년 세제개편안"의 종합부동산세 개편
- * 방향을 미리 계산해보는 시뮬레이션입니다. 이 개편안은 아직 입법예고·
- * 국무회의·국회 통과를 거치지 않았으며, 국회 심의 과정에서 내용이 달라지거나
- * 폐기될 수 있습니다. 아래 상수는 law.go.kr이 아니라 언론 보도(복수 매체
- * 교차확인)를 근거로 하며, 이는 LEGAL_REFERENCES.md의 "공식 출처만 인용"
- * 원칙에 대한 유일한 예외입니다.
+ * 기획재정부(현 재정경제부)가 2026-08-03 발표한 "2026년 세제개편안"의
+ * 종합부동산세 개편 방향을 미리 계산해보는 시뮬레이션입니다. 이 개편안은
+ * 아직 입법예고·국무회의·국회 통과를 거치지 않았으며, 국회 심의 과정에서
+ * 내용이 달라지거나 폐기될 수 있습니다. 아래 상수는 law.go.kr이 아니라
+ * 재정경제부 공식 발표 자료(보도자료·인포그래픽, mofe.go.kr)를 근거로 하며,
+ * 이는 LEGAL_REFERENCES.md의 "공식 출처만 인용" 원칙에 대한 유일한 예외입니다.
  *
  * 재산세(지방세) 변경 근거는 발견되지 않아 이 모듈은 종합부동산세만 다룹니다.
  * 재산세·현행 종부세는 `propertyTaxCalculator.ts`(변경하지 않음)를 그대로
@@ -50,8 +50,10 @@ const CURRENT_FMV_RATIO = 0.6;
 const DEDUCTION_SINGLE_RESIDING = 1_400_000_000;
 /** 1세대1주택 기본공제 — 비거주 9억원 (2027년부터). */
 const DEDUCTION_SINGLE_NONRESIDING = 900_000_000;
-/** 2·3주택 이상 기본공제 — 9억원(현행 유지, 변경 여부 미확인). */
-const DEDUCTION_MULTI_HOUSE = 900_000_000;
+/** 2·3주택 이상 기본공제 — 기본액 4억원(2027년부터). 거주비중에 따라 최대 9억원까지 가산된다. */
+const DEDUCTION_MULTI_BASE = 400_000_000;
+/** 2·3주택 이상 기본공제 — 거주비중 100%일 때 가산되는 최대 금액(5억원). */
+const DEDUCTION_MULTI_RESIDENCE_MAX = 500_000_000;
 
 /** 2027년 공정시장가액비율 — 주택수·지역 구분 없이 70% 단일. */
 const FMV_2027_FLAT = 0.7;
@@ -66,13 +68,44 @@ const RURAL_SPECIAL_TAX_RATE = 0.2;
 /**
  * 고령자 세액공제율(60/65/70세 20/30/40%) — propertyTaxCalculator.ts의
  * 비공개 함수와 값이 같지만, 원본 파일을 변경하지 않기 위해 의도적으로
- * 이 파일에 다시 선언한다. 개편안에서도 유지된다는 보도가 있어 전 연도
- * 공통 적용한다(장기보유·거주기간 공제는 아래 참고처럼 별도로 미반영).
+ * 이 파일에 다시 선언한다. 개편안에서도 전 연도 동일하게 유지된다
+ * (재정경제부 발표자료 박스5).
  */
 function seniorCreditRate(age: number): number {
   if (age >= 70) return 0.4;
   if (age >= 65) return 0.3;
   if (age >= 60) return 0.2;
+  return 0;
+}
+
+/** 1세대1주택 세액공제 합산 상한(연령+보유/거주공제) — 현행과 동일 80%. */
+const CREDIT_RATE_CAP = 0.8;
+/** 1세대1주택 세액공제 금액 상한 — 2027년 800만원. */
+const CREDIT_AMOUNT_CAP_2027 = 8_000_000;
+/** 1세대1주택 세액공제 금액 상한 — 2028년 이후 600만원. */
+const CREDIT_AMOUNT_CAP_2028 = 6_000_000;
+
+/**
+ * 2027년 전용 보유공제율(5/10/15년 이상 10/20/25%) — 거주공제와 둘 중
+ * 유리한 쪽을 선택 적용한다(재정경제부 발표자료 박스5, '27년 "보유/거주
+ * 공제중선택"). 2028년부터는 보유공제 자체가 폐지되고 거주공제만 인정된다.
+ */
+function holdingCreditRate2027(holdingYears: number): number {
+  if (holdingYears >= 15) return 0.25;
+  if (holdingYears >= 10) return 0.2;
+  if (holdingYears >= 5) return 0.1;
+  return 0;
+}
+
+/**
+ * 거주공제율(5/10/15년 이상 20/40/50%) — 2027년엔 보유공제와 선택 적용,
+ * 2028년부터는 이 공제만 인정된다. 세율 자체는 현행 장기보유공제와 같은
+ * 20/40/50%이지만 기준이 "보유기간"에서 "거주기간"으로 바뀐다.
+ */
+function residenceCreditRate(residencyYears: number): number {
+  if (residencyYears >= 15) return 0.5;
+  if (residencyYears >= 10) return 0.4;
+  if (residencyYears >= 5) return 0.2;
   return 0;
 }
 
@@ -102,19 +135,20 @@ const REFORM_2027_HIGH_BRACKETS: TaxBracket[] = [
 const REFORM_2027_LOW_HOUSE_BRACKETS: TaxBracket[] = [...REFORM_LOW_BRACKETS, ...REFORM_2027_HIGH_BRACKETS];
 
 /**
- * 2027년 3주택이상 전용 — 뉴스핌·한국세정신문·세계타임즈 교차확인: 주택수
- * 구분은 2027년에도 유지되고 2028년에야 사라진다. 3주택이상은 2027년에도
- * 현행법(propertyTaxCalculator.ts의 비공개 COMPREHENSIVE_HIGH_BRACKETS와
- * 완전히 동일)을 그대로 적용받는다 — 원본이 비공개 export라 재사용할 수
- * 없어(원본 변경 금지 원칙) 값만 그대로 다시 선언한다.
+ * 2027년 3주택이상 전용 — 재정경제부 발표자료 박스4 원본 확인: 주택수 구분은
+ * 2027년에도 유지되고 2028년에야 사라지지만, 과세표준 6~12억원 구간만큼은
+ * 2027년에 1·2주택과 동일하게 1.3%로 함께 오른다(현행 1.0%). 12억원 초과
+ * 구간은 현행법(propertyTaxCalculator.ts의 비공개 COMPREHENSIVE_HIGH_BRACKETS와
+ * 완전히 동일 — 원본이 비공개 export라 재사용할 수 없어 값만 다시 선언)을
+ * 그대로 유지한다.
  */
-const CURRENT_HIGH_HOUSE_BRACKETS: TaxBracket[] = [
-  { upTo: 300_000_000, rate: 0.005 }, // 3억원 이하 0.5%
-  { upTo: 600_000_000, rate: 0.007 }, // ~6억원 0.7%
-  { upTo: 1_200_000_000, rate: 0.01 }, // ~12억원 1.0%
-  { upTo: 2_500_000_000, rate: 0.02 }, // ~25억원 2.0%
-  { upTo: 5_000_000_000, rate: 0.03 }, // ~50억원 3.0%
-  { upTo: Infinity, rate: 0.05 }, // 50억원 초과 5.0%
+const REFORM_2027_HIGH_HOUSE_BRACKETS: TaxBracket[] = [
+  { upTo: 300_000_000, rate: 0.005 }, // 3억원 이하 0.5% (현행 유지)
+  { upTo: 600_000_000, rate: 0.007 }, // ~6억원 0.7% (현행 유지)
+  { upTo: 1_200_000_000, rate: 0.013 }, // ~12억원 1.3% (현행 1.0%→2027년 상향, 1·2주택과 동일)
+  { upTo: 2_500_000_000, rate: 0.02 }, // ~25억원 2.0% (현행 유지)
+  { upTo: 5_000_000_000, rate: 0.03 }, // ~50억원 3.0% (현행 유지)
+  { upTo: Infinity, rate: 0.05 }, // 50억원 초과 5.0% (현행 유지)
 ];
 
 /**
@@ -147,11 +181,18 @@ export interface ReformTaxInput {
   /** 조정대상지역 여부. `houseCount === '2주택'`일 때만(2028년 이후) 공정시장가액비율 트랙에 반영된다. */
   isRegulatedArea?: boolean;
   /**
-   * 고령자 세액공제용 나이(1주택자만 적용). `holdingYears`는 2026년(현행법
-   * 위임 경로)에만 장기보유공제 계산에 쓰이고, 2027년 이후는 장기보유·
-   * 거주기간 공제 개편 내용이 단일 출처로만 보도돼 반영하지 않으므로 무시된다.
+   * 다주택(2·3주택) 중 실거주하는 주택의 공시가격. `houseCount !== '1주택'`이고
+   * 2027년 이후일 때만 기본공제 계산(4억원 + 5억원 × 이 값/공시가격합계)에
+   * 쓰인다. 실거주하는 주택이 없으면 생략(공제 4억원만 적용).
    */
-  ageAndHolding?: { age: number; holdingYears: number };
+  residentialHomeValue?: number;
+  /**
+   * 고령자·보유·거주 세액공제용 나이/보유기간/거주기간(1세대1주택자만 적용).
+   * `holdingYears`는 2026년(현행법 위임)과 2027년(보유공제·거주공제 중 선택)에
+   * 쓰이고, `residencyYears`는 2027년(거주공제 후보)과 2028년 이후(거주공제만)에
+   * 쓰인다.
+   */
+  ageAndHolding?: { age: number; holdingYears: number; residencyYears: number };
 }
 
 /**
@@ -179,9 +220,14 @@ export interface ReformTaxResult {
   taxBase: number;
   /** 세율 적용 결과(확정/현행법 위임). */
   bracket: BracketOutcome;
-  /** 적용된 세액공제율(고령자 공제만; 장기보유·거주기간 공제는 개편 연도에 미반영). */
+  /**
+   * 적용된 세액공제율(연령공제 + 보유/거주공제, 80% 상한 적용 후 명목값).
+   * 2027년 이후는 여기에 더해 연도별 금액 상한(2027년 800만원, 2028년
+   * 이후 600만원)까지 적용되므로, 실제 공제액(`creditAmount`)을 이 비율로
+   * 역산하면 상한이 걸린 경우 이 값과 다를 수 있다.
+   */
   creditRate: number;
-  /** 세액공제 금액. */
+  /** 세액공제 금액(금액 상한 적용 후 최종값). */
   creditAmount: number;
   /** 결정세액 = max(0, 산출세액 − 세액공제). */
   finalTax: number;
@@ -195,16 +241,20 @@ export interface ReformTaxResult {
 // 내부 헬퍼
 // ============================================================
 
-function resolveDeduction(houseCount: HouseCount, residency: ResidencyStatus | undefined): number {
+function resolveDeduction(
+  houseCount: HouseCount,
+  residency: ResidencyStatus | undefined,
+  totalPublicPrice: number,
+  residentialHomeValue: number | undefined,
+): number {
   if (houseCount === '1주택') {
     return residency === '비거주' ? DEDUCTION_SINGLE_NONRESIDING : DEDUCTION_SINGLE_RESIDING;
   }
-  // 다주택자 기본공제 개편 방식(예: "4억원 + 거주비중별 최대 5억원 가산")은 이제
-  // 4개 매체로 교차확인됐지만, 시행 시점(2027 vs 2028)과 필요 입력값(거주주택
-  // 가액 비중 — 이 계산기가 수집하지 않는 값)이 불명확해 아직 반영하지 않는다
-  // — 현행과 동일한 9억원을 적용한다. (UI 안내 문구는 각 로케일 페이지의 정적
-  // disclaimer가 담당한다.)
-  return DEDUCTION_MULTI_HOUSE;
+  // 다주택자 기본공제 = 4억원 + 5억원 × (거주용주택가액 ÷ 주택가액합계액).
+  // 거주하는 주택이 없으면(입력 생략) 비율 0으로 처리해 4억원만 적용된다.
+  const residenceRatio =
+    totalPublicPrice > 0 ? Math.min(1, Math.max(0, (residentialHomeValue ?? 0) / totalPublicPrice)) : 0;
+  return DEDUCTION_MULTI_BASE + DEDUCTION_MULTI_RESIDENCE_MAX * residenceRatio;
 }
 
 function resolveFmvTrack(houseCount: HouseCount, isRegulatedArea: boolean | undefined): 'A' | 'B' {
@@ -221,11 +271,36 @@ function resolveFmvRatio(year: 2027 | 2028 | 2029, track: 'A' | 'B'): number {
 function resolveBracketOutcome(year: 2027 | 2028 | 2029, taxBase: number, houseCount: HouseCount): BracketOutcome {
   if (year === 2027) {
     // 주택수 구분은 2027년에도 유지되고 2028년에야 사라진다 — 3주택이상은
-    // 2027년에도 현행법 세율표를 그대로 적용받는다.
-    const brackets = houseCount === '3주택이상' ? CURRENT_HIGH_HOUSE_BRACKETS : REFORM_2027_LOW_HOUSE_BRACKETS;
+    // 2027년에도 현행법 세율표(6~12억 구간만 1.3%로 상향)를 적용받는다.
+    const brackets = houseCount === '3주택이상' ? REFORM_2027_HIGH_HOUSE_BRACKETS : REFORM_2027_LOW_HOUSE_BRACKETS;
     return { status: 'computed', calculatedTax: progressiveTax(taxBase, brackets) };
   }
   return { status: 'computed', calculatedTax: progressiveTax(taxBase, REFORM_FULL_BRACKETS_2028) };
+}
+
+/**
+ * 1세대1주택 세액공제(연령공제 + 보유/거주공제) 결과. `rate`는 80% 상한을
+ * 적용한 명목 공제율, `amount`는 여기에 연도별 금액 상한(2027년 800만원,
+ * 2028년 이후 600만원)까지 적용한 최종 공제액이다 — 금액 상한이 걸리면
+ * `amount / calculatedTax`의 실효 공제율은 `rate`보다 낮아질 수 있다.
+ */
+function resolveCredit(
+  year: 2027 | 2028 | 2029,
+  houseCount: HouseCount,
+  calculatedTax: number,
+  ageAndHolding: { age: number; holdingYears: number; residencyYears: number } | undefined,
+): { rate: number; amount: number } {
+  if (houseCount !== '1주택' || !ageAndHolding) return { rate: 0, amount: 0 };
+
+  const { age, holdingYears, residencyYears } = ageAndHolding;
+  const holdingOrResidenceRate =
+    year === 2027
+      ? Math.max(holdingCreditRate2027(holdingYears), residenceCreditRate(residencyYears))
+      : residenceCreditRate(residencyYears);
+  const rate = Math.min(CREDIT_RATE_CAP, seniorCreditRate(age) + holdingOrResidenceRate);
+  const amountCap = year === 2027 ? CREDIT_AMOUNT_CAP_2027 : CREDIT_AMOUNT_CAP_2028;
+  const amount = Math.min(calculatedTax * rate, amountCap);
+  return { rate, amount };
 }
 
 // ============================================================
@@ -261,15 +336,18 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
     };
   }
 
-  const deduction = resolveDeduction(input.houseCount, input.residency);
+  const deduction = resolveDeduction(input.houseCount, input.residency, totalPublicPrice, input.residentialHomeValue);
   const track = resolveFmvTrack(input.houseCount, input.isRegulatedArea);
   const fairMarketRatio = resolveFmvRatio(input.year, track);
   const taxBase = Math.max(0, totalPublicPrice - deduction) * fairMarketRatio;
   const bracket = resolveBracketOutcome(input.year, taxBase, input.houseCount);
 
-  const creditRate =
-    input.houseCount === '1주택' && input.ageAndHolding ? seniorCreditRate(input.ageAndHolding.age) : 0;
-  const creditAmount = bracket.calculatedTax * creditRate;
+  const { rate: creditRate, amount: creditAmount } = resolveCredit(
+    input.year,
+    input.houseCount,
+    bracket.calculatedTax,
+    input.ageAndHolding,
+  );
   const finalTax = Math.max(0, bracket.calculatedTax - creditAmount);
   const ruralSpecialTax = finalTax * RURAL_SPECIAL_TAX_RATE;
   const totalWithSurtax = finalTax + ruralSpecialTax;
