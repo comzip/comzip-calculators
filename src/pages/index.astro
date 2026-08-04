@@ -8,6 +8,12 @@ import { calculators, categoryOrder, categoryLabels } from '../data/calculators'
 // 위한 하드코딩이다 — 필요해지면 그때 확장한다. 제목/설명은 calculators.ts를
 // 그대로 재사용해 SSOT를 지킨다.
 const featuredCalculator = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calculator');
+// 배너 제목이 좁은 화면에서 애매한 지점에 줄바꿈되지 않도록, "본제목 (부제)"
+// 형태인 title을 괄호 앞에서 명시적으로 끊어 표시한다. title 문자열 자체는
+// 그대로 두고(SSOT — <title> 태그·카드 등 다른 곳은 원문 그대로 씀) 이
+// 배너에서만 표시 방식을 나눈다.
+const featuredTitleParts = featuredCalculator?.title.split(' (') ?? [];
+const [featuredTitleMain, featuredTitleSub] = featuredTitleParts;
 ---
 
 <BaseLayout title="콤집계산기" path="/" lang="ko">
@@ -37,7 +43,7 @@ const featuredCalculator = calculators.find((c) => c.slug === 'comprehensive-tax
   {featuredCalculator && (
     <a class="hot-banner" href={`/calculators/${featuredCalculator.slug}`}>
       <span class="hot-badge">🔥 지금 화제의 계산기</span>
-      <h2>{featuredCalculator.title}</h2>
+      <h2>{featuredTitleMain}<br />({featuredTitleSub}</h2>
       <p>{featuredCalculator.description}</p>
     </a>
   )}
