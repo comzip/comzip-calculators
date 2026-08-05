@@ -86,11 +86,17 @@ const SHORT_TERM_RATE_UNDER_2Y = 0.6; // 1년 이상 2년 미만 60%
 
 /**
  * 1세대1주택 비과세 최소 보유기간(년, 소득세법 시행령 §154①). 이 기간을
- * 채우지 못하면 양도가액이 12억원 이하라도 비과세가 아니다. (취득 당시
- * 조정대상지역이었다면 2년 이상 "거주" 요건도 추가되는데, 이 계산기는
- * 취득 시점의 지역 지정 여부를 입력받지 않아 보유 요건만 판정한다.)
+ * 채우지 못하면 양도가액이 12억원 이하라도 비과세가 아니다.
  */
 const EXEMPTION_MIN_HOLDING_YEARS = 2;
+
+/**
+ * 1세대1주택 비과세 최소 거주기간(년). 2017-08-03 이후 **취득 당시** 조정대상
+ * 지역이었던 주택은 보유 2년에 더해 거주 2년도 채워야 비과세된다(8·2 대책,
+ * 소득세법 시행령 §154①). 취득 시점 기준이라 나중에 조정대상지역에서
+ * 해제되어도 요건은 사라지지 않는다.
+ */
+const EXEMPTION_MIN_RESIDENCY_YEARS = 2;
 
 /** 지방소득세율 — 양도소득세 산출세액의 10%(지방세법, 개편 대상 아님). */
 const LOCAL_INCOME_TAX_RATE = 0.1;
@@ -130,6 +136,12 @@ export interface CapitalGainsReformInput {
   residencyYears: number;
   /** 조정대상지역 소재 여부. `houseCount !== '1주택'`일 때만 중과 여부에 반영된다. */
   isRegulatedArea?: boolean;
+  /**
+   * **취득 당시** 조정대상지역이었는지. `houseCount === '1주택'`일 때만 쓰이며,
+   * true면 비과세에 거주 2년 요건이 추가된다(위 EXEMPTION_MIN_RESIDENCY_YEARS 참고).
+   * 위 `isRegulatedArea`는 "지금" 조정대상지역인지(다주택 중과 판정용)라 서로 다르다.
+   */
+  wasRegulatedAreaAtAcquisition?: boolean;
 }
 
 export interface CapitalGainsReformResult {
@@ -170,9 +182,13 @@ function resolveTaxableGain(input: CapitalGainsReformInput): { taxableGain: numb
   if (input.houseCount !== '1주택') {
     return { taxableGain: gain, isExempt: false };
   }
-  // 1세대1주택 비과세는 2년 이상 보유해야 한다 — 보유기간이 짧으면 양도가액이
-  // 12억원 이하여도 전액 과세되고, 12억원 초과 안분도 적용되지 않는다.
-  if (input.holdingYears < EXEMPTION_MIN_HOLDING_YEARS) {
+  // 1세대1주택 비과세 요건을 못 채우면 양도가액이 12억원 이하여도 전액 과세되고,
+  // 12억원 초과 안분도 적용되지 않는다(§95③의 안분은 "비과세 요건을 갖춘"
+  // 고가주택에만 걸리기 때문). 요건은 ①보유 2년, ②취득 당시 조정대상지역이었다면
+  // 거주 2년까지.
+  const exemptionResidencyUnmet =
+    Boolean(input.wasRegulatedAreaAtAcquisition) && input.residencyYears < EXEMPTION_MIN_RESIDENCY_YEARS;
+  if (input.holdingYears < EXEMPTION_MIN_HOLDING_YEARS || exemptionResidencyUnmet) {
     return { taxableGain: gain, isExempt: false };
   }
   if (input.saleValue <= SINGLE_HOUSE_EXEMPT_SALE_VALUE) {
@@ -310,9 +326,11 @@ export function calculateCapitalGainsReformTax(input: CapitalGainsReformInput): 
       : INCOME_TAX_BRACKETS;
   const progressiveAmount = progressiveTax(taxBase, brackets);
 
-  // 하나의 자산에 둘 이상의 세율이 적용될 수 있으면 각각 계산한 세액 중 큰
-  // 금액을 세액으로 한다(소득세법 §104⑤ 비교과세). 단기 보유이면서 조정대상
-  // 지역 다주택 중과 대상이기도 한 경우가 여기 해당한다.
+  // 보유 2년 미만이면 "기본세율+중과가산율로 계산한 산출세액"과 "단기 단일세율로
+  // 계산한 산출세액" 중 **큰 세액**을 산출세액으로 한다 — 소득세법 §104⑦ 후단이
+  // 이 비교를 명시적으로 규정한다(§104⑤는 자산이 여러 세율에 걸릴 때의 일반
+  // 비교과세 조항이고, 단기+중과 조합을 직접 규율하는 건 §104⑦ 후단이다).
+  // 즉 단기 보유라고 해서 중과가 꺼지는 게 아니라, 대개 비교에서 질 뿐이다.
   const shortTermRate = resolveShortTermRate(input.holdingYears);
   const shortTermAmount = shortTermRate === null ? 0 : taxBase * shortTermRate;
   const calculatedTax = Math.max(progressiveAmount, shortTermAmount);

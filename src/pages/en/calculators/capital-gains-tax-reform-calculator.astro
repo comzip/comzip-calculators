@@ -105,6 +105,12 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
       <span>Located in a regulated area (affects multi-home surcharge)</span>
     </label>
 
+    <label class="check-row" id="acquired-regulated-options">
+      <input type="checkbox" id="wasRegulatedAreaAtAcquisition" />
+      <span>Was in a regulated area when acquired (adds a 2-year residency requirement for the 1-home exemption)</span>
+    </label>
+    <p class="note hidden" id="acquired-regulated-note"></p>
+
     <label>
       Holding Period (years)
       <span class="hint">Used for the long-term deduction (long-residence income deduction) and surcharge eligibility.</span>
@@ -359,6 +365,21 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     </details>
 
     <details>
+      <summary>I own one home but never lived in it — do I lose the exemption?</summary>
+      <p>
+        <strong>If the area was regulated when you acquired it</strong>, yes. A home acquired on or
+        after August 3, 2017 in a regulated area needs <strong>2 years of residency</strong> on top
+        of 2 years of holding to qualify for the 1-home exemption. Gangnam, Seocho, Songpa and
+        Yongsan in Seoul have been regulated continuously since then, and in October 2025 the
+        designation expanded to all of Seoul — so renting your home out and living elsewhere may
+        well put you in this bucket. It's judged <strong>at acquisition</strong>, so later
+        de-designation doesn't remove the requirement. If you don't meet it, the entire gain is
+        taxed even below ₩1.2 billion, and the long-term deduction drops from the 1-home table (up
+        to 80%) to the general table (2%/year, up to 30%).
+      </p>
+    </details>
+
+    <details>
       <summary>What if I sell before owning it for 2 years?</summary>
       <p>
         For homes, a flat <strong>70% rate applies under 1 year of holding, and 60% from 1 to under
@@ -502,12 +523,24 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
   const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
   const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
   const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const acquiredRegulatedOptions = document.getElementById('acquired-regulated-options') as HTMLLabelElement;
+  const wasRegulatedAtAcquisitionInput = document.getElementById(
+    'wasRegulatedAreaAtAcquisition',
+  ) as HTMLInputElement;
+  const acquiredRegulatedNote = document.getElementById('acquired-regulated-note') as HTMLParagraphElement;
 
-  // Regulated-area status only matters for multi-home owners — a single
-  // household's one home is never subject to the surcharge.
+  // Whether it's regulated *now* decides the multi-home surcharge; whether it
+  // was regulated *at acquisition* decides the 1-home exemption's residency
+  // requirement. Different inputs, so each shows only when it applies.
   const syncHouseCountOptions = () => {
     const houseCount = houseCountSelect.value as CgtHouseCount;
     regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+    acquiredRegulatedOptions.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.textContent =
+      houseCount === '1주택'
+        ? '※ A home acquired on or after August 3, 2017 while the area was regulated needs 2 years of residency on top of 2 years of holding to qualify for the exemption. Gangnam, Seocho, Songpa and Yongsan in Seoul have been regulated continuously since then, and in October 2025 the designation expanded to all of Seoul. It is judged at acquisition, so later de-designation does not remove the requirement.'
+        : '';
   };
   houseCountSelect.addEventListener('change', syncHouseCountOptions);
   syncHouseCountOptions();
@@ -538,7 +571,15 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
     const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
 
-    const commonInput = { saleValue, gain, houseCount, isRegulatedArea, holdingYears, residencyYears };
+    const commonInput = {
+      saleValue,
+      gain,
+      houseCount,
+      isRegulatedArea,
+      wasRegulatedAreaAtAcquisition: wasRegulatedAtAcquisitionInput.checked,
+      holdingYears,
+      residencyYears,
+    };
     const year = currentYear();
     const result = calculateCapitalGainsReformTax({ ...commonInput, year });
 

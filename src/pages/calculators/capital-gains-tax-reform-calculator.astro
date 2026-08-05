@@ -98,6 +98,12 @@ const [titleMain, titleSub] = meta.title.split(' (');
       <span>조정대상지역 소재 (다주택자 중과 여부에 반영)</span>
     </label>
 
+    <label class="check-row" id="acquired-regulated-options">
+      <input type="checkbox" id="wasRegulatedAreaAtAcquisition" />
+      <span>취득할 때 조정대상지역이었음 (1세대1주택 비과세에 거주 2년 요건 추가)</span>
+    </label>
+    <p class="note hidden" id="acquired-regulated-note"></p>
+
     <label>
       보유기간 (년)
       <span class="hint">장기보유특별공제(장기거주소득공제)·중과 여부 판정에 쓰입니다.</span>
@@ -339,6 +345,20 @@ const [titleMain, titleSub] = meta.title.split(' (');
     </details>
 
     <details>
+      <summary>1주택인데 실거주를 안 했으면 비과세를 못 받나요?</summary>
+      <p>
+        <strong>취득 당시 조정대상지역이었다면</strong> 그렇습니다. 2017년 8월 3일 이후 조정대상
+        지역에서 취득한 주택은 보유 2년에 더해 <strong>거주 2년</strong>까지 채워야 1세대1주택
+        비과세를 받습니다(8·2 대책). 서울 강남·서초·송파·용산 등은 그때부터 계속 조정대상지역
+        이었고 2025년 10월에는 서울 전역으로 확대돼, 집을 세주고 다른 곳에 살았다면 해당될 수
+        있습니다. <strong>취득 시점 기준</strong>이라 나중에 조정대상지역에서 해제됐어도 요건은
+        사라지지 않습니다. 요건을 못 채우면 양도가액이 12억원 이하여도 양도차익 전액이 과세되고,
+        장기보유특별공제도 1주택 특례표(최대 80%)가 아닌 일반표(보유 연 2%, 최대 30%)가
+        적용됩니다.
+      </p>
+    </details>
+
+    <details>
       <summary>2년도 안 되어 팔면 세금이 어떻게 되나요?</summary>
       <p>
         주택은 보유기간이 <strong>1년 미만이면 70%, 1년 이상 2년 미만이면 60%</strong>의 단일세율이
@@ -482,12 +502,24 @@ const [titleMain, titleSub] = meta.title.split(' (');
   const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
   const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
   const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const acquiredRegulatedOptions = document.getElementById('acquired-regulated-options') as HTMLLabelElement;
+  const wasRegulatedAtAcquisitionInput = document.getElementById(
+    'wasRegulatedAreaAtAcquisition',
+  ) as HTMLInputElement;
+  const acquiredRegulatedNote = document.getElementById('acquired-regulated-note') as HTMLParagraphElement;
 
-  // 조정대상지역 여부는 다주택자에게만 의미가 있다 — 1세대1주택은 중과 대상이
-  // 아니므로 입력란을 숨긴다.
+  // "지금" 조정대상지역인지는 다주택 중과 판정용이라 다주택에만, "취득 당시"
+  // 조정대상지역이었는지는 1세대1주택 비과세의 거주요건 판정용이라 1주택에만
+  // 의미가 있다 — 서로 다른 입력이므로 각각 해당할 때만 보여준다.
   const syncHouseCountOptions = () => {
     const houseCount = houseCountSelect.value as CgtHouseCount;
     regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+    acquiredRegulatedOptions.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.textContent =
+      houseCount === '1주택'
+        ? '※ 2017년 8월 3일 이후 조정대상지역에서 취득한 주택은 보유 2년에 더해 거주 2년도 채워야 비과세됩니다. 서울 강남·서초·송파·용산 등은 그때부터 계속 조정대상지역이었고, 2025년 10월에는 서울 전역으로 확대됐습니다. 취득 시점 기준이라 이후 해제됐어도 요건은 남습니다.'
+        : '';
   };
   houseCountSelect.addEventListener('change', syncHouseCountOptions);
   syncHouseCountOptions();
@@ -518,7 +550,15 @@ const [titleMain, titleSub] = meta.title.split(' (');
     const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
     const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
 
-    const commonInput = { saleValue, gain, houseCount, isRegulatedArea, holdingYears, residencyYears };
+    const commonInput = {
+      saleValue,
+      gain,
+      houseCount,
+      isRegulatedArea,
+      wasRegulatedAreaAtAcquisition: wasRegulatedAtAcquisitionInput.checked,
+      holdingYears,
+      residencyYears,
+    };
     const year = currentYear();
     const result = calculateCapitalGainsReformTax({ ...commonInput, year });
 
