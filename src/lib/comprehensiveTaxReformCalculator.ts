@@ -74,8 +74,19 @@ const RURAL_SPECIAL_TAX_RATE = 0.2;
 
 /** 재산세 주택분 공정시장가액비율 — 다주택(일반). */
 const PROPERTY_TAX_FMV_DEFAULT = 0.6;
-/** 재산세 주택 표준세율 최고구간(3억원 초과) 0.4% — 근사식의 한계세율로 쓴다. */
+/** 재산세 주택 표준세율 최고구간(3억원 초과) 0.4%. */
 const PROPERTY_TAX_TOP_RATE = 0.004;
+/**
+ * 재산세 주택 표준세율의 3억원까지 누적세액(=누진공제 기준액) 570,000원.
+ * 6천만×0.1% + 9천만×0.15% + 1.5억×0.25% = 570,000.
+ */
+const PROPERTY_TAX_PROGRESSIVE_BASE = 570_000;
+/**
+ * 주택을 한 채 더 쪼갤 때마다 재산세 합계가 줄어드는 금액 630,000원
+ * (= 3억 × 0.4% − 570,000). 누진구조 때문에 같은 총액이라도 여러 채로
+ * 나뉘면 재산세 합계가 작아지는데, 그 채당 감소분이다.
+ */
+const PROPERTY_TAX_SPLIT_GAP = 630_000;
 
 /** 재산세 1세대1주택 특례 공정시장가액비율(공시가격 구간별 43~45%). */
 function propertyTaxSingleHouseFmvRatio(publicPrice: number): number {
@@ -308,22 +319,42 @@ function resolveBracketOutcome(year: 2027 | 2028 | 2029, taxBase: number, houseC
 }
 
 /**
- * 재산세액공제(이중과세 조정, 종부세법 §9③) 근사액.
+ * 재산세액공제(이중과세 조정, 종부세법 §9③, 시행령 §4의2).
  *
- * 근사식: 종부세 과세표준 × 재산세 공정시장가액비율 × 재산세 최고구간세율.
- * `propertyTaxCalculator.ts`가 쓰는 것과 같은 근사식으로(그쪽 주석 참고 — 실제
- * 사례와 대조 검증됨), 정식 법령 산식(주택별 다단계 안분)은 아니다. 이 계산기는
- * 주택별 공시가격이 아니라 합계만 입력받으므로 실제 납부 재산세를 상한으로
- * 씌우는 캡은 적용하지 못한다 — 다만 통상 근사액이 실제 재산세보다 훨씬 작아
- * 캡이 걸리는 경우는 드물다.
+ * 법정산식: `공제액 = ① × (② ÷ ③)`
+ *  - ① 실제 부과된 주택분 재산세 합계(주택별로 계산해 합산)
+ *  - ② 종부세 과세표준 × 재산세 공정시장가액비율 × 재산세 표준세율
+ *  - ③ 공시가격 합계를 한 채로 보고 표준세율로 계산한 재산세 상당액
  *
- * 이 공제를 빼먹으면 산출세액을 18~32%가량 과대계상하게 되어(실측) 무시할 수
- * 없다.
+ * **1주택**은 ① = ③ 이라 `②`가 그대로 공제액이 된다 — 근사가 아니라 정확값이다
+ * (외부 계산기 및 기재부 공식 시뮬레이션과 원 단위 일치 확인).
+ *
+ * **다주택**은 재산세 누진구조 때문에 여러 채로 나뉠수록 ① < ③ 이 되어
+ * `①/③` 만큼 공제가 깎인다. 각 주택 과세표준이 3억원을 넘으면(공시가격 5억원
+ * 이상) 이 비율은 분할 방식과 무관하게 주택 수 n과 총액만으로 정해진다:
+ *   ③ = 570,000 + (총공시가격 × 0.6 − 3억) × 0.4%
+ *   ① = ③ − (n−1) × 630,000
+ * 이 헤어컷을 빼먹으면 공제가 과대해져 세액을 6~8% 과소표시하게 된다.
+ *
+ * 한계: 이 계산기는 주택별 공시가격이 아니라 합계만 받으므로, 5억원 미만
+ * 주택이 섞이면 위 비율이 근사가 된다. '3주택이상'은 n=3을 하한으로 쓴다
+ * (주택이 더 많으면 실제 공제는 더 깎이므로 세액을 다소 과소표시).
  */
 function resolvePropertyTaxCredit(taxBase: number, totalPublicPrice: number, houseCount: HouseCount): number {
-  const fmvRatio =
-    houseCount === '1주택' ? propertyTaxSingleHouseFmvRatio(totalPublicPrice) : PROPERTY_TAX_FMV_DEFAULT;
-  return Math.max(0, taxBase * fmvRatio * PROPERTY_TAX_TOP_RATE);
+  if (houseCount === '1주택') {
+    // n = 1 이라 ①/③ = 1 — ②가 곧 공제액이다.
+    return Math.max(0, taxBase * propertyTaxSingleHouseFmvRatio(totalPublicPrice) * PROPERTY_TAX_TOP_RATE);
+  }
+
+  const rawCredit = taxBase * PROPERTY_TAX_FMV_DEFAULT * PROPERTY_TAX_TOP_RATE;
+  const lumpPropertyTax =
+    PROPERTY_TAX_PROGRESSIVE_BASE +
+    (totalPublicPrice * PROPERTY_TAX_FMV_DEFAULT - 300_000_000) * PROPERTY_TAX_TOP_RATE;
+  if (lumpPropertyTax <= 0) return Math.max(0, rawCredit);
+
+  const houses = houseCount === '2주택' ? 2 : 3;
+  const splitRatio = Math.min(1, Math.max(0, 1 - ((houses - 1) * PROPERTY_TAX_SPLIT_GAP) / lumpPropertyTax));
+  return Math.max(0, rawCredit * splitRatio);
 }
 
 /**
