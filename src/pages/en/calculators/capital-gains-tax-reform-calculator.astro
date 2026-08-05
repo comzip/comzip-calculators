@@ -215,7 +215,35 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
           here.
         </li>
         <li>Acquisition cost and necessary-expense calculations are not handled — calculate your capital gain yourself and enter it directly.</li>
-        <li>The multi-home regulated-area surcharge only applies with <strong>2+ years of holding</strong>.</li>
+        <li>
+          The 1-home exemption is judged on the <strong>2-year holding requirement only</strong> —
+          if the home was in a regulated area when you acquired it, a <strong>2-year residency</strong>
+          requirement also applies, which this calculator can't check since it doesn't ask about the
+          area designation at acquisition time.
+        </li>
+        <li>
+          Exceptions that <strong>exclude a home from the house count</strong> (temporary 2-home,
+          inheritance, caring for elderly parents, etc.) are not reflected — if one applies to you,
+          select "1 home" directly.
+        </li>
+      </ul>
+      <strong>Key rules that ARE reflected (for reference)</strong>
+      <ul>
+        <li>
+          Homes subject to the regulated-area multi-home surcharge have the
+          <strong>long-term deduction fully excluded</strong> (Income Tax Act §95②). This exclusion
+          continues during the 2027/2028 temporary surcharge relief, because the proposal only
+          lowers the rate — the surcharge designation itself remains.
+        </li>
+        <li>
+          A flat <strong>70% rate applies under 1 year of holding, and 60% from 1 to under 2
+          years</strong>. If the home is also surcharge-eligible, tax is the <strong>greater</strong>
+          of (progressive + surcharge) vs. the short-holding flat rate (Income Tax Act §104⑤).
+        </li>
+        <li>
+          The temporary surcharge relief (2027/2028) requires <strong>2+ years of holding</strong> —
+          under 2 years, the full current surcharge (+20%p / +30%p) applies with no relief.
+        </li>
       </ul>
     </div>
   </div>
@@ -304,10 +332,34 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     <details>
       <summary>When does the multi-home surcharge apply?</summary>
       <p>
-        Only when you own 2+ homes and sell one located in a <strong>regulated area</strong> that
-        you've held for at least 2 years. The surcharge temporarily drops from the current level
-        (+20%p / +30%p) to +5%p / +10%p in 2027, then +10%p / +15%p in 2028, before returning to
-        the current level in 2029.
+        When you own 2+ homes and sell one located in a <strong>regulated area</strong> —
+        regardless of how long you held it. The current surcharge is +20%p (2 homes) / +30%p (3+
+        homes), temporarily relaxed to +5%p / +10%p in 2027 and +10%p / +15%p in 2028, returning to
+        the current level in 2029. Note that this <strong>relief only applies with 2+ years of
+        holding</strong> — under 2 years, the full current surcharge applies even during the relief
+        window.
+      </p>
+    </details>
+
+    <details>
+      <summary>Do I lose the long-term deduction if the surcharge applies?</summary>
+      <p>
+        Yes. Homes subject to the regulated-area multi-home surcharge have the
+        <strong>long-term deduction excluded entirely</strong> (Income Tax Act Article 95(2),
+        effective April 1, 2018) — no matter how long you held the property. The 2027/2028 relief
+        only lowers the rate; the surcharge designation itself remains, so the exclusion continues
+        through the relief window.
+      </p>
+    </details>
+
+    <details>
+      <summary>What if I sell before owning it for 2 years?</summary>
+      <p>
+        For homes, a flat <strong>70% rate applies under 1 year of holding, and 60% from 1 to under
+        2 years</strong> (instead of the progressive table). You also get no long-term deduction
+        (that requires 3+ years) and no 1-home exemption (that requires 2+ years). If the home is
+        also surcharge-eligible, you're taxed at the <strong>greater</strong> of the progressive
+        amount (including surcharge) or the short-holding flat amount.
       </p>
     </details>
   </section>
@@ -503,10 +555,13 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     setWon('rt-basic', result.basicDeduction);
     setWon('rt-taxbase', result.taxBase);
     setWon('rt-tax', result.calculatedTax);
-    setText(
-      'rt-surcharge-hint',
-      result.surchargeRate > 0 ? `(multi-home surcharge +${pct(result.surchargeRate)}p applied)` : '',
-    );
+    const surchargeHints = [
+      result.surchargeRate > 0 ? `multi-home surcharge +${pct(result.surchargeRate)}p` : '',
+      result.appliedShortTermRate !== null
+        ? `short-holding flat rate ${pct(result.appliedShortTermRate)} applied`
+        : '',
+    ].filter(Boolean);
+    setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
     setWon('rt-local', result.localIncomeTax);
     setWon('rt-total', result.totalWithSurtax);
 

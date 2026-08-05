@@ -65,6 +65,25 @@ const FMV_TRACK_B_2028 = 0.8;
 /** 농어촌특별세율 — 종부세액의 20%. propertyTaxCalculator.ts와 동일, 개편 대상 아님. */
 const RURAL_SPECIAL_TAX_RATE = 0.2;
 
+// ------------------------------------------------------------
+// 재산세액공제(이중과세 조정, 종부세법 §9③)용 재산세 상수.
+// 개편안의 종부세 개정 대상 조문은 §7①·§8①·§9①②·§9⑤⑧⑨·§10·§15·§20의2로,
+// §9③은 포함되지 않는다 — 즉 재산세액공제는 개편 후에도 그대로 유지된다.
+// 아래 값은 지방세법·시행령(재산세)에서 오며 이번 개편과 무관하다.
+// ------------------------------------------------------------
+
+/** 재산세 주택분 공정시장가액비율 — 다주택(일반). */
+const PROPERTY_TAX_FMV_DEFAULT = 0.6;
+/** 재산세 주택 표준세율 최고구간(3억원 초과) 0.4% — 근사식의 한계세율로 쓴다. */
+const PROPERTY_TAX_TOP_RATE = 0.004;
+
+/** 재산세 1세대1주택 특례 공정시장가액비율(공시가격 구간별 43~45%). */
+function propertyTaxSingleHouseFmvRatio(publicPrice: number): number {
+  if (publicPrice <= 300_000_000) return 0.43;
+  if (publicPrice <= 600_000_000) return 0.44;
+  return 0.45;
+}
+
 /**
  * 고령자 세액공제율(60/65/70세 20/30/40%) — propertyTaxCalculator.ts의
  * 비공개 함수와 값이 같지만, 원본 파일을 변경하지 않기 위해 의도적으로
@@ -226,6 +245,11 @@ export interface ReformTaxResult {
   /** 세율 적용 결과(확정/현행법 위임). */
   bracket: BracketOutcome;
   /**
+   * 재산세액공제(이중과세 조정, 종부세법 §9③) 근사액. 산출세액에서 이 금액을
+   * 먼저 뺀 뒤 1세대1주택 세액공제를 적용한다.
+   */
+  propertyTaxCredit: number;
+  /**
    * 적용된 세액공제율(연령공제 + 보유/거주공제, 80% 상한 적용 후 명목값).
    * 2027년 이후는 여기에 더해 연도별 금액 상한(2027년 800만원, 2028년
    * 이후 600만원)까지 적용되므로, 실제 공제액(`creditAmount`)을 이 비율로
@@ -284,6 +308,25 @@ function resolveBracketOutcome(year: 2027 | 2028 | 2029, taxBase: number, houseC
 }
 
 /**
+ * 재산세액공제(이중과세 조정, 종부세법 §9③) 근사액.
+ *
+ * 근사식: 종부세 과세표준 × 재산세 공정시장가액비율 × 재산세 최고구간세율.
+ * `propertyTaxCalculator.ts`가 쓰는 것과 같은 근사식으로(그쪽 주석 참고 — 실제
+ * 사례와 대조 검증됨), 정식 법령 산식(주택별 다단계 안분)은 아니다. 이 계산기는
+ * 주택별 공시가격이 아니라 합계만 입력받으므로 실제 납부 재산세를 상한으로
+ * 씌우는 캡은 적용하지 못한다 — 다만 통상 근사액이 실제 재산세보다 훨씬 작아
+ * 캡이 걸리는 경우는 드물다.
+ *
+ * 이 공제를 빼먹으면 산출세액을 18~32%가량 과대계상하게 되어(실측) 무시할 수
+ * 없다.
+ */
+function resolvePropertyTaxCredit(taxBase: number, totalPublicPrice: number, houseCount: HouseCount): number {
+  const fmvRatio =
+    houseCount === '1주택' ? propertyTaxSingleHouseFmvRatio(totalPublicPrice) : PROPERTY_TAX_FMV_DEFAULT;
+  return Math.max(0, taxBase * fmvRatio * PROPERTY_TAX_TOP_RATE);
+}
+
+/**
  * 1세대1주택 세액공제(연령공제 + 보유/거주공제) 결과. `rate`는 80% 상한을
  * 적용한 명목 공제율, `amount`는 여기에 연도별 금액 상한(2027년 800만원,
  * 2028년 이후 600만원)까지 적용한 최종 공제액이다 — 금액 상한이 걸리면
@@ -321,11 +364,21 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
   const totalPublicPrice = Math.max(0, input.totalPublicPrice || 0);
 
   if (input.year === 2026) {
+    // 현행법 계산은 그대로 위임하되, 재산세액공제는 이 계산기가 직접 붙인다 —
+    // 위임 대상 함수는 주택 1건의 재산세 정보를 넘겨줘야만 공제를 계산하는데,
+    // 이 계산기는 공시가격 "합계"만 받으므로 그 경로를 쓸 수 없기 때문이다.
+    // 아래 2027년 이후 경로와 같은 근사식을 써서 연도 간 일관성을 유지한다.
     const base = calculateComprehensiveTax({
       totalPublicPrice,
       houseCount: input.houseCount,
       ageAndHolding: input.ageAndHolding,
     });
+    const propertyTaxCredit = resolvePropertyTaxCredit(base.taxBase, totalPublicPrice, input.houseCount);
+    const afterPropertyCredit = Math.max(0, base.calculatedTax - propertyTaxCredit);
+    // 고령자·장기보유 세액공제는 재산세액공제를 뺀 금액에 곱한다(현행법 순서).
+    const creditAmount = afterPropertyCredit * base.seniorLongTermCreditRate;
+    const finalTax = Math.max(0, afterPropertyCredit - creditAmount);
+    const ruralSpecialTax = finalTax * RURAL_SPECIAL_TAX_RATE;
     return {
       year: 2026,
       deduction: base.deduction,
@@ -333,11 +386,12 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
       fmvTrack: null,
       taxBase: base.taxBase,
       bracket: { status: 'delegated', calculatedTax: base.calculatedTax },
+      propertyTaxCredit,
       creditRate: base.seniorLongTermCreditRate,
-      creditAmount: base.seniorLongTermCredit,
-      finalTax: base.finalTax,
-      ruralSpecialTax: base.ruralSpecialTax,
-      totalWithSurtax: base.totalWithSurtax,
+      creditAmount,
+      finalTax,
+      ruralSpecialTax,
+      totalWithSurtax: finalTax + ruralSpecialTax,
     };
   }
 
@@ -347,13 +401,17 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
   const taxBase = Math.max(0, totalPublicPrice - deduction) * fairMarketRatio;
   const bracket = resolveBracketOutcome(input.year, taxBase, input.houseCount);
 
+  // 재산세액공제(이중과세 조정)를 먼저 뺀 뒤, 남은 금액에 1세대1주택 세액공제를
+  // 적용한다(현행법 §9의 계산 순서를 그대로 따른다).
+  const propertyTaxCredit = resolvePropertyTaxCredit(taxBase, totalPublicPrice, input.houseCount);
+  const afterPropertyCredit = Math.max(0, bracket.calculatedTax - propertyTaxCredit);
   const { rate: creditRate, amount: creditAmount } = resolveCredit(
     input.year,
     input.houseCount,
-    bracket.calculatedTax,
+    afterPropertyCredit,
     input.ageAndHolding,
   );
-  const finalTax = Math.max(0, bracket.calculatedTax - creditAmount);
+  const finalTax = Math.max(0, afterPropertyCredit - creditAmount);
   const ruralSpecialTax = finalTax * RURAL_SPECIAL_TAX_RATE;
   const totalWithSurtax = finalTax + ruralSpecialTax;
 
@@ -367,6 +425,7 @@ export function calculateReformTax(input: ReformTaxInput): ReformTaxResult {
     fmvTrack: input.year === 2027 ? null : track,
     taxBase,
     bracket,
+    propertyTaxCredit,
     creditRate,
     creditAmount,
     finalTax,

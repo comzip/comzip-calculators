@@ -206,7 +206,32 @@ const [titleMain, titleSub] = meta.title.split(' (');
           경우 실제 세액이 이 계산 결과보다 낮을 수 있습니다.
         </li>
         <li>취득가액·필요경비 계산은 반영하지 않습니다 — 양도차익을 직접 계산해 입력해야 합니다.</li>
-        <li>다주택자 조정대상지역 중과는 <strong>2년 이상 보유</strong>한 경우에만 적용됩니다.</li>
+        <li>
+          1세대1주택 비과세는 <strong>2년 이상 보유</strong> 요건만 판정합니다 — 취득 당시
+          조정대상지역이었다면 <strong>2년 이상 거주</strong> 요건도 추가되는데, 이 계산기는
+          취득 시점의 지역 지정 여부를 입력받지 않아 반영하지 못합니다.
+        </li>
+        <li>
+          일시적 2주택·상속·동거봉양 등으로 <strong>주택 수 산정에서 제외</strong>되는 특례는
+          반영하지 않습니다 — 해당되면 "1주택"을 직접 선택해 계산하세요.
+        </li>
+      </ul>
+      <strong>반영된 주요 규칙 (참고)</strong>
+      <ul>
+        <li>
+          조정대상지역 다주택 <strong>중과 대상 주택은 장기보유특별공제가 배제</strong>됩니다
+          (소득세법 §95②). 2027·2028년 중과 한시완화 기간에도 중과 대상 지정 자체는 유지되므로
+          이 배제는 계속 적용됩니다.
+        </li>
+        <li>
+          보유기간이 <strong>1년 미만이면 70%, 1년 이상 2년 미만이면 60%</strong>의 단일세율이
+          적용됩니다. 중과 대상이기도 하면 누진세율(+중과)과 단기세율 중 <strong>큰 금액</strong>으로
+          과세합니다(소득세법 §104⑤ 비교과세).
+        </li>
+        <li>
+          중과 한시완화(2027·2028)는 <strong>2년 이상 보유</strong>한 경우로 한정됩니다 — 2년
+          미만이면 완화 없이 현행 가산율(+20%p/+30%p)이 그대로 붙습니다.
+        </li>
       </ul>
     </div>
   </div>
@@ -289,9 +314,32 @@ const [titleMain, titleSub] = meta.title.split(' (');
     <details>
       <summary>다주택자 중과는 언제 적용되나요?</summary>
       <p>
-        2주택 이상을 보유하고, 그중 <strong>조정대상지역에 소재한 주택</strong>을 2년 이상 보유
-        후 양도할 때만 적용됩니다. 세율 가산폭은 2026년(현행 +20%p/+30%p)에서 2027년(+5%p/+10%p)
-        →2028년(+10%p/+15%p)까지 한시적으로 줄었다가, 2029년부터 현행 수준으로 되돌아갑니다.
+        2주택 이상을 보유하고 그중 <strong>조정대상지역에 소재한 주택</strong>을 양도할 때
+        적용됩니다(보유기간과 무관). 세율 가산폭은 현행 +20%p(2주택)/+30%p(3주택 이상)이며,
+        2027년(+5%p/+10%p)→2028년(+10%p/+15%p)으로 한시 완화됐다가 2029년부터 현행 수준으로
+        되돌아갑니다. 다만 이 <strong>한시 완화는 2년 이상 보유한 경우로 한정</strong>되므로,
+        2년 미만 보유 주택은 완화 기간에도 현행 가산율이 그대로 적용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>중과 대상이면 장기보유특별공제를 못 받나요?</summary>
+      <p>
+        네. 조정대상지역 다주택 중과 대상 주택은 <strong>장기보유특별공제가 전액 배제</strong>됩니다
+        (소득세법 제95조제2항, 2018년 4월 1일 시행). 오래 보유했더라도 공제를 받을 수 없습니다.
+        2027·2028년 중과 한시 완화는 세율만 낮추는 것이고 중과 대상 지정 자체는 그대로여서, 완화
+        기간에도 이 배제는 계속됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>2년도 안 되어 팔면 세금이 어떻게 되나요?</summary>
+      <p>
+        주택은 보유기간이 <strong>1년 미만이면 70%, 1년 이상 2년 미만이면 60%</strong>의 단일세율이
+        적용됩니다(누진세율표 대신). 장기보유특별공제도 3년 이상 보유해야 시작되므로 받을 수
+        없고, 1세대1주택 비과세도 2년 이상 보유해야 하므로 적용되지 않습니다. 중과 대상이기도
+        하다면 누진세율(중과 포함)로 계산한 세액과 단기세율로 계산한 세액 중 <strong>큰
+        금액</strong>으로 과세합니다.
       </p>
     </details>
   </section>
@@ -486,10 +534,13 @@ const [titleMain, titleSub] = meta.title.split(' (');
     setWon('rt-basic', result.basicDeduction);
     setWon('rt-taxbase', result.taxBase);
     setWon('rt-tax', result.calculatedTax);
-    setText(
-      'rt-surcharge-hint',
-      result.surchargeRate > 0 ? `(다주택자 중과 +${pct(result.surchargeRate)}p 반영)` : '',
-    );
+    const surchargeHints = [
+      result.surchargeRate > 0 ? `다주택자 중과 +${pct(result.surchargeRate)}p` : '',
+      result.appliedShortTermRate !== null
+        ? `단기 보유 단일세율 ${pct(result.appliedShortTermRate)} 적용`
+        : '',
+    ].filter(Boolean);
+    setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
     setWon('rt-local', result.localIncomeTax);
     setWon('rt-total', result.totalWithSurtax);
 

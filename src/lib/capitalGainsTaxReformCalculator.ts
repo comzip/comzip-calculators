@@ -62,8 +62,26 @@ const DEDUCTION_CAP_2029 = 1_000_000_000;
 /** 다주택자 조정대상지역 중과 가산율 — 연도별(현행/한시완화). */
 const SURCHARGE_2HOUSE: Record<CgtReformYear, number> = { 2026: 0.2, 2027: 0.05, 2028: 0.1, 2029: 0.2 };
 const SURCHARGE_3HOUSE: Record<CgtReformYear, number> = { 2026: 0.3, 2027: 0.1, 2028: 0.15, 2029: 0.3 };
-/** 중과 적용 최소 보유기간(년). */
+/**
+ * 중과 한시완화(2027·2028)의 적용 요건인 최소 보유기간(년). 보유 2년 미만은
+ * 애초에 아래 단기양도 세율(60~70%) 대상이라 완화 대상에서 빠진다.
+ */
 const SURCHARGE_MIN_HOLDING_YEARS = 2;
+
+/**
+ * 주택·조합원입주권 단기양도 세율(소득세법 제104조제1항). 보유기간이 짧으면
+ * 누진세율표 대신 이 단일세율이 적용된다 — 개편 대상이 아닌 현행 제도.
+ */
+const SHORT_TERM_RATE_UNDER_1Y = 0.7; // 1년 미만 70%
+const SHORT_TERM_RATE_UNDER_2Y = 0.6; // 1년 이상 2년 미만 60%
+
+/**
+ * 1세대1주택 비과세 최소 보유기간(년, 소득세법 시행령 §154①). 이 기간을
+ * 채우지 못하면 양도가액이 12억원 이하라도 비과세가 아니다. (취득 당시
+ * 조정대상지역이었다면 2년 이상 "거주" 요건도 추가되는데, 이 계산기는
+ * 취득 시점의 지역 지정 여부를 입력받지 않아 보유 요건만 판정한다.)
+ */
+const EXEMPTION_MIN_HOLDING_YEARS = 2;
 
 /** 지방소득세율 — 양도소득세 산출세액의 10%(지방세법, 개편 대상 아님). */
 const LOCAL_INCOME_TAX_RATE = 0.1;
@@ -121,7 +139,12 @@ export interface CapitalGainsReformResult {
   taxBase: number;
   /** 적용된 다주택자 중과 가산율(0이면 미적용). */
   surchargeRate: number;
-  /** 산출세액 — 기본세율표(+중과 가산율)를 과세표준에 적용한 값. */
+  /**
+   * 실제로 적용된 단기 보유 단일세율(0.7 또는 0.6). 비교과세 결과 누진세율표
+   * 쪽이 더 크면 null — 즉 이 값이 null이 아니면 단기세율로 과세된 것이다.
+   */
+  appliedShortTermRate: number | null;
+  /** 산출세액 — 누진세율표(+중과)와 단기 단일세율 중 큰 금액(비교과세). */
   calculatedTax: number;
   /** 지방소득세 = 산출세액 × 10%. */
   localIncomeTax: number;
@@ -134,14 +157,20 @@ export interface CapitalGainsReformResult {
 // ============================================================
 
 function resolveTaxableGain(input: CapitalGainsReformInput): { taxableGain: number; isExempt: boolean } {
+  const gain = Math.max(0, input.gain);
   if (input.houseCount !== '1주택') {
-    return { taxableGain: Math.max(0, input.gain), isExempt: false };
+    return { taxableGain: gain, isExempt: false };
+  }
+  // 1세대1주택 비과세는 2년 이상 보유해야 한다 — 보유기간이 짧으면 양도가액이
+  // 12억원 이하여도 전액 과세되고, 12억원 초과 안분도 적용되지 않는다.
+  if (input.holdingYears < EXEMPTION_MIN_HOLDING_YEARS) {
+    return { taxableGain: gain, isExempt: false };
   }
   if (input.saleValue <= SINGLE_HOUSE_EXEMPT_SALE_VALUE) {
     return { taxableGain: 0, isExempt: true };
   }
   const taxablePortion = (input.saleValue - SINGLE_HOUSE_EXEMPT_SALE_VALUE) / input.saleValue;
-  return { taxableGain: Math.max(0, input.gain) * taxablePortion, isExempt: false };
+  return { taxableGain: gain * taxablePortion, isExempt: false };
 }
 
 function resolveBasicDeduction(input: CapitalGainsReformInput): number {
@@ -158,13 +187,30 @@ function annualRate(years: number, perYear: number, cap: number): number {
   return Math.min(cap, Math.max(0, years) * perYear);
 }
 
+/**
+ * 조정대상지역 다주택 중과 대상인지 — 세율 가산뿐 아니라 **장기보유특별공제
+ * 배제**(소득세법 §95②)의 판정 기준이기도 하다. 보유기간과 무관하게 성립한다
+ * (보유 2년 이상은 아래 `resolveSurchargeRate`의 한시완화 요건일 뿐이다).
+ */
+function isSurchargeTarget(input: CapitalGainsReformInput): boolean {
+  return input.houseCount !== '1주택' && Boolean(input.isRegulatedArea);
+}
+
 function resolveLongTermDeductionRate(input: CapitalGainsReformInput): number {
   const { year, houseCount, holdingYears, residencyYears } = input;
+  // 조정대상지역 다주택 중과 대상 주택은 장기보유특별공제가 통째로 배제된다
+  // (소득세법 §95②, 2018-04-01 시행). 2027·2028년 중과세율 한시완화는 §104⑦에
+  // 세율 단서만 신설할 뿐 중과 대상 지정 자체는 그대로 두므로, 완화 기간에도
+  // 이 배제는 계속된다.
+  if (isSurchargeTarget(input)) return 0;
   if (holdingYears < MIN_HOLDING_YEARS) return 0;
 
-  if (houseCount === '1주택') {
-    // 1세대1주택은 거주요건(2년 이상)도 충족해야 공제 자체가 시작된다.
-    if (residencyYears < MIN_RESIDENCY_YEARS_FOR_CREDIT) return 0;
+  // 1세대1주택 특례표(최대 80%)는 2년 이상 거주해야 적용된다. 거주요건을
+  // 채우지 못한 1주택은 공제가 0이 되는 게 아니라 일반표(보유 연2%, 최대
+  // 30%)로 내려간다 — 아래 다주택 분기와 같은 계산이라 여기서 위임한다.
+  const useSingleHouseTable = houseCount === '1주택' && residencyYears >= MIN_RESIDENCY_YEARS_FOR_CREDIT;
+
+  if (useSingleHouseTable) {
     if (year <= 2027) {
       // 현행: 거주 연4%(최대40%) + 보유 연4%(최대40%), 합산 최대 80%.
       return annualRate(residencyYears, 0.04, 0.4) + annualRate(holdingYears, 0.04, 0.4);
@@ -177,7 +223,7 @@ function resolveLongTermDeductionRate(input: CapitalGainsReformInput): number {
     return annualRate(residencyYears, 0.08, 0.8);
   }
 
-  // 다주택자(2·3주택)
+  // 일반표 — 다주택자(비조정대상지역)와, 거주요건 미충족 1주택자에 공통 적용.
   if (year <= 2027) {
     // 현행: 보유공제만 연2%(최대30%), 거주공제 없음.
     return annualRate(holdingYears, 0.02, 0.3);
@@ -199,10 +245,22 @@ function resolveDeductionCap(year: CgtReformYear): number {
 }
 
 function resolveSurchargeRate(input: CapitalGainsReformInput): number {
-  if (input.houseCount === '1주택' || !input.isRegulatedArea) return 0;
-  if (input.holdingYears < SURCHARGE_MIN_HOLDING_YEARS) return 0;
+  if (!isSurchargeTarget(input)) return 0;
   const table = input.houseCount === '2주택' ? SURCHARGE_2HOUSE : SURCHARGE_3HOUSE;
+  // 한시완화(2027·2028)는 보유 2년 이상인 경우로 한정된다 — 2년 미만이면
+  // 완화 없이 현행 가산율(+20%p/+30%p)이 그대로 붙는다.
+  if (input.holdingYears < SURCHARGE_MIN_HOLDING_YEARS) return table[2026];
   return table[input.year];
+}
+
+/**
+ * 단기 보유 단일세율(1년 미만 70%, 2년 미만 60%). 해당 없으면 null.
+ * 누진세율표 대신 적용되며, 중과 대상이면 아래 비교과세로 큰 쪽을 택한다.
+ */
+function resolveShortTermRate(holdingYears: number): number | null {
+  if (holdingYears < 1) return SHORT_TERM_RATE_UNDER_1Y;
+  if (holdingYears < 2) return SHORT_TERM_RATE_UNDER_2Y;
+  return null;
 }
 
 // ============================================================
@@ -223,6 +281,7 @@ export function calculateCapitalGainsReformTax(input: CapitalGainsReformInput): 
       basicDeduction: 0,
       taxBase: 0,
       surchargeRate: 0,
+      appliedShortTermRate: null,
       calculatedTax: 0,
       localIncomeTax: 0,
       totalWithSurtax: 0,
@@ -240,7 +299,15 @@ export function calculateCapitalGainsReformTax(input: CapitalGainsReformInput): 
     surchargeRate > 0
       ? INCOME_TAX_BRACKETS.map((bracket) => ({ upTo: bracket.upTo, rate: bracket.rate + surchargeRate }))
       : INCOME_TAX_BRACKETS;
-  const calculatedTax = progressiveTax(taxBase, brackets);
+  const progressiveAmount = progressiveTax(taxBase, brackets);
+
+  // 하나의 자산에 둘 이상의 세율이 적용될 수 있으면 각각 계산한 세액 중 큰
+  // 금액을 세액으로 한다(소득세법 §104⑤ 비교과세). 단기 보유이면서 조정대상
+  // 지역 다주택 중과 대상이기도 한 경우가 여기 해당한다.
+  const shortTermRate = resolveShortTermRate(input.holdingYears);
+  const shortTermAmount = shortTermRate === null ? 0 : taxBase * shortTermRate;
+  const calculatedTax = Math.max(progressiveAmount, shortTermAmount);
+  const appliedShortTermRate = shortTermRate !== null && shortTermAmount >= progressiveAmount ? shortTermRate : null;
 
   const localIncomeTax = calculatedTax * LOCAL_INCOME_TAX_RATE;
   const totalWithSurtax = calculatedTax + localIncomeTax;
@@ -254,6 +321,7 @@ export function calculateCapitalGainsReformTax(input: CapitalGainsReformInput): 
     basicDeduction,
     taxBase,
     surchargeRate,
+    appliedShortTermRate,
     calculatedTax,
     localIncomeTax,
     totalWithSurtax,

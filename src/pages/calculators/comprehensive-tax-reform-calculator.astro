@@ -168,6 +168,10 @@ const [titleMain, titleSub] = meta.title.split(' (');
           <td>산출세액 <span class="hint" id="rt-status-badge"></span></td>
           <td id="rt-tax">-</td>
         </tr>
+        <tr>
+          <td>재산세액공제 <span class="hint">(이중과세 조정, 근사치)</span></td>
+          <td id="rt-property-credit">-</td>
+        </tr>
         <tr id="rt-credit-row" class="hidden">
           <td>세액공제 <span class="hint" id="rt-credit-label"></span></td>
           <td id="rt-credit">-</td>
@@ -215,7 +219,7 @@ const [titleMain, titleSub] = meta.title.split(' (');
           <td id="cmp-fmv-2029">-</td>
         </tr>
         <tr class="total">
-          <td>결정세액</td>
+          <td>합계 <span class="hint">(농특세 포함)</span></td>
           <td id="cmp-final-2026">-</td>
           <td id="cmp-final-2027">-</td>
           <td id="cmp-final-2028">-</td>
@@ -229,8 +233,10 @@ const [titleMain, titleSub] = meta.title.split(' (');
       <strong>이 계산기의 한계</strong>
       <ul>
         <li>
-          <strong>재산세액공제(이중과세 조정)</strong>는 반영하지 않습니다 — 개편안에서도
-          유지되는지 확인되지 않았습니다.
+          <strong>재산세액공제(이중과세 조정)</strong>는 <strong>근사식</strong>으로 반영합니다
+          (종부세 과세표준 × 재산세 공정시장가액비율 × 재산세 최고세율). 실제 법령은 주택마다
+          안분하는 다단계 계산이라 차이가 날 수 있고, 이 계산기는 공시가격 합계만 받으므로
+          "실제 납부한 재산세"를 상한으로 씌우는 처리는 하지 못합니다.
         </li>
         <li>
           <strong>세부담상한</strong>(150%→200%로 상향 예정)은 반영하지 않습니다 — 기존
@@ -580,16 +586,20 @@ const [titleMain, titleSub] = meta.title.split(' (');
       setText('rt-credit-label', `(${creditLabel}, 명목 ${pct(result.creditRate)})`);
     }
 
+    setWon('rt-property-credit', result.propertyTaxCredit);
     setWon('rt-final', result.finalTax);
     setWon('rt-rural', result.ruralSpecialTax);
     setWon('rt-total', result.totalWithSurtax);
 
+    // 비교표의 마지막 행은 위 상세표의 마지막 행("합계")과 반드시 같은 값을
+    // 보여줘야 한다 — 예전엔 여기만 결정세액(농특세 제외)이라, 같은 연도인데
+    // 두 표의 숫자가 달라 보이는 문제가 있었다.
     const allYears = calculateReformTaxAllYears(commonInput);
     for (const y of [2026, 2027, 2028, 2029] as const) {
       const r = allYears[y];
       setWon(`cmp-deduction-${y}`, r.deduction);
       setText(`cmp-fmv-${y}`, pct(r.fairMarketRatio));
-      setWon(`cmp-final-${y}`, r.finalTax);
+      setWon(`cmp-final-${y}`, r.totalWithSurtax);
     }
 
     resultBox.classList.remove('hidden');
