@@ -162,6 +162,27 @@ const meta = calculators.find((c) => c.slug === 'tdee-calculator')!;
         하면 실제보다 유지 칼로리가 높게 나올 수 있습니다.
       </p>
     </details>
+
+    <details>
+      <summary>임산부나 수유부에게도 이 계산 결과가 적용되나요?</summary>
+      <p>
+        아니요. 임신·수유 중에는 태아 성장, 모유 생산 등으로 추가적인 열량이
+        필요한데, 이 계산기가 쓰는 일반 성인용 공식은 이런 요인을 반영하지
+        않습니다. 임신·수유 중 적정 섭취 칼로리는 산부인과·영양 전문가와
+        상담하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>근육량이 매우 많은 사람(보디빌더 등)에게도 정확한가요?</summary>
+      <p>
+        오차가 커질 수 있습니다. Mifflin-St Jeor 공식은 신장·체중·나이만
+        사용하고 <strong>체지방률을 반영하지 않기 때문에</strong>, 근육량이
+        매우 많거나 매우 적은 사람은 실제 기초대사량과 차이가 날 수
+        있습니다. 이런 경우 체지방률까지 반영하는 Katch-McArdle 공식이 더
+        정확할 수 있습니다.
+      </p>
+    </details>
   </section>
 </BaseLayout>
 

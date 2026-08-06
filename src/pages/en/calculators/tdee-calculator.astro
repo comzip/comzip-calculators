@@ -164,6 +164,27 @@ const meta = calculators.find((c) => c.slug === 'tdee-calculator')!;
         too high an activity level will overestimate your maintenance calories.
       </p>
     </details>
+
+    <details>
+      <summary>Does this apply during pregnancy or breastfeeding?</summary>
+      <p>
+        No. Pregnancy and breastfeeding require additional energy for fetal growth and milk
+        production, which the standard adult formula used here does not account for. Consult
+        an OB-GYN or nutrition professional for appropriate caloric intake during pregnancy or
+        breastfeeding.
+      </p>
+    </details>
+
+    <details>
+      <summary>Is this accurate for people with very high muscle mass (e.g. bodybuilders)?</summary>
+      <p>
+        It may be less accurate. The Mifflin-St Jeor formula uses only height, weight, and age
+        and <strong>does not account for body fat percentage</strong>, so people with very high
+        or very low muscle mass can see larger deviations from their actual BMR. The
+        Katch-McArdle formula, which factors in body fat percentage, may be more accurate in
+        these cases.
+      </p>
+    </details>
   </section>
 </BaseLayout>
 

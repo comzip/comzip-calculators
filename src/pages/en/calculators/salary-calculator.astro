@@ -145,6 +145,27 @@ const meta = calculators.find((c) => c.slug === 'salary-calculator')!;
         non-taxable limit — adjust it based on your own pay stub.
       </p>
     </details>
+
+    <details>
+      <summary>Can freelancers (3.3% withholding) use this calculator?</summary>
+      <p>
+        No. This calculator is built for <strong>employees</strong> enrolled in Korea's 4
+        major social insurances. Freelancers and business-income earners instead have 3.3%
+        withheld (3% business income tax + 0.3% local income tax) from each payment, which
+        doesn't match this calculator's social-insurance and employment-income-tax structure.
+      </p>
+    </details>
+
+    <details>
+      <summary>What if my salary includes bonuses or performance pay?</summary>
+      <p>
+        This calculator assumes your annual salary is <strong>paid evenly across 12
+        months</strong>. If a bonus is actually paid in a lump sum in a specific month,
+        that month's insurance premiums and taxes will be higher than this estimate, and
+        other months lower. Your annual take-home total should be similar, but the monthly
+        breakdown may differ.
+      </p>
+    </details>
   </section>
 </BaseLayout>
 

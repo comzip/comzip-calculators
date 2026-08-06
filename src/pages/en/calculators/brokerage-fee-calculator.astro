@@ -148,6 +148,25 @@ const meta = calculators.find((c) => c.slug === 'brokerage-fee-calculator')!;
         is illegal.
       </p>
     </details>
+
+    <details>
+      <summary>Do both the seller and the buyer pay a brokerage fee?</summary>
+      <p>
+        Yes, in principle each party pays <strong>their own agent</strong>. The seller
+        pays the agent who represented the sale side, and the buyer pays the agent who
+        represented the purchase side — each within the ceiling this calculator shows.
+      </p>
+    </details>
+
+    <details>
+      <summary>If two agents are involved (dual representation), does the fee double?</summary>
+      <p>
+        No. The ceiling rate based on the transaction amount stays the same either way —
+        each agent is paid <strong>only by the client they represented</strong>, within
+        the statutory ceiling. Compared to a single agent representing both sides, the
+        total amount paid across the whole transaction does not double.
+      </p>
+    </details>
   </section>
 </BaseLayout>
 

@@ -103,6 +103,24 @@ const meta = calculators.find((c) => c.slug === 'dday-calculator')!;
         milestone.
       </p>
     </details>
+
+    <details>
+      <summary>Is D-day notation an official standard?</summary>
+      <p>
+        No, it isn't defined by any law or formal standard. But the convention of a minus sign
+        for days remaining (D-DAY, D-1) and a plus sign for days elapsed (D+1) is by far the
+        most common usage in Korea, and this calculator follows that convention.
+      </p>
+    </details>
+
+    <details>
+      <summary>Are leap years handled correctly?</summary>
+      <p>
+        Yes. This calculator computes the actual calendar-day difference between the two dates,
+        so a February 29 falling within the range is automatically accounted for. You don't need
+        to worry about leap years separately.
+      </p>
+    </details>
   </section>
 </BaseLayout>
 
