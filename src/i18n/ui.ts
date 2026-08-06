@@ -14,6 +14,7 @@ export const ui: Record<Lang, {
   defaultDescription: string;
   navLabel: string;
   policyLabel: string;
+  about: string;
   privacy: string;
   terms: string;
   langSwitchLabel: string;
@@ -24,6 +25,7 @@ export const ui: Record<Lang, {
       '만나이, 연봉 실수령액 등 일상에 필요한 계산기를 모아둔 무료 계산기 사이트, 콤집계산기입니다.',
     navLabel: '주요 계산기',
     policyLabel: '정책',
+    about: '소개',
     privacy: '개인정보처리방침',
     terms: '이용약관',
     langSwitchLabel: 'English',
@@ -34,6 +36,7 @@ export const ui: Record<Lang, {
       'Comzip Calculators is a free collection of everyday calculators for Korean age, take-home pay, taxes, and more.',
     navLabel: 'Calculators',
     policyLabel: 'Policies',
+    about: 'About',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
     langSwitchLabel: '한국어',

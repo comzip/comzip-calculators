@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { calculators, categoryOrder, categoryLabels } from '../../data/calculators';
+
+const categoryCounts = categoryOrder.map((category) => ({
+  label: categoryLabels[category].en,
+  count: calculators.filter((c) => c.category === category).length,
+}));
+---
+
+<BaseLayout
+  title="About"
+  description="Why Comzip Calculators exists and how it's run."
+  path="/about"
+  lang="en"
+>
+  <h1>About Comzip Calculators</h1>
+
+  <p>
+    Comzip Calculators is a free site that brings together the calculators
+    you end up needing at some point in everyday life — Korean age, salary,
+    taxes, real estate, and more. Instead of searching around for a
+    calculator with the right assumptions every time, you can run the
+    calculation here and see exactly how the result was derived.
+  </p>
+
+  <h2>Why it exists</h2>
+  <p>
+    Every time I needed to calculate take-home pay, acquisition tax, or my
+    Korean age, I kept running into sites cluttered with ads, calculators
+    with unclear methodology, or pages that were awkward to use on mobile —
+    so I started building my own. This is an independently run side project,
+    and the number of calculators keeps growing.
+  </p>
+
+  <h2>How it's run</h2>
+  <ul>
+    <li>
+      <strong>No sign-up — everything runs in your browser.</strong> Values
+      you enter are never sent to or stored on a server; they're processed
+      entirely on your device. See the
+      <a href="/en/privacy">Privacy Policy</a> for details.
+    </li>
+    <li>
+      <strong>Calculations cite their basis.</strong> Tax and legal
+      calculators list the specific statute and the date it was last checked
+      at the bottom of the page.
+    </li>
+    <li>
+      <strong>Korean and English are both supported.</strong> New calculators
+      are built with both language versions from the start.
+    </li>
+  </ul>
+
+  <h2>What's covered right now</h2>
+  <p>
+    {calculators.length} calculators across {categoryOrder.length} categories:{' '}
+    {categoryCounts.map(({ label, count }) => `${label} (${count})`).join(', ')}.
+    Browse the full list by category or search on the <a href="/en/">homepage</a>.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    If a result looks off, a law has changed, or you'd like to see a new
+    calculator added, let me know.
+  </p>
+  <ul>
+    <li>Email: <a href="mailto:comzip@gmail.com">comzip@gmail.com</a></li>
+  </ul>
+
+  <div class="disclaimer">
+    All results are for reference only and carry no legal effect. Before
+    filing, paying, or processing payroll, always confirm with the relevant
+    authority (National Tax Service, Hometax, Ministry of Employment and
+    Labor, etc.).
+  </div>
+</BaseLayout>
