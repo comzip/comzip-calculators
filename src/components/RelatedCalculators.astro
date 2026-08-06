@@ -1,0 +1,31 @@
+---
+import { relatedCalculators } from '../data/calculators';
+import type { Lang } from '../i18n/ui';
+
+export interface Props {
+  slug: string;
+  lang?: Lang;
+}
+
+const { slug, lang = 'ko' } = Astro.props;
+const items = relatedCalculators(slug);
+const localePrefix = lang === 'en' ? '/en' : '';
+---
+
+{
+  items.length > 0 && (
+    <section class="related-calculators">
+      <h2>{lang === 'en' ? 'Explore More Calculators' : '다른 계산기 둘러보기'}</h2>
+      <ul>
+        {items.map((c) => (
+          <li>
+            <a href={`${localePrefix}/calculators/${c.slug}`}>
+              {lang === 'en' ? c.titleEn : c.title}
+            </a>
+            <p>{lang === 'en' ? c.descriptionEn : c.description}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
 import { calculators } from '../../data/calculators';
 import { CUSTOMS_ITEMS } from '../../lib/customsDutyCalculator';
 
@@ -152,6 +153,8 @@ for (const item of CUSTOMS_ITEMS) {
   </div>
 
   <AdSlot />
+
+  <RelatedCalculators slug="customs-duty-calculator" />
 
   <section class="faq">
     <h2>자주 묻는 질문</h2>

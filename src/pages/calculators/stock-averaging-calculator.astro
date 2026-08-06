@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
 import { calculators } from '../../data/calculators';
 
 const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
@@ -262,6 +263,8 @@ const meta = calculators.find((c) => c.slug === 'stock-averaging-calculator')!;
   </div>
 
   <AdSlot />
+
+  <RelatedCalculators slug="stock-averaging-calculator" />
 
   <section class="faq">
     <h2>자주 묻는 질문</h2>

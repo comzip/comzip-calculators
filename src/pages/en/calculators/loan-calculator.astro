@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
 import { calculators } from '../../../data/calculators';
 
 const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
@@ -130,6 +131,8 @@ const meta = calculators.find((c) => c.slug === 'loan-calculator')!;
   </div>
 
   <AdSlot lang="en" />
+
+  <RelatedCalculators slug="loan-calculator" lang="en" />
 
   <section class="faq">
     <h2>Frequently asked questions</h2>

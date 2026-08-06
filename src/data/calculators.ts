@@ -279,3 +279,13 @@ export const calculators: Calculator[] = [
 export function calculatorsByCategory(category: CalculatorCategory): Calculator[] {
   return calculators.filter((c) => c.category === category);
 }
+
+/** Same-category calculators first, backfilled from other categories, excluding itself. */
+export function relatedCalculators(slug: string, count = 3): Calculator[] {
+  const current = calculators.find((c) => c.slug === slug);
+  if (!current) return [];
+  const rest = calculators.filter((c) => c.slug !== slug);
+  const sameCategory = rest.filter((c) => c.category === current.category);
+  const others = rest.filter((c) => c.category !== current.category);
+  return [...sameCategory, ...others].slice(0, count);
+}
