@@ -1,0 +1,517 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'savings-interest-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the principal for a lump-sum deposit (예금) or the monthly contribution for
+    installment savings (적금), plus the annual rate and term, to calculate <strong>pre-tax
+    and after-tax interest</strong> — including the 15.4% interest income tax withholding —
+    and your maturity payout.
+  </p>
+
+  <form class="calc-form" id="savings-form">
+    <fieldset class="method-toggle stacked-options">
+      <legend>Product Type</legend>
+      <label class="method-option">
+        <input type="radio" name="productType" value="예금" checked />
+        <span>Lump-sum Deposit (예금) — deposit a fixed principal at once</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="productType" value="적금" />
+        <span>Installment Savings (적금) — contribute a fixed amount monthly</span>
+      </label>
+    </fieldset>
+
+    <fieldset class="method-toggle stacked-options" id="interest-method-field">
+      <legend>Calculation Method (lump-sum deposits only)</legend>
+      <label class="method-option">
+        <input type="radio" name="interestMethod" value="단리" checked />
+        <span>Simple Interest</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="interestMethod" value="복리" />
+        <span>Compound Interest (monthly)</span>
+      </label>
+    </fieldset>
+    <p class="note hidden" id="installment-note">
+      Installment savings are calculated using the standard Korean bank convention:
+      per-installment simple interest.
+    </p>
+
+    <label id="principal-field">
+      Principal (KRW)
+      <input
+        type="number"
+        id="principal"
+        name="principal"
+        min="0"
+        step="any"
+        placeholder="e.g. 10000000"
+        required
+      />
+      <span class="amount-preview" id="principal-preview" aria-live="polite"></span>
+    </label>
+
+    <label id="monthlyDeposit-field" class="hidden">
+      Monthly Contribution (KRW)
+      <input
+        type="number"
+        id="monthlyDeposit"
+        name="monthlyDeposit"
+        min="0"
+        step="any"
+        placeholder="e.g. 300000"
+      />
+      <span class="amount-preview" id="monthlyDeposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Term (months)
+      <input type="number" id="months" name="months" min="1" step="1" placeholder="e.g. 12" required />
+    </label>
+
+    <label>
+      Annual Interest Rate (%)
+      <span class="hint">Enter the pre-tax advertised rate the bank quotes.</span>
+      <input
+        type="number"
+        id="annualRatePercent"
+        name="annualRatePercent"
+        min="0"
+        step="0.01"
+        placeholder="e.g. 3.5"
+        required
+      />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item primary">
+        <span class="label">Total After-Tax Payout</span>
+        <span class="value"><span id="payout-post-tax">-</span></span>
+        <span class="sub-caption" id="payout-caption"></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calculation breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>
+            Total Principal
+            <span class="formula-line" id="principal-formula-line">-</span>
+            <span class="formula-actual" id="principal-formula">-</span>
+          </td>
+          <td id="row-principal">-</td>
+        </tr>
+        <tr>
+          <td>
+            Pre-Tax Interest
+            <span class="formula-line" id="interest-formula-line">-</span>
+          </td>
+          <td id="row-pretax-interest">-</td>
+        </tr>
+        <tr>
+          <td>Interest Income Tax (15.4%)</td>
+          <td id="row-tax">-</td>
+        </tr>
+        <tr class="total">
+          <td>After-Tax Interest</td>
+          <td id="row-posttax-interest">-</td>
+        </tr>
+        <tr>
+          <td>Effective Return <span class="hint">(after-tax, simple annualized)</span></td>
+          <td id="row-effective-rate">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="schedule-scroll hidden" id="schedule-wrap">
+      <table class="breakdown schedule" id="schedule-table">
+        <caption class="note" style="text-align:left;margin-bottom:6px;">
+          Per-installment breakdown <span class="hint">(installment savings only — the 1st deposit earns interest for the full term, the last deposit earns 1 month)</span>
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Months Held</th>
+            <th scope="col">Pre-Tax Interest</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-body">
+          <!-- rows injected by client script -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    These results are <strong>simplified estimates</strong>. Actual interest calculation
+    methods (monthly vs. quarterly/annual compounding, early-withdrawal rates, etc.) vary by
+    financial institution and product — this calculator assumes the product is held to
+    maturity. Tax-advantaged products (한도 있는 비과세종합저축, 세금우대저축, etc.) are not
+    reflected. The installment-savings formula (per-installment simple interest) is an
+    industry convention, not a statutory rate table.
+  </div>
+
+  <section class="law-refs">
+    <h2>Legal Basis</h2>
+    <ul>
+      <li>
+        Basis: <strong>Income Tax Act</strong>, Article 129(1)(1)(d) (14% withholding rate on
+        general interest income) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Local Tax Act</strong>, Article 103-13(1) (individual local income tax
+        special withholding, 10% of the withheld income tax) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <RelatedCalculators slug="savings-interest-calculator" lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why is interest calculated differently for lump-sum deposits vs. installment savings?</summary>
+      <p>
+        A lump-sum deposit (예금) sits at the bank in full from day one to maturity, but with
+        installment savings (적금) you contribute month by month, so <strong>each
+        contribution earns interest for a different length of time</strong>. The 1st
+        contribution earns interest for the entire term, while the last contribution earns
+        only 1 month's worth.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is the actual interest on my "4% APY" installment account so much lower?</summary>
+      <p>
+        This is the sticker-rate illusion. Over a 12-month term, your money is on deposit for
+        roughly half the term on average, so the actual interest ends up around half of
+        "monthly contribution × 12 × rate." Check the per-installment breakdown table in this
+        calculator's results to see exactly how many months each contribution earns interest for.
+      </p>
+    </details>
+
+    <details>
+      <summary>Is interest income tax always 15.4%?</summary>
+      <p>
+        For ordinary deposits and installment savings, yes (14% income tax + 1.4 percentage
+        points local income tax). Tax-advantaged products — such as tax-free comprehensive
+        savings for seniors/people with disabilities, or preferential-rate savings at credit
+        unions — are outside this calculator's scope and may have a different effective rate.
+      </p>
+    </details>
+
+    <details>
+      <summary>What's the difference between simple and compound interest, and which does this calculator use?</summary>
+      <p>
+        Simple interest accrues only on the principal; compound interest also accrues on
+        interest already earned. This calculator's compound option is fixed at
+        <strong>monthly compounding</strong> — if your actual product compounds quarterly or
+        annually, your real result may differ slightly.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does this calculation change if I withdraw early?</summary>
+      <p>
+        Yes. Withdrawing before maturity almost always triggers a much lower
+        <strong>early-withdrawal rate</strong> than the advertised rate. This calculator only
+        computes interest for holding the product to maturity as agreed — check your specific
+        product's early-withdrawal rate separately if that's a possibility.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  #savings-form ~ .result-box .schedule-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: auto;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  #savings-form ~ .result-box table.schedule {
+    margin-top: 0;
+    font-size: 0.85rem;
+  }
+  #savings-form ~ .result-box table.schedule caption {
+    padding: 8px 8px 0;
+  }
+  #savings-form ~ .result-box table.schedule th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-soft);
+    z-index: 1;
+  }
+  #savings-form ~ .result-box table.breakdown.schedule td,
+  #savings-form ~ .result-box table.breakdown.schedule th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 8px 10px;
+  }
+  #savings-form ~ .result-box table.breakdown.schedule td:first-child,
+  #savings-form ~ .result-box table.breakdown.schedule th:first-child {
+    text-align: center;
+  }
+</style>
+
+<style>
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-item.primary .value {
+    font-size: 1.75rem;
+  }
+  .result-item .sub-caption {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateSavingsInterest } from '../../../lib/savingsInterestCalculator';
+  import type {
+    SavingsProductType,
+    DepositInterestMethod,
+  } from '../../../lib/savingsInterestCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('savings-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const principalField = document.getElementById('principal-field') as HTMLLabelElement;
+  const monthlyDepositField = document.getElementById('monthlyDeposit-field') as HTMLLabelElement;
+  const principalInput = document.getElementById('principal') as HTMLInputElement;
+  const monthlyDepositInput = document.getElementById('monthlyDeposit') as HTMLInputElement;
+  const interestMethodField = document.getElementById('interest-method-field') as HTMLFieldSetElement;
+  const installmentNote = document.getElementById('installment-note') as HTMLParagraphElement;
+
+  const currentProductType = (): SavingsProductType =>
+    (document.querySelector('input[name="productType"]:checked') as HTMLInputElement)
+      .value as SavingsProductType;
+
+  const syncProductType = () => {
+    const productType = currentProductType();
+    const isDeposit = productType === '예금';
+    principalField.classList.toggle('hidden', !isDeposit);
+    monthlyDepositField.classList.toggle('hidden', isDeposit);
+    principalInput.required = isDeposit;
+    monthlyDepositInput.required = !isDeposit;
+    interestMethodField.classList.toggle('hidden', !isDeposit);
+    installmentNote.classList.toggle('hidden', isDeposit);
+    result.classList.add('hidden');
+  };
+  document
+    .querySelectorAll('input[name="productType"]')
+    .forEach((el) => el.addEventListener('change', syncProductType));
+  syncProductType();
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('principal', 'principal-preview');
+  bindAmountPreview('monthlyDeposit', 'monthlyDeposit-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (value: number) => `${value.toFixed(2)}%`;
+
+  const scheduleWrap = document.getElementById('schedule-wrap') as HTMLDivElement;
+  const scheduleBody = document.getElementById('schedule-body') as HTMLTableSectionElement;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const productType = currentProductType();
+    const months = Number((document.getElementById('months') as HTMLInputElement).value);
+    const annualRatePercent = Number(
+      (document.getElementById('annualRatePercent') as HTMLInputElement).value,
+    );
+
+    if (!months || months <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid term in months.';
+      return;
+    }
+    if (!annualRatePercent || annualRatePercent < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid annual interest rate.';
+      return;
+    }
+
+    let principal = 0;
+    let monthlyDeposit = 0;
+    if (productType === '예금') {
+      principal = Number(principalInput.value);
+      if (!principal || principal <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = 'Please enter a valid principal.';
+        return;
+      }
+    } else {
+      monthlyDeposit = Number(monthlyDepositInput.value);
+      if (!monthlyDeposit || monthlyDeposit <= 0) {
+        result.classList.add('hidden');
+        errorMsg.textContent = 'Please enter a valid monthly contribution.';
+        return;
+      }
+    }
+
+    const interestMethod = (
+      document.querySelector('input[name="interestMethod"]:checked') as HTMLInputElement
+    ).value as DepositInterestMethod;
+
+    const r = calculateSavingsInterest({
+      productType,
+      principal,
+      monthlyDeposit,
+      months,
+      annualRatePercent,
+      interestMethod,
+    });
+
+    setWon('payout-post-tax', r.totalPayoutPostTax);
+    setText(
+      'payout-caption',
+      `Pre-tax ${won.format(Math.round(r.totalPayoutPreTax))} → After-tax ${won.format(Math.round(r.totalPayoutPostTax))} (${won.format(Math.round(r.interestTax))} withheld)`,
+    );
+
+    setWon('row-principal', r.totalPrincipal);
+    setText(
+      'principal-formula-line',
+      productType === '예금' ? '= principal' : '= monthly contribution × months',
+    );
+    setText(
+      'principal-formula',
+      productType === '예금'
+        ? `= ${won.format(Math.round(principal))}`
+        : `= ${won.format(Math.round(monthlyDeposit))} × ${months} months`,
+    );
+
+    setWon('row-pretax-interest', r.preTaxInterest);
+    setText(
+      'interest-formula-line',
+      productType === '예금'
+        ? interestMethod === '복리'
+          ? '= principal × ((1+rate/12)^months − 1)'
+          : '= principal × rate × (months/12)'
+        : '= monthly contribution × months×(months+1)/2 × (rate/12)',
+    );
+
+    setWon('row-tax', r.interestTax);
+    setWon('row-posttax-interest', r.postTaxInterest);
+    setText('row-effective-rate', pct(r.effectiveAnnualReturnPercent));
+
+    if (productType === '적금' && r.schedule.length > 0) {
+      scheduleBody.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      for (const row of r.schedule) {
+        const tr = document.createElement('tr');
+        const periodCell = document.createElement('td');
+        periodCell.textContent = `#${row.period}`;
+        const amountCell = document.createElement('td');
+        amountCell.textContent = won.format(Math.round(row.amount));
+        const monthsCell = document.createElement('td');
+        monthsCell.textContent = `${row.monthsHeld} mo`;
+        const interestCell = document.createElement('td');
+        interestCell.textContent = won.format(Math.round(row.interest));
+        tr.append(periodCell, amountCell, monthsCell, interestCell);
+        fragment.appendChild(tr);
+      }
+      scheduleBody.appendChild(fragment);
+      scheduleWrap.classList.remove('hidden');
+    } else {
+      scheduleWrap.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

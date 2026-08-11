@@ -238,6 +238,18 @@ export const calculators: Calculator[] = [
       'Enter your current shares, average cost, and current price to see your new average cost and breakeven return after buying more. Work backward from a target average price, or use it for both KRW and USD holdings.',
   },
   {
+    slug: 'savings-interest-calculator',
+    title: '예적금 이자 계산기',
+    titleEn: 'Korea Savings & Deposit Interest Calculator',
+    navLabel: '예적금 이자 계산기',
+    navLabelEn: 'Savings & Deposit Interest',
+    category: '투자',
+    description:
+      '예금(거치식)과 적금(적립식)의 세전·세후 이자를 계산합니다. 단리·복리, 이자소득세(15.4%) 원천징수를 반영해 만기 수령액을 보여줍니다.',
+    descriptionEn:
+      'Calculate pre-tax and after-tax interest on Korean lump-sum deposits (예금) and installment savings (적금), including the 15.4% interest income tax withholding, to see your maturity payout.',
+  },
+  {
     slug: 'bmi-calculator',
     title: 'BMI 계산기',
     titleEn: 'BMI Calculator',
