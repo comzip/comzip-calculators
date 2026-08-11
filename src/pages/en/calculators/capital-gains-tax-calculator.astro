@@ -1,0 +1,502 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'capital-gains-tax-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter your acquisition price, necessary expenses, and sale price to calculate Korean
+    <strong>capital gains tax on housing</strong> (current law) for one-household-one-home
+    owners and multi-home owners. For acquisition tax, property tax, and comprehensive real
+    estate tax, use the <a href="/en/calculators/acquisition-tax-calculator">Acquisition Tax
+    Calculator</a> and <a href="/en/calculators/property-tax-calculator">Property Holding Tax
+    Calculator</a>.
+  </p>
+  <p class="note">
+    💡 Curious how the proposed 2026 tax reform (not yet law) would change this? →
+    <a href="/en/calculators/capital-gains-tax-reform-calculator">2026 Reform Preview</a>
+  </p>
+
+  <form class="calc-form" id="cgt-form">
+    <label>
+      Acquisition Price (KRW)
+      <span class="hint">The amount you paid when buying the home. e.g. 1000000000</span>
+      <input
+        type="number"
+        id="acquisitionPrice"
+        name="acquisitionPrice"
+        min="0"
+        step="any"
+        placeholder="e.g. 1000000000"
+        required
+      />
+      <span class="amount-preview" id="acquisitionPrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Necessary Expenses (KRW)
+      <span class="hint">
+        Total of acquisition tax, brokerage fees, notary fees, and capital improvements (window
+        replacement, extensions, etc.). Optional, default 0. e.g. 20000000
+      </span>
+      <input
+        type="number"
+        id="necessaryExpenses"
+        name="necessaryExpenses"
+        min="0"
+        step="any"
+        placeholder="e.g. 20000000"
+      />
+      <span class="amount-preview" id="necessaryExpenses-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Sale Price (KRW)
+      <span class="hint">
+        The amount you sold for. Used to determine the one-home exemption (₩1.2 billion or
+        less). e.g. 1800000000
+      </span>
+      <input
+        type="number"
+        id="saleValue"
+        name="saleValue"
+        min="0"
+        step="any"
+        placeholder="e.g. 1800000000"
+        required
+      />
+      <span class="amount-preview" id="saleValue-preview" aria-live="polite"></span>
+    </label>
+
+    <p class="note" id="gain-preview-line"></p>
+
+    <label>
+      Number of Homes
+      <select id="houseCount">
+        <option value="1주택">1 home (one-household, one-home)</option>
+        <option value="2주택">2 homes</option>
+        <option value="3주택이상">3 or more homes</option>
+      </select>
+    </label>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>Located in a regulated area (affects multi-home surcharge)</span>
+    </label>
+
+    <label class="check-row" id="acquired-regulated-options">
+      <input type="checkbox" id="wasRegulatedAreaAtAcquisition" />
+      <span>Was a regulated area at acquisition (adds a 2-year residency requirement to the exemption)</span>
+    </label>
+    <p class="note hidden" id="acquired-regulated-note"></p>
+
+    <label>
+      Holding Period (years)
+      <span class="hint">Used to determine the long-term holding deduction and surcharge eligibility.</span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="e.g. 10" />
+    </label>
+    <label>
+      Residency Period (years)
+      <span class="hint">Used to determine the one-home special long-term holding deduction (up to 80%).</span>
+      <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="e.g. 10" />
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="cgt-error" role="alert"></p>
+
+  <div class="result-box hidden" id="cgt-result" aria-live="polite">
+    <p class="note hidden" id="exempt-note"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Calculation breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>Capital Gain <span class="hint">(sale price − acquisition price − expenses)</span></td>
+          <td id="rt-gain">-</td>
+        </tr>
+        <tr>
+          <td>Taxable Capital Gain <span class="hint" id="taxable-gain-hint"></span></td>
+          <td id="rt-taxable-gain">-</td>
+        </tr>
+        <tr>
+          <td>Long-term Holding Deduction <span class="hint" id="rt-lt-rate"></span></td>
+          <td id="rt-lt-amount">-</td>
+        </tr>
+        <tr>
+          <td>Basic Deduction</td>
+          <td id="rt-basic">-</td>
+        </tr>
+        <tr class="total">
+          <td>Tax Base</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>Calculated Tax <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr>
+          <td>Local Income Tax <span class="hint">(10% of calculated tax)</span></td>
+          <td id="rt-local">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>Limitations of this calculator</strong>
+      <ul>
+        <li>
+          <strong>Converted acquisition price</strong> is not supported — if you've lost the
+          original purchase records, Korean law provides a separate calculation method based on
+          the standard assessed value ratio, which this calculator does not implement.
+        </li>
+        <li>
+          <strong>Regional second-home relief, win-win lease (상생임대주택) relief, temporary
+          two-home relief, and rental-registered apartment surcharge exemptions</strong> in
+          regulated areas are not reflected — if you qualify for one of these, your actual tax
+          may be lower than this estimate.
+        </li>
+        <li>
+          Special exclusions from the "number of homes" count (temporary two-home ownership,
+          inheritance, co-residence with parents, etc.) are not reflected — if you qualify,
+          select "1 home" directly.
+        </li>
+      </ul>
+      <strong>Key rules that are reflected</strong>
+      <ul>
+        <li>
+          A home subject to the multi-home regulated-area surcharge has its
+          <strong>long-term holding deduction fully excluded</strong> (Income Tax Act §95(2)).
+        </li>
+        <li>
+          A flat rate of <strong>70% applies if held under 1 year, 60% if held 1–2 years</strong>,
+          instead of the progressive schedule. If the property is also subject to the surcharge,
+          tax is calculated both ways (progressive + surcharge vs. flat rate) and the
+          <strong>larger amount</strong> applies (Income Tax Act §104(5) comparative taxation).
+        </li>
+        <li>
+          This calculation assumes a <strong>sale on or after May 10, 2026</strong>. Sales
+          between May 10, 2022 and May 9, 2026 had the multi-home surcharge temporarily
+          suspended (with the long-term holding deduction applying normally), resulting in much
+          lower tax — calculating a sale from that period with this calculator will significantly
+          overstate the tax.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    These results are <strong>simplified estimates</strong>. Actual tax may differ based on the
+    various relief and deduction provisions listed above. For an accurate figure, use the
+    National Tax Service Hometax capital gains tax simulator or consult a tax professional.
+  </div>
+
+  <section class="law-refs">
+    <h2>Legal Basis</h2>
+    <ul>
+      <li>
+        Basis: <strong>Income Tax Act</strong>, Article 89(1) (exemption), Article 95(2)
+        (long-term holding deduction), Article 103 (basic deduction), Article 104 (tax rates),
+        Enforcement Decree Article 154(1) (holding/residency requirements) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Local Tax Act</strong> (10% local income tax) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <RelatedCalculators slug="capital-gains-tax-calculator" lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>What counts as necessary expenses?</summary>
+      <p>
+        Costs actually incurred during acquisition and transfer — such as acquisition tax,
+        notary fees, and brokerage fees — plus <strong>capital improvements</strong> that raise
+        the property's value, like window replacement, balcony extension, or remodeling.
+        Ordinary repairs like wallpaper or flooring replacement don't count. Keep receipts and
+        contracts as proof, since you'll need them to claim these expenses when actually filing.
+      </p>
+    </details>
+
+    <details>
+      <summary>What if I don't know my acquisition price?</summary>
+      <p>
+        If you've lost the purchase contract or other records from long ago, the law provides a
+        separate <strong>converted acquisition price</strong> method using the standard assessed
+        value ratio. This calculator does not yet support that method — consult a tax
+        professional or use the National Tax Service Hometax simulator if this applies to you.
+      </p>
+    </details>
+
+    <details>
+      <summary>What are the one-household, one-home exemption requirements?</summary>
+      <p>
+        You must have <strong>held the home for at least 2 years</strong>, and if it was in a
+        regulated area at the time of acquisition, you must also have
+        <strong>resided there for at least 2 years</strong> (for acquisitions on or after August
+        3, 2017, under the "8.2 measures"). Seoul's Gangnam, Seocho, Songpa, and Yongsan
+        districts have been continuously regulated since then, and as of October 2025 the
+        designation expanded to all of Seoul. If you meet the requirements, sale proceeds up to
+        <strong>₩1.2 billion are exempt</strong>; for homes sold above that, only the gain
+        corresponding to the excess portion is taxed. If you don't meet the requirements, the
+        entire gain is taxed even if the sale price is ₩1.2 billion or less.
+      </p>
+    </details>
+
+    <details>
+      <summary>When does the multi-home surcharge apply?</summary>
+      <p>
+        It applies when you own 2 or more homes and sell one located in a
+        <strong>regulated area</strong> (regardless of how long you held it). The rate surcharge
+        is +20 percentage points for 2 homes and +30 percentage points for 3 or more homes, and
+        homes subject to the surcharge also lose the long-term holding deduction entirely
+        (Income Tax Act §95(2)).
+      </p>
+    </details>
+
+    <details>
+      <summary>What if I sell within 2 years?</summary>
+      <p>
+        Housing sold after being held for <strong>under 1 year is taxed at a flat 70%</strong>,
+        and <strong>1–2 years at a flat 60%</strong>, instead of the progressive schedule. You
+        also can't get the long-term holding deduction (requires 3+ years) or the one-home
+        exemption (requires 2+ years). If the property is also subject to the multi-home
+        surcharge, tax is calculated both ways and the <strong>larger amount</strong> applies.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why might this calculator's result differ from my actual tax bill?</summary>
+      <p>
+        Various reliefs — temporary two-home ownership, win-win lease housing, regional
+        second-homes — have detailed eligibility conditions this calculator doesn't reflect. It
+        also doesn't support the converted acquisition price method for cases where the original
+        purchase price is unknown. Always verify with the National Tax Service Hometax simulator
+        or a tax professional before filing.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+</style>
+
+<script>
+  import { calculateCapitalGainsTax } from '../../../lib/capitalGainsTaxCalculator';
+  import type { CgtHouseCount } from '../../../lib/capitalGainsTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('acquisitionPrice', 'acquisitionPrice-preview');
+  bindAmountPreview('necessaryExpenses', 'necessaryExpenses-preview');
+  bindAmountPreview('saleValue', 'saleValue-preview');
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('cgt-form') as HTMLFormElement;
+  const resultBox = document.getElementById('cgt-result') as HTMLDivElement;
+  const errorEl = document.getElementById('cgt-error') as HTMLParagraphElement;
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const acquiredRegulatedOptions = document.getElementById('acquired-regulated-options') as HTMLLabelElement;
+  const wasRegulatedAtAcquisitionInput = document.getElementById(
+    'wasRegulatedAreaAtAcquisition',
+  ) as HTMLInputElement;
+  const acquiredRegulatedNote = document.getElementById('acquired-regulated-note') as HTMLParagraphElement;
+
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+    acquiredRegulatedOptions.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.textContent =
+      houseCount === '1주택'
+        ? '※ A home acquired in a regulated area on or after August 3, 2017 must also meet a 2-year residency requirement in addition to 2 years of holding. Seoul\'s Gangnam, Seocho, Songpa, and Yongsan districts have been continuously regulated since then, expanding to all of Seoul in October 2025. Since this is based on the acquisition date, the requirement remains even if the area is later deregulated.'
+        : '';
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  // Update the capital-gain preview as the user fills in acquisition price / expenses / sale price.
+  const gainPreviewLine = document.getElementById('gain-preview-line') as HTMLParagraphElement;
+  const updateGainPreview = () => {
+    const acquisitionPrice = Number(
+      (document.getElementById('acquisitionPrice') as HTMLInputElement).value,
+    );
+    const necessaryExpenses = Number(
+      (document.getElementById('necessaryExpenses') as HTMLInputElement).value,
+    );
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+    if (!acquisitionPrice || !saleValue) {
+      gainPreviewLine.textContent = '';
+      return;
+    }
+    const gain = saleValue - acquisitionPrice - (necessaryExpenses || 0);
+    gainPreviewLine.textContent = `Capital gain = ${formatWonEn(saleValue)} − ${formatWonEn(
+      acquisitionPrice,
+    )} − ${formatWonEn(necessaryExpenses || 0)} = ${gain >= 0 ? formatWonEn(gain) : `-${formatWonEn(-gain)}`}`;
+  };
+  ['acquisitionPrice', 'necessaryExpenses', 'saleValue'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', updateGainPreview);
+  });
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const acquisitionPrice = Number(
+      (document.getElementById('acquisitionPrice') as HTMLInputElement).value,
+    );
+    const necessaryExpenses = Number(
+      (document.getElementById('necessaryExpenses') as HTMLInputElement).value,
+    );
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+
+    if (!acquisitionPrice || acquisitionPrice <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = 'Please enter a valid acquisition price.';
+      return;
+    }
+    if (!saleValue || saleValue <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = 'Please enter a valid sale price.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
+    const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
+
+    const result = calculateCapitalGainsTax({
+      acquisitionPrice,
+      necessaryExpenses: necessaryExpenses || 0,
+      saleValue,
+      houseCount,
+      isRegulatedArea,
+      wasRegulatedAreaAtAcquisition: wasRegulatedAtAcquisitionInput.checked,
+      holdingYears,
+      residencyYears,
+    });
+
+    const exemptNote = document.getElementById('exempt-note') as HTMLParagraphElement;
+    if (result.isExempt) {
+      exemptNote.textContent =
+        '✓ This qualifies for the one-household, one-home exemption (sale price ₩1.2 billion or less) — no capital gains tax is due.';
+      exemptNote.classList.remove('hidden');
+    } else {
+      exemptNote.classList.add('hidden');
+    }
+
+    setWon('rt-gain', result.gain);
+    setWon('rt-taxable-gain', result.taxableGain);
+    // This hint is only accurate when proportional taxation actually applied — a
+    // 1-home owner who fails the holding/residency requirements is taxed on the
+    // full gain, so houseCount alone isn't enough to decide.
+    const isProportional = !result.isExempt && result.taxableGain < Math.max(0, result.gain);
+    setText(
+      'taxable-gain-hint',
+      isProportional ? '(only the portion above ₩1.2 billion is taxed)' : '',
+    );
+    setWon('rt-lt-amount', result.longTermDeductionAmount);
+    setText('rt-lt-rate', `(rate ${pct(result.longTermDeductionRate)})`);
+    setWon('rt-basic', result.basicDeduction);
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.calculatedTax);
+    const surchargeHints = [
+      result.surchargeRate > 0 ? `multi-home surcharge +${pct(result.surchargeRate)}p` : '',
+      result.appliedShortTermRate !== null
+        ? `flat short-term rate ${pct(result.appliedShortTermRate)} applied`
+        : '',
+    ].filter(Boolean);
+    setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
+    setWon('rt-local', result.localIncomeTax);
+    setWon('rt-total', result.totalWithSurtax);
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>

@@ -1,0 +1,479 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'capital-gains-tax-calculator')!;
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    취득가액·필요경비·양도가액을 입력하면 <strong>1세대1주택·다주택자의 주택
+    양도소득세</strong>(현행법 기준)를 계산합니다. 취득세·재산세·종합부동산세는
+    기존 <a href="/calculators/acquisition-tax-calculator">취득세 계산기</a>,
+    <a href="/calculators/property-tax-calculator">보유세 계산기</a>를 이용하세요.
+  </p>
+  <p class="note">
+    💡 2026년 세제개편안(미시행)에 따른 양도세 변화가 궁금하다면 →
+    <a href="/calculators/capital-gains-tax-reform-calculator">2026 개편안 미리보기</a>
+  </p>
+
+  <form class="calc-form" id="cgt-form">
+    <label>
+      취득가액 (원)
+      <span class="hint">주택을 살 때 낸 금액. 예: 1000000000</span>
+      <input
+        type="number"
+        id="acquisitionPrice"
+        name="acquisitionPrice"
+        min="0"
+        step="any"
+        placeholder="예: 1000000000"
+        required
+      />
+      <span class="amount-preview" id="acquisitionPrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      필요경비 (원)
+      <span class="hint">
+        취득세·중개수수료·법무사 비용·자본적 지출(새시 교체, 확장 공사 등) 합계.
+        선택 입력, 기본값 0. 예: 20000000
+      </span>
+      <input
+        type="number"
+        id="necessaryExpenses"
+        name="necessaryExpenses"
+        min="0"
+        step="any"
+        placeholder="예: 20000000"
+      />
+      <span class="amount-preview" id="necessaryExpenses-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      양도가액 (원)
+      <span class="hint">
+        판 금액. 1세대1주택 비과세(12억원 이하) 판정에 쓰입니다. 예: 1800000000
+      </span>
+      <input
+        type="number"
+        id="saleValue"
+        name="saleValue"
+        min="0"
+        step="any"
+        placeholder="예: 1800000000"
+        required
+      />
+      <span class="amount-preview" id="saleValue-preview" aria-live="polite"></span>
+    </label>
+
+    <p class="note" id="gain-preview-line"></p>
+
+    <label>
+      주택 수
+      <select id="houseCount">
+        <option value="1주택">1주택 (1세대 1주택)</option>
+        <option value="2주택">2주택</option>
+        <option value="3주택이상">3주택 이상</option>
+      </select>
+    </label>
+
+    <label class="check-row" id="regulated-area-options">
+      <input type="checkbox" id="isRegulatedArea" />
+      <span>조정대상지역 소재 (다주택자 중과 여부에 반영)</span>
+    </label>
+
+    <label class="check-row" id="acquired-regulated-options">
+      <input type="checkbox" id="wasRegulatedAreaAtAcquisition" />
+      <span>취득할 때 조정대상지역이었음 (1세대1주택 비과세에 거주 2년 요건 추가)</span>
+    </label>
+    <p class="note hidden" id="acquired-regulated-note"></p>
+
+    <label>
+      보유기간 (년)
+      <span class="hint">장기보유특별공제·중과 여부 판정에 쓰입니다.</span>
+      <input type="number" id="holdingYears" name="holdingYears" min="0" step="1" placeholder="예: 10" />
+    </label>
+    <label>
+      거주기간 (년)
+      <span class="hint">1세대1주택 특례 장기보유특별공제(최대 80%) 판정에 쓰입니다.</span>
+      <input type="number" id="residencyYears" name="residencyYears" min="0" step="1" placeholder="예: 10" />
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="cgt-error" role="alert"></p>
+
+  <div class="result-box hidden" id="cgt-result" aria-live="polite">
+    <p class="note hidden" id="exempt-note"></p>
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        산출 내역
+      </caption>
+      <tbody>
+        <tr>
+          <td>양도차익 <span class="hint">(양도가액 − 취득가액 − 필요경비)</span></td>
+          <td id="rt-gain">-</td>
+        </tr>
+        <tr>
+          <td>과세대상 양도차익 <span class="hint" id="taxable-gain-hint"></span></td>
+          <td id="rt-taxable-gain">-</td>
+        </tr>
+        <tr>
+          <td>장기보유특별공제 <span class="hint" id="rt-lt-rate"></span></td>
+          <td id="rt-lt-amount">-</td>
+        </tr>
+        <tr>
+          <td>기본공제</td>
+          <td id="rt-basic">-</td>
+        </tr>
+        <tr class="total">
+          <td>과세표준</td>
+          <td id="rt-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>산출세액 <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td id="rt-tax">-</td>
+        </tr>
+        <tr>
+          <td>지방소득세 <span class="hint">(산출세액의 10%)</span></td>
+          <td id="rt-local">-</td>
+        </tr>
+        <tr class="total">
+          <td>합계</td>
+          <td id="rt-total">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="disclaimer strong-disclaimer">
+      <strong>이 계산기의 한계</strong>
+      <ul>
+        <li>
+          <strong>환산취득가액</strong>은 반영하지 않습니다 — 취득 당시 계약서 등을 분실해 실제
+          취득가액을 모르는 경우 사용하는 별도 계산 방식이 있으나 이 계산기는 다루지 않습니다.
+        </li>
+        <li>
+          <strong>지방 세컨드홈 특례, 상생임대주택 특례, 일시적 2주택 특례, 조정대상지역
+          매입임대아파트 중과배제·특례</strong> 등 세부 조정 조항은 반영하지 않습니다 — 해당되는
+          경우 실제 세액이 이 계산 결과보다 낮을 수 있습니다.
+        </li>
+        <li>
+          일시적 2주택·상속·동거봉양 등으로 <strong>주택 수 산정에서 제외</strong>되는 특례는
+          반영하지 않습니다 — 해당되면 "1주택"을 직접 선택해 계산하세요.
+        </li>
+      </ul>
+      <strong>반영된 주요 규칙 (참고)</strong>
+      <ul>
+        <li>
+          조정대상지역 다주택 <strong>중과 대상 주택은 장기보유특별공제가 배제</strong>됩니다
+          (소득세법 §95②).
+        </li>
+        <li>
+          보유기간이 <strong>1년 미만이면 70%, 1년 이상 2년 미만이면 60%</strong>의 단일세율이
+          적용됩니다. 중과 대상이기도 하면 누진세율(+중과)과 단기세율 중 <strong>큰 금액</strong>으로
+          과세합니다(소득세법 §104⑤ 비교과세).
+        </li>
+        <li>
+          이 계산은 <strong>2026년 5월 10일 이후 양도분 기준</strong>입니다. 2022년 5월 10일
+          ~ 2026년 5월 9일 양도분은 <strong>다주택자 중과가 한시 배제</strong>되어(장기보유특별공제도
+          정상 적용) 세액이 훨씬 낮았습니다 — 그 기간의 양도를 이 계산기로 계산하면 실제보다 크게
+          높게 나옵니다.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 실제 세액은 위에 나열된 여러 특례·공제
+    조항에 따라 달라질 수 있으므로, 정확한 금액은 국세청 홈택스 양도소득세 모의계산 또는 세무사
+    상담을 통해 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>법령 근거</h2>
+    <ul>
+      <li>
+        근거: <strong>소득세법</strong> 제89조제1항(비과세), 제95조제2항(장기보유특별공제),
+        제103조(기본공제), 제104조(세율), 시행령 제154조제1항(보유·거주 요건) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+      <li>
+        근거: <strong>지방세법</strong> (지방소득세 10%) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="capital-gains-tax-calculator" />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>필요경비에는 무엇이 포함되나요?</summary>
+      <p>
+        취득세·법무사 비용·중개수수료처럼 취득·양도 과정에서 실제로 지출한 비용과, 새시 교체·
+        발코니 확장·리모델링처럼 자산 가치를 높이는 <strong>자본적 지출</strong>이 해당됩니다.
+        단순 도배·장판 교체 같은 통상적인 수선비는 포함되지 않습니다. 지출을 증빙할 영수증·계약서를
+        보관해 두어야 실제 신고 시 인정받을 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>취득가액을 모르면 어떻게 하나요?</summary>
+      <p>
+        오래 전에 취득해 계약서 등 증빙을 분실한 경우, 법에서는 기준시가 비율 등을 이용한
+        <strong>환산취득가액</strong> 산정 방식을 별도로 두고 있습니다. 이 계산기는 아직 이
+        방식을 지원하지 않으므로, 해당하는 경우 세무사와 상담하거나 국세청 홈택스 모의계산을
+        이용하세요.
+      </p>
+    </details>
+
+    <details>
+      <summary>1세대1주택 비과세 요건은 무엇인가요?</summary>
+      <p>
+        <strong>2년 이상 보유</strong>해야 하고, 취득 당시 조정대상지역이었다면
+        <strong>2년 이상 거주</strong>까지 채워야 합니다(2017년 8월 3일 이후 취득분, 8·2 대책).
+        서울 강남·서초·송파·용산 등은 그때부터 계속 조정대상지역이었고 2025년 10월에는 서울
+        전역으로 확대됐습니다. 요건을 충족하면 양도가액 <strong>12억원까지 비과세</strong>이고,
+        12억원을 초과하는 주택은 그 초과 비중에 해당하는 양도차익만 과세됩니다. 요건을 못 채우면
+        양도가액이 12억원 이하여도 양도차익 전액이 과세됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>다주택자 중과는 언제 적용되나요?</summary>
+      <p>
+        2주택 이상을 보유하고 그중 <strong>조정대상지역에 소재한 주택</strong>을 양도할 때
+        적용됩니다(보유기간과 무관). 세율 가산폭은 2주택 +20%p, 3주택 이상 +30%p이며, 중과 대상
+        주택은 장기보유특별공제도 전액 배제됩니다(소득세법 §95②).
+      </p>
+    </details>
+
+    <details>
+      <summary>2년도 안 되어 팔면 세금이 어떻게 되나요?</summary>
+      <p>
+        주택은 보유기간이 <strong>1년 미만이면 70%, 1년 이상 2년 미만이면 60%</strong>의 단일세율이
+        적용됩니다(누진세율표 대신). 장기보유특별공제도 3년 이상 보유해야 시작되므로 받을 수
+        없고, 1세대1주택 비과세도 2년 이상 보유해야 하므로 적용되지 않습니다. 중과 대상이기도
+        하다면 누진세율(중과 포함)로 계산한 세액과 단기세율로 계산한 세액 중 <strong>큰
+        금액</strong>으로 과세합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>왜 이 계산기 결과가 실제 고지서와 다를 수 있나요?</summary>
+      <p>
+        일시적 2주택·상생임대주택·지방 세컨드홈 등 여러 특례는 조건이 세밀해 이 계산기가 반영하지
+        못합니다. 또한 취득가액을 정확히 모르는 경우의 환산취득가액 계산도 지원하지 않습니다.
+        실제 신고 전에는 반드시 국세청 홈택스 모의계산이나 세무사 상담으로 재확인하세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+  .strong-disclaimer {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--text);
+    margin-top: 16px;
+  }
+  .strong-disclaimer ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .strong-disclaimer li {
+    margin: 4px 0;
+  }
+</style>
+
+<script>
+  import { calculateCapitalGainsTax } from '../../lib/capitalGainsTaxCalculator';
+  import type { CgtHouseCount } from '../../lib/capitalGainsTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('acquisitionPrice', 'acquisitionPrice-preview');
+  bindAmountPreview('necessaryExpenses', 'necessaryExpenses-preview');
+  bindAmountPreview('saleValue', 'saleValue-preview');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+
+  const form = document.getElementById('cgt-form') as HTMLFormElement;
+  const resultBox = document.getElementById('cgt-result') as HTMLDivElement;
+  const errorEl = document.getElementById('cgt-error') as HTMLParagraphElement;
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaOptions = document.getElementById('regulated-area-options') as HTMLLabelElement;
+  const isRegulatedAreaInput = document.getElementById('isRegulatedArea') as HTMLInputElement;
+  const acquiredRegulatedOptions = document.getElementById('acquired-regulated-options') as HTMLLabelElement;
+  const wasRegulatedAtAcquisitionInput = document.getElementById(
+    'wasRegulatedAreaAtAcquisition',
+  ) as HTMLInputElement;
+  const acquiredRegulatedNote = document.getElementById('acquired-regulated-note') as HTMLParagraphElement;
+
+  const syncHouseCountOptions = () => {
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    regulatedAreaOptions.classList.toggle('hidden', houseCount === '1주택');
+    acquiredRegulatedOptions.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.classList.toggle('hidden', houseCount !== '1주택');
+    acquiredRegulatedNote.textContent =
+      houseCount === '1주택'
+        ? '※ 2017년 8월 3일 이후 조정대상지역에서 취득한 주택은 보유 2년에 더해 거주 2년도 채워야 비과세됩니다. 서울 강남·서초·송파·용산 등은 그때부터 계속 조정대상지역이었고, 2025년 10월에는 서울 전역으로 확대됐습니다. 취득 시점 기준이라 이후 해제됐어도 요건은 남습니다.'
+        : '';
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountOptions);
+  syncHouseCountOptions();
+
+  // 취득가액·필요경비·양도가액 입력 즉시 양도차익 미리보기를 갱신합니다.
+  const gainPreviewLine = document.getElementById('gain-preview-line') as HTMLParagraphElement;
+  const updateGainPreview = () => {
+    const acquisitionPrice = Number(
+      (document.getElementById('acquisitionPrice') as HTMLInputElement).value,
+    );
+    const necessaryExpenses = Number(
+      (document.getElementById('necessaryExpenses') as HTMLInputElement).value,
+    );
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+    if (!acquisitionPrice || !saleValue) {
+      gainPreviewLine.textContent = '';
+      return;
+    }
+    const gain = saleValue - acquisitionPrice - (necessaryExpenses || 0);
+    gainPreviewLine.textContent = `양도차익 = ${formatKoreanWon(saleValue)} − ${formatKoreanWon(
+      acquisitionPrice,
+    )} − ${formatKoreanWon(necessaryExpenses || 0)} = ${gain >= 0 ? formatKoreanWon(gain) : `-${formatKoreanWon(-gain)}`}`;
+  };
+  ['acquisitionPrice', 'necessaryExpenses', 'saleValue'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', updateGainPreview);
+  });
+
+  const recalc = () => {
+    errorEl.textContent = '';
+
+    const acquisitionPrice = Number(
+      (document.getElementById('acquisitionPrice') as HTMLInputElement).value,
+    );
+    const necessaryExpenses = Number(
+      (document.getElementById('necessaryExpenses') as HTMLInputElement).value,
+    );
+    const saleValue = Number((document.getElementById('saleValue') as HTMLInputElement).value);
+
+    if (!acquisitionPrice || acquisitionPrice <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = '취득가액을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!saleValue || saleValue <= 0) {
+      resultBox.classList.add('hidden');
+      errorEl.textContent = '양도가액을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const houseCount = houseCountSelect.value as CgtHouseCount;
+    const isRegulatedArea = isRegulatedAreaInput.checked;
+    const holdingYears = Number((document.getElementById('holdingYears') as HTMLInputElement).value) || 0;
+    const residencyYears = Number((document.getElementById('residencyYears') as HTMLInputElement).value) || 0;
+
+    const result = calculateCapitalGainsTax({
+      acquisitionPrice,
+      necessaryExpenses: necessaryExpenses || 0,
+      saleValue,
+      houseCount,
+      isRegulatedArea,
+      wasRegulatedAreaAtAcquisition: wasRegulatedAtAcquisitionInput.checked,
+      holdingYears,
+      residencyYears,
+    });
+
+    const exemptNote = document.getElementById('exempt-note') as HTMLParagraphElement;
+    if (result.isExempt) {
+      exemptNote.textContent = '✓ 1세대1주택 비과세 대상입니다 (양도가액 12억원 이하) — 양도소득세가 발생하지 않습니다.';
+      exemptNote.classList.remove('hidden');
+    } else {
+      exemptNote.classList.add('hidden');
+    }
+
+    setWon('rt-gain', result.gain);
+    setWon('rt-taxable-gain', result.taxableGain);
+    // "12억원 초과 비중만 과세" 안내는 실제로 안분(비과세 요건 충족)이 적용됐을
+    // 때만 맞다 — 1주택이어도 보유·거주 요건 미충족이면 전액 과세되므로
+    // houseCount만으로는 판정할 수 없다.
+    const isProportional = !result.isExempt && result.taxableGain < Math.max(0, result.gain);
+    setText(
+      'taxable-gain-hint',
+      isProportional ? '(양도가액 12억원 초과 비중만 과세)' : '',
+    );
+    setWon('rt-lt-amount', result.longTermDeductionAmount);
+    setText('rt-lt-rate', `(공제율 ${pct(result.longTermDeductionRate)})`);
+    setWon('rt-basic', result.basicDeduction);
+    setWon('rt-taxbase', result.taxBase);
+    setWon('rt-tax', result.calculatedTax);
+    const surchargeHints = [
+      result.surchargeRate > 0 ? `다주택자 중과 +${pct(result.surchargeRate)}p` : '',
+      result.appliedShortTermRate !== null
+        ? `단기 보유 단일세율 ${pct(result.appliedShortTermRate)} 적용`
+        : '',
+    ].filter(Boolean);
+    setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
+    setWon('rt-local', result.localIncomeTax);
+    setWon('rt-total', result.totalWithSurtax);
+
+    resultBox.classList.remove('hidden');
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    recalc();
+  });
+</script>
