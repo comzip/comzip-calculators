@@ -1,0 +1,567 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'rental-yield-calculator')!;
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    매매가·보증금·월세를 입력하면 <strong>취득세를 반영한 실투자금 기준
+    세전·세후 수익률</strong>을 계산합니다. 주택임대소득세가 발생하는
+    경우 <strong>분리과세(14%) 기준으로만</strong> 반영합니다(종합과세
+    비교는 다루지 않습니다).
+  </p>
+  <p class="note">
+    💡 취득세만 따로 자세히 계산하려면 →
+    <a href="/calculators/acquisition-tax-calculator">취득세 계산기</a>
+  </p>
+
+  <form class="calc-form" id="rental-form">
+    <label>
+      매매가 (원)
+      <input
+        type="number"
+        id="purchasePrice"
+        name="purchasePrice"
+        min="0"
+        step="any"
+        placeholder="예: 500000000"
+        required
+      />
+      <span class="amount-preview" id="purchasePrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      보증금 (원)
+      <input
+        type="number"
+        id="deposit"
+        name="deposit"
+        min="0"
+        step="any"
+        placeholder="예: 50000000"
+        required
+      />
+      <span class="amount-preview" id="deposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      월세 (원)
+      <input
+        type="number"
+        id="monthlyRent"
+        name="monthlyRent"
+        min="0"
+        step="any"
+        placeholder="예: 1000000"
+        required
+      />
+      <span class="amount-preview" id="monthlyRent-preview" aria-live="polite"></span>
+    </label>
+
+    <fieldset class="method-toggle" id="property-type-toggle">
+      <legend>물건 종류</legend>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="주택" checked />
+        <span>주택 (아파트·연립·단독주택 등)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="오피스텔" />
+        <span>오피스텔</span>
+      </label>
+    </fieldset>
+
+    <!-- 주택 전용 옵션 (acquisition-tax-calculator와 동일 구조) -->
+    <div id="house-options">
+      <label>
+        주택 수 <span class="hint">이번에 취득하는 주택을 포함한 1세대 기준</span>
+        <select id="houseCount">
+          <option value="1주택">1주택 (일시적 2주택 포함)</option>
+          <option value="2주택">2주택</option>
+          <option value="3주택">3주택</option>
+          <option value="4주택이상또는법인">4주택 이상 또는 법인</option>
+        </select>
+      </label>
+
+      <label class="check-row" id="regulated-area-row">
+        <input type="checkbox" id="isRegulatedArea" />
+        <span>조정대상지역 내 주택입니다 (취득세 중과 판정용)</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="isOver85Sqm" checked />
+        <span>전용면적 85㎡ 초과 (취득세 농어촌특별세 과세대상)</span>
+      </label>
+
+      <label class="check-row" id="high-value-house-row">
+        <input type="checkbox" id="isHighValueHouse" />
+        <span>
+          기준시가(공시가격) 12억원 초과 (고가주택)
+          <span class="hint">매매가와 다릅니다 — 국토교통부 부동산공시가격 알리미에서 확인하세요.</span>
+        </span>
+      </label>
+    </div>
+
+    <p class="note hidden" id="officetel-note">
+      오피스텔은 취득세율 4%가 고정 적용됩니다. 이 계산기는 오피스텔을
+      <strong>사실상 주거용으로 임대</strong>한다고 가정해 주택임대소득세
+      규정을 적용합니다 — 업무용으로 임대 중이라면 실제 세금은 다를 수 있습니다.
+    </p>
+
+    <fieldset class="method-toggle">
+      <legend>임대사업자 등록 여부</legend>
+      <label class="method-option">
+        <input type="radio" name="registrationStatus" value="미등록" checked />
+        <span>미등록</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="registrationStatus" value="등록임대" />
+        <span>등록임대주택</span>
+      </label>
+    </fieldset>
+
+    <label class="check-row">
+      <input type="checkbox" id="otherIncomeUnder20M" />
+      <span>
+        이 임대소득을 제외한 종합소득금액이 연 2,000만원 이하입니다
+        <span class="hint">근로소득·사업소득 등 이 임대소득을 뺀 나머지 소득의 합계입니다. 기본공제(200만/400만원) 적용 조건입니다.</span>
+      </span>
+    </label>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">세전 수익률</span>
+        <span class="value"><span id="pretax-yield">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">세후 수익률</span>
+        <span class="value"><span id="posttax-yield">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        실투자금 산출
+      </caption>
+      <tbody>
+        <tr>
+          <td>
+            취득세등 합계
+            <span class="formula-line">= 취득세 + 지방교육세 + 농어촌특별세</span>
+            <span class="formula-actual" id="acqtax-formula">-</span>
+          </td>
+          <td id="row-acqtax">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            실투자금
+            <span class="formula-line">= 매매가 − 보증금 + 취득세등 합계</span>
+            <span class="formula-actual" id="capital-formula">-</span>
+          </td>
+          <td id="row-capital">-</td>
+        </tr>
+        <tr>
+          <td>연간 월세수입 <span class="formula-line">= 월세 × 12</span></td>
+          <td id="row-annual-rent">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" id="taxability-note" style="font-weight:600;"></p>
+
+    <table class="breakdown hidden" id="tax-table">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        주택임대소득세 산출 내역 (분리과세)
+      </caption>
+      <tbody>
+        <tr>
+          <td>수입금액</td>
+          <td id="row-income">-</td>
+        </tr>
+        <tr>
+          <td>필요경비 <span class="hint" id="expense-rate-hint"></span></td>
+          <td id="row-expense">-</td>
+        </tr>
+        <tr>
+          <td>기본공제</td>
+          <td id="row-deduction">-</td>
+        </tr>
+        <tr class="total">
+          <td>사업소득금액</td>
+          <td id="row-business-income">-</td>
+        </tr>
+        <tr>
+          <td>소득세 (14%)</td>
+          <td id="row-income-tax">-</td>
+        </tr>
+        <tr>
+          <td>개인지방소득세 (소득세의 10%)</td>
+          <td id="row-local-tax">-</td>
+        </tr>
+        <tr class="total">
+          <td>임대소득세 합계</td>
+          <td id="row-total-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="deposit-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 취득세는 일시적
+    2주택 특례·생애최초 감면 등을 반영하지 않습니다(<a
+      href="/calculators/acquisition-tax-calculator">취득세 계산기</a
+    > 한계와 동일). 주택임대소득세는 <strong>분리과세만</strong> 계산하며
+    종합과세와 비교하지 않고, 3주택 이상 보유자의 보증금(전세)에 대한
+    간주임대료는 계산하지 않습니다(보유한 모든 주택의 보증금 합계 정보가
+    없어 구조적으로 계산 불가). 정확한 세액은 국세청 홈택스 또는 세무사
+    상담을 통해 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>법령 근거</h2>
+    <ul>
+      <li>
+        근거: <strong>취득세</strong> — <a href="/calculators/acquisition-tax-calculator">취득세 계산기</a>의 법령 근거를 참고하세요(같은 계산 로직을 재사용합니다).
+      </li>
+      <li>
+        근거: <strong>소득세법</strong> 제64조의2(주택임대소득에 대한 세액 계산의 특례, 분리과세 14%·필요경비율·기본공제), 제14조제3항제7호(분리과세 선택 상한 연 2천만원), 제12조제2호나목(1주택 비과세, 기준시가 12억원) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+      <li>
+        근거: <strong>지방세법</strong> 제92조(종합소득 개인지방소득세, 소득세 산출세액의 10%) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="rental-yield-calculator" />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>취득세를 왜 실투자금에 포함하나요?</summary>
+      <p>
+        취득세·지방교육세·농어촌특별세는 매매 즉시 실제로 지출하는 돈입니다.
+        이를 포함해야 "이 물건에 내 돈이 실제로 얼마나 묶였는지" 기준의
+        수익률이 됩니다. 취득세를 빼고 계산하면 수익률이 실제보다 부풀려
+        보일 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>보증금은 왜 수입이 아니라 실투자금에서 빠지나요?</summary>
+      <p>
+        보증금은 임대인이 임차인에게 돌려줘야 할 돈이라 내 소득이 아니라
+        <strong>내가 실제로 부담하는 투자금을 줄여주는 자금 조달</strong>
+        입니다. 그래서 매매가에서 보증금만큼을 빼고, 대신 취득세를 더해
+        "실제로 내 돈이 묶인 금액"을 계산합니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>제 임대소득이 왜 비과세(또는 과세)로 나오나요?</summary>
+      <p>
+        1세대가 국내에 <strong>주택 1채만</strong> 보유하고 그 주택의
+        <strong>기준시가(공시가격)가 12억원 이하</strong>면 임대소득이
+        비과세입니다(소득세법 제12조제2호나목). 2주택 이상이거나, 1주택이라도
+        기준시가가 12억원을 초과하는 고가주택이면 과세 대상입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>임대사업자로 등록하면 세금이 얼마나 줄어드나요?</summary>
+      <p>
+        미등록은 필요경비율 50%·기본공제 최대 200만원이지만, 등록임대주택은
+        필요경비율 <strong>60%</strong>·기본공제 최대 <strong>400만원</strong>으로
+        더 유리합니다(단, 기본공제는 이 임대소득을 제외한 종합소득금액이
+        2,000만원 이하일 때만 적용). 다만 등록에는 임대료 증액 제한(5%),
+        의무 임대기간 등 별도 의무가 따릅니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>오피스텔도 정확히 계산되나요?</summary>
+      <p>
+        이 계산기는 오피스텔을 <strong>사실상 주거용으로 임대</strong>한다고
+        가정해 주택임대소득세 규정(분리과세 14% 등)을 적용합니다. 실제로
+        업무용(사무실 등)으로 임대 중이라면 일반 사업소득으로 분류되어
+        결과가 다를 수 있습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>3주택 이상인데 왜 보증금 관련 세금은 안 나오나요?</summary>
+      <p>
+        3주택 이상을 보유하고 <strong>보증금 합계가 3억원을 초과</strong>하면
+        보증금(전세)에 대해서도 간주임대료가 추가로 과세됩니다. 하지만 이
+        판정은 <strong>보유한 모든 주택의 보증금 합계</strong>가 기준인데, 이
+        계산기는 지금 계산 중인 물건 1건의 보증금만 입력받으므로 계산 자체가
+        불가능합니다. 3주택 이상을 선택하면 월세분 임대소득세는 정상 계산하되,
+        간주임대료는 반영되지 않았다는 안내가 함께 표시됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>연간 월세수입이 2,000만원을 넘으면 어떻게 되나요?</summary>
+      <p>
+        연 주택임대 총수입금액이 2,000만원을 초과하면 분리과세를 선택할 수
+        없고(소득세법 제14조제3항제7호), 다른 소득과 합산한 <strong>종합과세
+        (누진세율)</strong>가 의무 적용됩니다. 이 계산기는 종합과세 세액을
+        계산하지 않으므로, 안내만 표시하고 세액은 보여주지 않습니다. 또한 연
+        수입이 2,000만원 이하로 나오더라도 다른 임대주택이 있다면 전체
+        합산금액이 2,000만원을 넘는지 별도로 확인해야 합니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #property-type-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #house-options {
+    display: grid;
+    gap: 16px;
+  }
+  /* #house-options is an ID selector, so Astro's scoped-style attribute
+     boost makes it beat the global `.hidden` class (0,1,0) on specificity
+     alone — the documented CSS-specificity trap in CLAUDE.md. Re-declare
+     at matching specificity so toggling `.hidden` via JS actually hides it. */
+  #house-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateRentalYield } from '../../lib/rentalYieldCalculator';
+  import type {
+    HouseCountForAcquisition,
+    PropertyType,
+    RentalRegistrationStatus,
+  } from '../../lib/rentalYieldCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('rental-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('purchasePrice', 'purchasePrice-preview');
+  bindAmountPreview('deposit', 'deposit-preview');
+  bindAmountPreview('monthlyRent', 'monthlyRent-preview');
+
+  const currentPropertyType = (): PropertyType =>
+    (form.querySelector('input[name="propertyType"]:checked') as HTMLInputElement)
+      .value as PropertyType;
+
+  const houseOptions = document.getElementById('house-options') as HTMLDivElement;
+  const officetelNote = document.getElementById('officetel-note') as HTMLParagraphElement;
+  const syncPropertyType = () => {
+    const isOfficetel = currentPropertyType() === '오피스텔';
+    houseOptions.classList.toggle('hidden', isOfficetel);
+    officetelNote.classList.toggle('hidden', !isOfficetel);
+  };
+  form.querySelectorAll('input[name="propertyType"]').forEach((radio) => {
+    radio.addEventListener('change', syncPropertyType);
+  });
+  syncPropertyType();
+
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaRow = document.getElementById('regulated-area-row') as HTMLLabelElement;
+  const highValueHouseRow = document.getElementById('high-value-house-row') as HTMLLabelElement;
+  const syncHouseCountVisibility = () => {
+    regulatedAreaRow.classList.toggle('hidden', houseCountSelect.value === '1주택');
+    highValueHouseRow.classList.toggle('hidden', houseCountSelect.value !== '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountVisibility);
+  syncHouseCountVisibility();
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (value: number) => `${value.toFixed(2)}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const purchasePrice = Number((document.getElementById('purchasePrice') as HTMLInputElement).value);
+    const deposit = Number((document.getElementById('deposit') as HTMLInputElement).value);
+    const monthlyRent = Number((document.getElementById('monthlyRent') as HTMLInputElement).value);
+
+    if (!purchasePrice || purchasePrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '매매가를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (deposit < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '보증금을 올바르게 입력해 주세요.';
+      return;
+    }
+    if (!monthlyRent || monthlyRent <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '월세를 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const propertyType = currentPropertyType();
+    const houseCount = houseCountSelect.value as HouseCountForAcquisition;
+    const isRegulatedArea = (document.getElementById('isRegulatedArea') as HTMLInputElement).checked;
+    const isOver85Sqm = (document.getElementById('isOver85Sqm') as HTMLInputElement).checked;
+    const isHighValueHouse = (document.getElementById('isHighValueHouse') as HTMLInputElement).checked;
+    const registrationStatus = (
+      form.querySelector('input[name="registrationStatus"]:checked') as HTMLInputElement
+    ).value as RentalRegistrationStatus;
+    const otherIncomeUnder20M = (
+      document.getElementById('otherIncomeUnder20M') as HTMLInputElement
+    ).checked;
+
+    const r = calculateRentalYield({
+      purchasePrice,
+      deposit,
+      monthlyRent,
+      propertyType,
+      houseCount,
+      isRegulatedArea,
+      isOver85Sqm,
+      isHighValueHouse,
+      registrationStatus,
+      otherIncomeUnder20M,
+    });
+
+    const yieldOrDash = (id: string, value: number | null) => {
+      setText(id, value === null ? '계산 불가' : pct(value));
+    };
+    yieldOrDash('pretax-yield', r.preTaxYieldPercent);
+    yieldOrDash('posttax-yield', r.postTaxYieldPercent);
+
+    setWon('row-acqtax', r.acquisitionTax.total);
+    setText(
+      'acqtax-formula',
+      `= ${won.format(Math.round(r.acquisitionTax.acquisitionTax))} + ${won.format(Math.round(r.acquisitionTax.localEducationTax))} + ${won.format(Math.round(r.acquisitionTax.ruralSpecialTax))}`,
+    );
+    setWon('row-capital', r.netCapitalInvested);
+    setText(
+      'capital-formula',
+      `= ${won.format(Math.round(purchasePrice))} − ${won.format(Math.round(deposit))} + ${won.format(Math.round(r.acquisitionTax.total))}`,
+    );
+    setWon('row-annual-rent', r.annualRentIncome);
+
+    if (r.netCapitalInvested <= 0) {
+      errorMsg.textContent =
+        '보증금이 매매가와 취득세 합계보다 커서 실투자금이 0 이하입니다. 수익률을 계산할 수 없습니다.';
+    }
+
+    const taxabilityNote = document.getElementById('taxability-note') as HTMLParagraphElement;
+    const taxTable = document.getElementById('tax-table') as HTMLTableElement;
+    const depositNote = document.getElementById('deposit-note') as HTMLParagraphElement;
+
+    if (r.taxability.kind === '비과세') {
+      taxabilityNote.textContent =
+        '✓ 1세대 1주택이며 기준시가 12억원 이하로 주택임대소득세가 비과세됩니다.';
+      taxTable.classList.add('hidden');
+      depositNote.classList.add('hidden');
+    } else if (r.taxability.kind === '분리과세불가_종합과세') {
+      taxabilityNote.textContent =
+        '⚠ 연간 월세수입이 2,000만원을 초과해 분리과세를 선택할 수 없습니다. 다른 소득과 합산한 종합과세(누진세율)가 적용되며, 이 계산기는 종합과세 세액을 계산하지 않습니다.';
+      taxTable.classList.add('hidden');
+      depositNote.classList.add('hidden');
+    } else {
+      const t = r.taxability;
+      taxabilityNote.textContent = '분리과세 대상입니다. 아래 세액이 반영된 세후 수익률입니다.';
+      taxTable.classList.remove('hidden');
+      setWon('row-income', r.annualRentIncome);
+      setText('expense-rate-hint', `(수입금액의 ${pct(t.necessaryExpenseRatio * 100)})`);
+      setWon('row-expense', t.necessaryExpense);
+      setWon('row-deduction', t.basicDeduction);
+      setWon('row-business-income', t.businessIncome);
+      setWon('row-income-tax', t.incomeTax);
+      setWon('row-local-tax', t.localIncomeTax);
+      setWon('row-total-tax', t.totalRentalTax);
+
+      if (t.depositImputedIncomeExcluded) {
+        depositNote.textContent =
+          '⚠ 3주택 이상 보유 시 보증금 합계가 3억원을 초과하면 보증금(전세)에 대한 간주임대료도 추가로 과세됩니다. 이 계산기는 보유한 모든 주택의 보증금 합계 정보가 없어 간주임대료를 반영하지 않았습니다 — 실제 세금은 더 높을 수 있습니다.';
+        depositNote.classList.remove('hidden');
+      } else {
+        depositNote.classList.add('hidden');
+      }
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

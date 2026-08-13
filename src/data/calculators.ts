@@ -142,6 +142,18 @@ export const calculators: Calculator[] = [
       'Enter a purchase price to estimate Korea’s acquisition tax, local education tax, and special rural development tax — for both houses (including the 8%/12% multi-home surtax rates) and officetels.',
   },
   {
+    slug: 'rental-yield-calculator',
+    title: '부동산 월세 수익률 계산기',
+    titleEn: 'Korea Rental Yield Calculator (Monthly Rent)',
+    navLabel: '월세 수익률 계산기',
+    navLabelEn: 'Rental Yield',
+    category: '부동산',
+    description:
+      '매매가·보증금·월세를 입력하면 취득세를 반영한 실투자금 기준 세전·세후 수익률을 계산합니다. 오피스텔·아파트(다주택 중과 포함)를 구분하고, 주택임대소득세(분리과세 14%)까지 반영합니다.',
+    descriptionEn:
+      "Enter the purchase price, deposit, and monthly rent to calculate pre-tax and after-tax rental yield on your net invested capital — including acquisition tax (with multi-home surtax), and Korea's separate-taxation rental income tax (14%).",
+  },
+  {
     slug: 'brokerage-fee-calculator',
     title: '부동산 중개수수료 계산기',
     titleEn: 'Korea Real Estate Brokerage Fee Calculator',

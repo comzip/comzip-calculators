@@ -1,0 +1,578 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'rental-yield-calculator')!;
+---
+
+<BaseLayout
+  title={meta.titleEn}
+  description={meta.descriptionEn}
+  path={`/calculators/${meta.slug}`}
+  lang="en"
+>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the purchase price, deposit, and monthly rent to calculate <strong>pre-tax and
+    after-tax rental yield based on your net invested capital</strong>, including acquisition
+    tax. If rental income tax applies, this calculator reflects it on a
+    <strong>separate-taxation (분리과세, 14%) basis only</strong> — it does not compare
+    against comprehensive taxation.
+  </p>
+  <p class="note">
+    💡 Want to calculate acquisition tax on its own in more detail? →
+    <a href="/en/calculators/acquisition-tax-calculator">Acquisition Tax Calculator</a>
+  </p>
+
+  <form class="calc-form" id="rental-form">
+    <label>
+      Purchase Price (KRW)
+      <input
+        type="number"
+        id="purchasePrice"
+        name="purchasePrice"
+        min="0"
+        step="any"
+        placeholder="e.g. 500000000"
+        required
+      />
+      <span class="amount-preview" id="purchasePrice-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Deposit (KRW)
+      <input
+        type="number"
+        id="deposit"
+        name="deposit"
+        min="0"
+        step="any"
+        placeholder="e.g. 50000000"
+        required
+      />
+      <span class="amount-preview" id="deposit-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Monthly Rent (KRW)
+      <input
+        type="number"
+        id="monthlyRent"
+        name="monthlyRent"
+        min="0"
+        step="any"
+        placeholder="e.g. 1000000"
+        required
+      />
+      <span class="amount-preview" id="monthlyRent-preview" aria-live="polite"></span>
+    </label>
+
+    <fieldset class="method-toggle" id="property-type-toggle">
+      <legend>Property Type</legend>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="주택" checked />
+        <span>House (apartment, townhouse, detached house, etc.)</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="propertyType" value="오피스텔" />
+        <span>Officetel</span>
+      </label>
+    </fieldset>
+
+    <!-- House-only options (same structure as acquisition-tax-calculator) -->
+    <div id="house-options">
+      <label>
+        Number of Homes <span class="hint">For one household, including the home being acquired</span>
+        <select id="houseCount">
+          <option value="1주택">1 home (including temporary 2nd home)</option>
+          <option value="2주택">2 homes</option>
+          <option value="3주택">3 homes</option>
+          <option value="4주택이상또는법인">4+ homes or a corporation</option>
+        </select>
+      </label>
+
+      <label class="check-row" id="regulated-area-row">
+        <input type="checkbox" id="isRegulatedArea" />
+        <span>This property is in a regulated area (affects acquisition tax surcharge)</span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="isOver85Sqm" checked />
+        <span>Exclusive area exceeds 85㎡ (subject to acquisition tax Special Rural Development Tax)</span>
+      </label>
+
+      <label class="check-row" id="high-value-house-row">
+        <input type="checkbox" id="isHighValueHouse" />
+        <span>
+          Standard assessed value exceeds ₩1.2 billion (high-value home)
+          <span class="hint">This differs from the purchase price — check it on the Ministry of Land, Infrastructure and Transport's Real Estate Price Notification site.</span>
+        </span>
+      </label>
+    </div>
+
+    <p class="note hidden" id="officetel-note">
+      Officetel units are subject to a fixed 4% acquisition tax rate. This calculator assumes
+      the officetel is <strong>rented out as a de facto residence</strong> and applies rental
+      income tax rules accordingly — if it's actually rented for business use, the real tax
+      treatment may differ.
+    </p>
+
+    <fieldset class="method-toggle">
+      <legend>Rental Business Registration</legend>
+      <label class="method-option">
+        <input type="radio" name="registrationStatus" value="미등록" checked />
+        <span>Not registered</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="registrationStatus" value="등록임대" />
+        <span>Registered rental housing</span>
+      </label>
+    </fieldset>
+
+    <label class="check-row">
+      <input type="checkbox" id="otherIncomeUnder20M" />
+      <span>
+        My comprehensive income excluding this rental income is ₩20 million or less per year
+        <span class="hint">The sum of your other income (wages, business income, etc.) excluding this rental income. Required for the basic deduction (₩2M/₩4M).</span>
+      </span>
+    </label>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Pre-Tax Yield</span>
+        <span class="value"><span id="pretax-yield">-</span></span>
+      </div>
+      <div class="result-item">
+        <span class="label">After-Tax Yield</span>
+        <span class="value"><span id="posttax-yield">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Net invested capital breakdown
+      </caption>
+      <tbody>
+        <tr>
+          <td>
+            Total Acquisition Tax
+            <span class="formula-line">= acquisition tax + local education tax + Special Rural Development Tax</span>
+            <span class="formula-actual" id="acqtax-formula">-</span>
+          </td>
+          <td id="row-acqtax">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            Net Invested Capital
+            <span class="formula-line">= purchase price − deposit + total acquisition tax</span>
+            <span class="formula-actual" id="capital-formula">-</span>
+          </td>
+          <td id="row-capital">-</td>
+        </tr>
+        <tr>
+          <td>Annual Rent Income <span class="formula-line">= monthly rent × 12</span></td>
+          <td id="row-annual-rent">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note" id="taxability-note" style="font-weight:600;"></p>
+
+    <table class="breakdown hidden" id="tax-table">
+      <caption class="note" style="text-align:left;margin-bottom:6px;">
+        Rental income tax breakdown (separate taxation)
+      </caption>
+      <tbody>
+        <tr>
+          <td>Total Revenue</td>
+          <td id="row-income">-</td>
+        </tr>
+        <tr>
+          <td>Necessary Expenses <span class="hint" id="expense-rate-hint"></span></td>
+          <td id="row-expense">-</td>
+        </tr>
+        <tr>
+          <td>Basic Deduction</td>
+          <td id="row-deduction">-</td>
+        </tr>
+        <tr class="total">
+          <td>Business Income</td>
+          <td id="row-business-income">-</td>
+        </tr>
+        <tr>
+          <td>Income Tax (14%)</td>
+          <td id="row-income-tax">-</td>
+        </tr>
+        <tr>
+          <td>Local Income Tax (10% of income tax)</td>
+          <td id="row-local-tax">-</td>
+        </tr>
+        <tr class="total">
+          <td>Total Rental Income Tax</td>
+          <td id="row-total-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="deposit-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    These results are <strong>simplified estimates</strong>. Acquisition tax does not reflect
+    the temporary two-home exemption or first-time buyer reduction (same limitation as the
+    <a href="/en/calculators/acquisition-tax-calculator">Acquisition Tax Calculator</a>). Rental
+    income tax is calculated on a <strong>separate-taxation basis only</strong> and is not
+    compared against comprehensive taxation. Imputed rental income (간주임대료) on deposits for
+    owners of 3+ homes is not calculated — this requires the combined deposits across all
+    homes you own, which this calculator does not have. For an accurate figure, use the
+    National Tax Service Hometax or consult a tax professional.
+  </div>
+
+  <section class="law-refs">
+    <h2>Legal Basis</h2>
+    <ul>
+      <li>
+        Basis: <strong>Acquisition tax</strong> — see the <a href="/en/calculators/acquisition-tax-calculator">Acquisition Tax Calculator</a> for the legal basis (this calculator reuses the same logic).
+      </li>
+      <li>
+        Basis: <strong>Income Tax Act</strong>, Article 64-2 (special taxation for rental housing income — 14% separate tax rate, necessary expense ratio, basic deduction), Article 14(3)(7) (₩20 million/year cap for choosing separate taxation), Article 12(2)(b) (one-home exemption, ₩1.2 billion standard assessed value threshold) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%86%8C%EB%93%9D%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Local Tax Act</strong>, Article 92 (individual local income tax on comprehensive income, 10% of the income tax) —
+        <a
+          href="https://www.law.go.kr/LSW/lsInfoP.do?lsId=001649&ancYnChk=0"
+          target="_blank"
+          rel="noopener noreferrer">View full statute</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot lang="en" />
+
+  <RelatedCalculators slug="rental-yield-calculator" lang="en" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why is acquisition tax included in the invested capital?</summary>
+      <p>
+        Acquisition tax, local education tax, and Special Rural Development Tax are real cash
+        outlays at the time of purchase. Including them gives a yield based on how much of your
+        own money is actually tied up in this property. Leaving acquisition tax out would make
+        the yield look better than it really is.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does the deposit reduce invested capital instead of counting as income?</summary>
+      <p>
+        The deposit is money you'll eventually have to return to the tenant, so it isn't your
+        income — it's <strong>financing that reduces how much of your own capital you need</strong>.
+        That's why it's subtracted from the purchase price, while acquisition tax is added, to
+        calculate the amount of your own money actually tied up.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is my rental income tax-exempt (or taxable)?</summary>
+      <p>
+        If your household owns <strong>only one home</strong> nationwide and its standard
+        assessed value is <strong>₩1.2 billion or less</strong>, the rental income is
+        tax-exempt (Income Tax Act Article 12(2)(b)). If you own 2 or more homes, or your one
+        home exceeds ₩1.2 billion in standard assessed value, the income is taxable.
+      </p>
+    </details>
+
+    <details>
+      <summary>How much does registering as a rental business reduce my tax?</summary>
+      <p>
+        Unregistered gets a 50% necessary expense ratio and up to ₩2 million basic deduction.
+        Registered rental housing gets a more favorable <strong>60%</strong> expense ratio and
+        up to <strong>₩4 million</strong> basic deduction (the deduction only applies if your
+        other comprehensive income excluding this rental income is ₩20 million or less).
+        Registration does come with obligations, though — a 5% cap on rent increases and a
+        mandatory rental period.
+      </p>
+    </details>
+
+    <details>
+      <summary>Does this work accurately for officetels?</summary>
+      <p>
+        This calculator assumes the officetel is <strong>rented out as a de facto
+        residence</strong> and applies rental income tax rules (14% separate taxation, etc.)
+        accordingly. If it's actually rented for business use (e.g., as an office), it would be
+        classified as ordinary business income instead, and the result may differ.
+      </p>
+    </details>
+
+    <details>
+      <summary>I own 3+ homes — why doesn't the deposit-related tax show up?</summary>
+      <p>
+        If you own 3 or more homes and your combined deposits exceed ₩300 million, an
+        additional <strong>imputed rental income</strong> tax also applies to the deposits.
+        However, this determination is based on the <strong>combined deposits across every
+        home you own</strong> — this calculator only knows the deposit for the one property
+        you're calculating, so it cannot compute this. If you select 3+ homes, the monthly-rent
+        portion of the tax is still calculated correctly, but a notice will indicate that
+        imputed rental income was not included.
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens if my annual rent income exceeds ₩20 million?</summary>
+      <p>
+        If your total annual housing rental revenue exceeds ₩20 million, you can no longer
+        choose separate taxation (Income Tax Act Article 14(3)(7)) — mandatory comprehensive
+        taxation (combined with your other income at progressive rates) applies instead. This
+        calculator does not compute comprehensive-taxation amounts, so it will only display a
+        notice with no tax figure in that case. Even if your annual revenue comes out under
+        ₩20 million, check separately whether the combined total across any other rental
+        properties you own exceeds that threshold.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #property-type-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #house-options {
+    display: grid;
+    gap: 16px;
+  }
+  /* #house-options is an ID selector, so Astro's scoped-style attribute
+     boost makes it beat the global `.hidden` class (0,1,0) on specificity
+     alone — the documented CSS-specificity trap in CLAUDE.md. Re-declare
+     at matching specificity so toggling `.hidden` via JS actually hides it. */
+  #house-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateRentalYield } from '../../../lib/rentalYieldCalculator';
+  import type {
+    HouseCountForAcquisition,
+    PropertyType,
+    RentalRegistrationStatus,
+  } from '../../../lib/rentalYieldCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('rental-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('purchasePrice', 'purchasePrice-preview');
+  bindAmountPreview('deposit', 'deposit-preview');
+  bindAmountPreview('monthlyRent', 'monthlyRent-preview');
+
+  const currentPropertyType = (): PropertyType =>
+    (form.querySelector('input[name="propertyType"]:checked') as HTMLInputElement)
+      .value as PropertyType;
+
+  const houseOptions = document.getElementById('house-options') as HTMLDivElement;
+  const officetelNote = document.getElementById('officetel-note') as HTMLParagraphElement;
+  const syncPropertyType = () => {
+    const isOfficetel = currentPropertyType() === '오피스텔';
+    houseOptions.classList.toggle('hidden', isOfficetel);
+    officetelNote.classList.toggle('hidden', !isOfficetel);
+  };
+  form.querySelectorAll('input[name="propertyType"]').forEach((radio) => {
+    radio.addEventListener('change', syncPropertyType);
+  });
+  syncPropertyType();
+
+  const houseCountSelect = document.getElementById('houseCount') as HTMLSelectElement;
+  const regulatedAreaRow = document.getElementById('regulated-area-row') as HTMLLabelElement;
+  const highValueHouseRow = document.getElementById('high-value-house-row') as HTMLLabelElement;
+  const syncHouseCountVisibility = () => {
+    regulatedAreaRow.classList.toggle('hidden', houseCountSelect.value === '1주택');
+    highValueHouseRow.classList.toggle('hidden', houseCountSelect.value !== '1주택');
+  };
+  houseCountSelect.addEventListener('change', syncHouseCountVisibility);
+  syncHouseCountVisibility();
+
+  const won = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const pct = (value: number) => `${value.toFixed(2)}%`;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const purchasePrice = Number((document.getElementById('purchasePrice') as HTMLInputElement).value);
+    const deposit = Number((document.getElementById('deposit') as HTMLInputElement).value);
+    const monthlyRent = Number((document.getElementById('monthlyRent') as HTMLInputElement).value);
+
+    if (!purchasePrice || purchasePrice <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid purchase price.';
+      return;
+    }
+    if (deposit < 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid deposit.';
+      return;
+    }
+    if (!monthlyRent || monthlyRent <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid monthly rent.';
+      return;
+    }
+
+    const propertyType = currentPropertyType();
+    const houseCount = houseCountSelect.value as HouseCountForAcquisition;
+    const isRegulatedArea = (document.getElementById('isRegulatedArea') as HTMLInputElement).checked;
+    const isOver85Sqm = (document.getElementById('isOver85Sqm') as HTMLInputElement).checked;
+    const isHighValueHouse = (document.getElementById('isHighValueHouse') as HTMLInputElement).checked;
+    const registrationStatus = (
+      form.querySelector('input[name="registrationStatus"]:checked') as HTMLInputElement
+    ).value as RentalRegistrationStatus;
+    const otherIncomeUnder20M = (
+      document.getElementById('otherIncomeUnder20M') as HTMLInputElement
+    ).checked;
+
+    const r = calculateRentalYield({
+      purchasePrice,
+      deposit,
+      monthlyRent,
+      propertyType,
+      houseCount,
+      isRegulatedArea,
+      isOver85Sqm,
+      isHighValueHouse,
+      registrationStatus,
+      otherIncomeUnder20M,
+    });
+
+    const yieldOrDash = (id: string, value: number | null) => {
+      setText(id, value === null ? 'N/A' : pct(value));
+    };
+    yieldOrDash('pretax-yield', r.preTaxYieldPercent);
+    yieldOrDash('posttax-yield', r.postTaxYieldPercent);
+
+    setWon('row-acqtax', r.acquisitionTax.total);
+    setText(
+      'acqtax-formula',
+      `= ${won.format(Math.round(r.acquisitionTax.acquisitionTax))} + ${won.format(Math.round(r.acquisitionTax.localEducationTax))} + ${won.format(Math.round(r.acquisitionTax.ruralSpecialTax))}`,
+    );
+    setWon('row-capital', r.netCapitalInvested);
+    setText(
+      'capital-formula',
+      `= ${won.format(Math.round(purchasePrice))} − ${won.format(Math.round(deposit))} + ${won.format(Math.round(r.acquisitionTax.total))}`,
+    );
+    setWon('row-annual-rent', r.annualRentIncome);
+
+    if (r.netCapitalInvested <= 0) {
+      errorMsg.textContent =
+        'The deposit exceeds the purchase price plus acquisition tax, so net invested capital is zero or negative. Yield cannot be calculated.';
+    }
+
+    const taxabilityNote = document.getElementById('taxability-note') as HTMLParagraphElement;
+    const taxTable = document.getElementById('tax-table') as HTMLTableElement;
+    const depositNote = document.getElementById('deposit-note') as HTMLParagraphElement;
+
+    if (r.taxability.kind === '비과세') {
+      taxabilityNote.textContent =
+        '✓ Tax-exempt: this is your only home nationwide and its standard assessed value is ₩1.2 billion or less.';
+      taxTable.classList.add('hidden');
+      depositNote.classList.add('hidden');
+    } else if (r.taxability.kind === '분리과세불가_종합과세') {
+      taxabilityNote.textContent =
+        '⚠ Annual rent income exceeds ₩20 million, so separate taxation cannot be chosen. Mandatory comprehensive taxation (combined with other income at progressive rates) applies, which this calculator does not compute.';
+      taxTable.classList.add('hidden');
+      depositNote.classList.add('hidden');
+    } else {
+      const t = r.taxability;
+      taxabilityNote.textContent =
+        'Subject to separate taxation. The after-tax yield below reflects the tax computed here.';
+      taxTable.classList.remove('hidden');
+      setWon('row-income', r.annualRentIncome);
+      setText('expense-rate-hint', `(${pct(t.necessaryExpenseRatio * 100)} of revenue)`);
+      setWon('row-expense', t.necessaryExpense);
+      setWon('row-deduction', t.basicDeduction);
+      setWon('row-business-income', t.businessIncome);
+      setWon('row-income-tax', t.incomeTax);
+      setWon('row-local-tax', t.localIncomeTax);
+      setWon('row-total-tax', t.totalRentalTax);
+
+      if (t.depositImputedIncomeExcluded) {
+        depositNote.textContent =
+          '⚠ If you own 3+ homes and your combined deposits exceed ₩300 million, imputed rental income on the deposits is also taxed. This calculator does not have your combined deposits across all homes, so it does not include that amount — your actual tax may be higher.';
+        depositNote.classList.remove('hidden');
+      } else {
+        depositNote.classList.add('hidden');
+      }
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>
