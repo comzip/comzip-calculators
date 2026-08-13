@@ -208,6 +208,15 @@ const meta = calculators.find((c) => c.slug === 'acquisition-tax-calculator')!;
     display: grid;
     gap: 16px;
   }
+  /* #house-options is an ID selector, so Astro's scoped-style
+     [data-astro-cid-*] attribute boost makes it beat the global `.hidden`
+     class (0,1,0) on specificity alone — the CSS-specificity trap
+     documented in CLAUDE.md. Toggling `.hidden` via JS when switching to
+     officetel never actually hid these fields. Re-declare at matching
+     specificity to fix. */
+  #house-options.hidden {
+    display: none;
+  }
 </style>
 
 <script>
