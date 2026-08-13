@@ -161,39 +161,74 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       </caption>
       <tbody>
         <tr>
-          <td>Deduction</td>
+          <td>
+            Deduction
+            <span class="formula-line" id="rt-deduction-line">-</span>
+            <span class="formula-actual" id="rt-deduction-formula">-</span>
+          </td>
           <td id="rt-deduction">-</td>
         </tr>
         <tr>
-          <td>Fair Market Value Ratio</td>
+          <td>
+            Fair Market Value Ratio
+            <span class="formula-line" id="rt-fmv-line">-</span>
+            <span class="formula-actual" id="rt-fmv-formula">-</span>
+          </td>
           <td id="rt-fmv">-</td>
         </tr>
         <tr>
-          <td>Tax Base</td>
+          <td>
+            Tax Base
+            <span class="formula-line">= max(0, total announced value − deduction) × fair market value ratio</span>
+            <span class="formula-actual" id="rt-taxbase-formula">-</span>
+          </td>
           <td id="rt-taxbase">-</td>
         </tr>
         <tr>
-          <td>Calculated Tax <span class="hint" id="rt-status-badge"></span></td>
+          <td>
+            Calculated Tax <span class="hint" id="rt-status-badge"></span>
+            <span class="formula-line" id="rt-tax-line">-</span>
+            <span class="formula-actual" id="rt-tax-formula">-</span>
+          </td>
           <td id="rt-tax">-</td>
         </tr>
         <tr>
-          <td>Property Tax Credit <span class="hint">(double taxation adjustment, approximate)</span></td>
+          <td>
+            Property Tax Credit <span class="hint">(double taxation adjustment, approximate)</span>
+            <span class="formula-line" id="rt-property-credit-line">-</span>
+            <span class="formula-actual" id="rt-property-credit-formula">-</span>
+          </td>
           <td id="rt-property-credit">-</td>
         </tr>
         <tr id="rt-credit-row" class="hidden">
-          <td>Tax Credit <span class="hint" id="rt-credit-label"></span></td>
+          <td>
+            Tax Credit <span class="hint" id="rt-credit-label"></span>
+            <span class="formula-line">= (calculated tax − property tax credit) × credit rate (age + holding/residency, capped)</span>
+            <span class="formula-actual" id="rt-credit-formula">-</span>
+          </td>
           <td id="rt-credit">-</td>
         </tr>
         <tr class="total">
-          <td>Final Tax</td>
+          <td>
+            Final Tax
+            <span class="formula-line">= calculated tax − property tax credit − tax credit</span>
+            <span class="formula-actual" id="rt-final-formula">-</span>
+          </td>
           <td id="rt-final">-</td>
         </tr>
         <tr>
-          <td>Special Rural Development Tax <span class="hint">(20% of final tax)</span></td>
+          <td>
+            Special Rural Development Tax <span class="hint">(20% of final tax)</span>
+            <span class="formula-actual" id="rt-rural-formula">-</span>
+          </td>
           <td id="rt-rural">-</td>
         </tr>
         <tr class="total">
-          <td>Total</td>
+          <td>
+            Total
+            <span class="formula-line">= final tax + rural development tax</span>
+            <span class="formula-actual" id="rt-total-formula">-</span>
+          </td>
           <td id="rt-total">-</td>
         </tr>
       </tbody>
@@ -461,6 +496,28 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
+  /* formula-line/formula-actual pattern — shows the general formula and the
+     actual substituted numbers side by side for each result row. Follows the
+     pattern introduced in buy-vs-jeonse-calculator.astro/
+     stock-averaging-calculator.astro (not yet promoted to BaseLayout global
+     CSS, see CLAUDE.md). */
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <script>
@@ -497,6 +554,9 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     if (el) el.textContent = text;
   };
   const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+  // pct()'s integer rounding is too coarse for formula display (0.5%, 1.3%,
+  // 43-45%, etc.), so formula-actual text uses two decimal places instead.
+  const fmtPct2 = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`;
 
   const form = document.getElementById('reform-form') as HTMLFormElement;
   const resultBox = document.getElementById('reform-result') as HTMLDivElement;
@@ -595,6 +655,75 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     const statusBadge = result.bracket.status === 'delegated' ? '(delegated to current law)' : '(confirmed bracket)';
     setText('rt-status-badge', statusBadge);
 
+    // The deduction formula itself differs by year and by 1-home vs
+    // multi-home, so the formula-line text switches to match what was
+    // actually applied.
+    if (year === 2026) {
+      setText('rt-deduction-line', '= flat deduction under current law (Comprehensive Real Estate Tax Act §8), delegated');
+      setText('rt-deduction-formula', `= ${won.format(result.deduction)}`);
+    } else if (houseCount === '1주택') {
+      setText('rt-deduction-line', '= flat deduction (₩1.4B owner-occupied / ₩900M not occupied)');
+      setText(
+        'rt-deduction-formula',
+        `= ${residency === '비거주' ? '₩900M (not occupied)' : '₩1.4B (owner-occupied)'} applied → ${won.format(result.deduction)}`,
+      );
+    } else {
+      setText('rt-deduction-line', '= ₩400M + ₩500M × (value of home you live in ÷ total announced value)');
+      const homeValue = residentialHomeValue > 0 ? residentialHomeValue : 0;
+      setText(
+        'rt-deduction-formula',
+        `= ${won.format(400_000_000)} + ${won.format(500_000_000)} × (${won.format(homeValue)} ÷ ${won.format(totalPublicPrice)}) = ${won.format(result.deduction)}`,
+      );
+    }
+
+    // The fair market value ratio's formula also differs by year/track — 2027
+    // has no track distinction at all, and only 2028+ apply track A/B.
+    if (year === 2026) {
+      setText('rt-fmv-line', '= fixed ratio under current law');
+      setText('rt-fmv-formula', `= ${fmtPct2(result.fairMarketRatio)}`);
+    } else if (year === 2027) {
+      setText('rt-fmv-line', '= 2027, single ratio regardless of home count or area');
+      setText('rt-fmv-formula', `= ${fmtPct2(result.fairMarketRatio)}`);
+    } else {
+      setText('rt-fmv-line', '= 2028 onward, fixed ratio by track (Track A 70% / Track B 80%)');
+      const trackLabel =
+        result.fmvTrack === 'B' ? 'Track B (regulated-area 2 homes · 3+ homes)' : 'Track A (1 home · non-regulated 2 homes)';
+      setText('rt-fmv-formula', `= ${trackLabel} → ${fmtPct2(result.fairMarketRatio)}`);
+    }
+
+    setText(
+      'rt-taxbase-formula',
+      `= max(0, ${won.format(totalPublicPrice)} − ${won.format(result.deduction)}) × ${fmtPct2(result.fairMarketRatio)} = ${won.format(result.taxBase)}`,
+    );
+
+    setText(
+      'rt-tax-line',
+      result.bracket.status === 'delegated'
+        ? '= current law (Comprehensive Real Estate Tax Act §8) rate table applied as-is (delegated)'
+        : '= tax base × year-specific progressive rate table',
+    );
+    const effectiveTaxRate = result.taxBase > 0 ? (result.bracket.calculatedTax / result.taxBase) * 100 : 0;
+    setText(
+      'rt-tax-formula',
+      `tax base ${won.format(result.taxBase)} → calculated tax ${won.format(result.bracket.calculatedTax)} (effective rate ${Number(effectiveTaxRate.toFixed(2))}%)`,
+    );
+
+    // The property tax credit is exact for 1-home owners, but for multi-home
+    // owners it also folds in a split-adjustment ratio driven by property
+    // tax's progressive structure — that internal ratio isn't exposed by this
+    // calculator's result, so here we show only which rule applied and the
+    // exact input → output relationship.
+    setText(
+      'rt-property-credit-line',
+      houseCount === '1주택'
+        ? '= tax base × property tax special ratio for 1-home owners (43-45%) × top property tax rate (0.4%)'
+        : '= tax base × property tax ratio (60%) × top rate (0.4%) × multi-home split-adjustment ratio (approximate)',
+    );
+    setText(
+      'rt-property-credit-formula',
+      `based on tax base ${won.format(result.taxBase)}, ${houseCount === '1주택' ? 'exact value' : 'approximate value'} → ${won.format(result.propertyTaxCredit)}`,
+    );
+
     const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
     creditRow.classList.toggle('hidden', result.creditAmount <= 0);
     if (result.creditAmount > 0) {
@@ -606,12 +735,31 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
             ? 'age credit + better of holding/residency credit, proposal (₩8M cap)'
             : 'age + residency credit, proposal (₩6M cap)';
       setText('rt-credit-label', `(${creditLabel}, nominal ${pct(result.creditRate)})`);
+
+      const afterPropertyCredit = Math.max(0, result.bracket.calculatedTax - result.propertyTaxCredit);
+      const nominalCreditAmount = afterPropertyCredit * result.creditRate;
+      const isCapped = nominalCreditAmount > result.creditAmount + 1;
+      setText(
+        'rt-credit-formula',
+        isCapped
+          ? `= (${won.format(afterPropertyCredit)} × ${fmtPct2(result.creditRate)} = ${won.format(nominalCreditAmount)}) → cap applied → ${won.format(result.creditAmount)}`
+          : `= ${won.format(afterPropertyCredit)} × ${fmtPct2(result.creditRate)} = ${won.format(result.creditAmount)}`,
+      );
     }
 
     setWon('rt-property-credit', result.propertyTaxCredit);
     setWon('rt-final', result.finalTax);
+    setText(
+      'rt-final-formula',
+      `= ${won.format(result.bracket.calculatedTax)} − ${won.format(result.propertyTaxCredit)} − ${won.format(result.creditAmount)} = ${won.format(result.finalTax)}`,
+    );
     setWon('rt-rural', result.ruralSpecialTax);
+    setText('rt-rural-formula', `= ${won.format(result.finalTax)} × 20% = ${won.format(result.ruralSpecialTax)}`);
     setWon('rt-total', result.totalWithSurtax);
+    setText(
+      'rt-total-formula',
+      `= ${won.format(result.finalTax)} + ${won.format(result.ruralSpecialTax)} = ${won.format(result.totalWithSurtax)}`,
+    );
 
     // The comparison table's bottom row must show the same figure as the
     // detail table's bottom row ("Total") — this row used to show 결정세액

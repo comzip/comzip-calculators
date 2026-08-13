@@ -135,31 +135,58 @@ const [titleMain, titleSub] = meta.title.split(' (');
       </caption>
       <tbody>
         <tr>
-          <td>과세대상 양도차익 <span class="hint" id="taxable-gain-hint"></span></td>
+          <td>
+            과세대상 양도차익 <span class="hint" id="taxable-gain-hint"></span>
+            <span class="formula-line" id="rt-taxable-gain-line">-</span>
+            <span class="formula-actual" id="rt-taxable-gain-formula">-</span>
+          </td>
           <td id="rt-taxable-gain">-</td>
         </tr>
         <tr>
-          <td>장기보유특별공제 <span class="hint" id="rt-lt-rate"></span></td>
+          <td>
+            장기보유특별공제 <span class="hint" id="rt-lt-rate"></span>
+            <span class="formula-line">= min(과세대상 양도차익 × 장기보유특별공제율, 공제한도)</span>
+            <span class="formula-actual" id="rt-lt-formula">-</span>
+          </td>
           <td id="rt-lt-amount">-</td>
         </tr>
         <tr>
-          <td>기본공제</td>
+          <td>
+            기본공제
+            <span class="formula-line" id="rt-basic-line">-</span>
+            <span class="formula-actual" id="rt-basic-formula">-</span>
+          </td>
           <td id="rt-basic">-</td>
         </tr>
         <tr class="total">
-          <td>과세표준</td>
+          <td>
+            과세표준
+            <span class="formula-line">= max(0, 과세대상 양도차익 − 장기보유특별공제 − 기본공제)</span>
+            <span class="formula-actual" id="rt-taxbase-formula">-</span>
+          </td>
           <td id="rt-taxbase">-</td>
         </tr>
         <tr>
-          <td>산출세액 <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td>
+            산출세액 <span class="hint" id="rt-surcharge-hint"></span>
+            <span class="formula-line" id="rt-tax-line">-</span>
+            <span class="formula-actual" id="rt-tax-formula">-</span>
+          </td>
           <td id="rt-tax">-</td>
         </tr>
         <tr>
-          <td>지방소득세 <span class="hint">(산출세액의 10%)</span></td>
+          <td>
+            지방소득세 <span class="hint">(산출세액의 10%)</span>
+            <span class="formula-actual" id="rt-local-formula">-</span>
+          </td>
           <td id="rt-local">-</td>
         </tr>
         <tr class="total">
-          <td>합계</td>
+          <td>
+            합계
+            <span class="formula-line">= 산출세액 + 지방소득세</span>
+            <span class="formula-actual" id="rt-total-formula">-</span>
+          </td>
           <td id="rt-total">-</td>
         </tr>
       </tbody>
@@ -467,6 +494,27 @@ const [titleMain, titleSub] = meta.title.split(' (');
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
+  /* formula-line/formula-actual 패턴 — 결과 항목마다 일반식과 실제 대입값을
+     나란히 보여준다. buy-vs-jeonse-calculator.astro/
+     stock-averaging-calculator.astro에서 도입한 패턴을 그대로 따른다
+     (아직 BaseLayout 전역 CSS로 승격되지 않음, CLAUDE.md 참고). */
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <script>
@@ -502,6 +550,20 @@ const [titleMain, titleSub] = meta.title.split(' (');
     if (el) el.textContent = text;
   };
   const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+  // 세율(0.5%, 1.3%, 43~45% 등) 표시는 pct()의 정수 반올림으로는 부정확해질
+  // 수 있어, 계산식(formula-actual) 표시 전용으로 소수 둘째 자리까지 보존한다.
+  const fmtPct2 = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`;
+  // 1세대1주택 비과세 기준(양도가액 12억원)과 공제한도(2028년 20억원, 2029년
+  // 10억원)는 capitalGainsTaxReformCalculator.ts의 상수와 값이 같다. 그 파일이
+  // export하지 않는 표시 전용 상수라 여기 다시 선언한다(계산 로직 자체는
+  // 절대 재구현하지 않고 항상 lib의 계산 결과만 사용 — 아래는 formula-actual에
+  // 보여줄 산식 텍스트 구성에만 쓰인다).
+  const SINGLE_HOUSE_EXEMPT_SALE_VALUE_DISPLAY = 1_200_000_000;
+  const deductionCapForYear = (year: CgtReformYear): number => {
+    if (year === 2028) return 2_000_000_000;
+    if (year === 2029) return 1_000_000_000;
+    return Infinity;
+  };
 
   const form = document.getElementById('reform-form') as HTMLFormElement;
   const resultBox = document.getElementById('reform-result') as HTMLDivElement;
@@ -578,14 +640,57 @@ const [titleMain, titleSub] = meta.title.split(' (');
     }
 
     setWon('rt-taxable-gain', result.taxableGain);
+    // 1주택이어도 보유·거주 요건 미충족이면 전액 과세되므로, houseCount만으로는
+    // "12억 초과분만 과세" 여부를 판정할 수 없다 — 실제로 안분됐는지
+    // (taxableGain < gain)를 직접 비교해야 한다(capital-gains-tax-calculator.astro
+    // 에서 먼저 고친 것과 같은 이유).
+    const isProportional = !result.isExempt && result.taxableGain < Math.max(0, gain);
+    setText('taxable-gain-hint', isProportional ? '(양도가액 12억원 초과 비중만 과세)' : '');
     setText(
-      'taxable-gain-hint',
-      houseCount === '1주택' ? '(양도가액 12억원 초과 비중만 과세)' : '',
+      'rt-taxable-gain-line',
+      result.isExempt
+        ? '= 1세대1주택 비과세 (양도가액 12억원 이하)'
+        : isProportional
+          ? '= 양도차익 × (양도가액 − 12억원) ÷ 양도가액'
+          : '= 양도차익 전액 (비과세 요건 미충족 또는 다주택)',
     );
+    setText(
+      'rt-taxable-gain-formula',
+      result.isExempt
+        ? `= 0원 (비과세)`
+        : isProportional
+          ? `= ${won.format(gain)} × (${won.format(saleValue)} − ${won.format(SINGLE_HOUSE_EXEMPT_SALE_VALUE_DISPLAY)}) ÷ ${won.format(saleValue)} = ${won.format(result.taxableGain)}`
+          : `= ${won.format(gain)} (전액 과세) = ${won.format(result.taxableGain)}`,
+    );
+
     setWon('rt-lt-amount', result.longTermDeductionAmount);
     setText('rt-lt-rate', `(공제율 ${pct(result.longTermDeductionRate)})`);
+    const ltNominal = result.taxableGain * result.longTermDeductionRate;
+    const ltCap = deductionCapForYear(year);
+    const ltCapped = Number.isFinite(ltCap) && ltNominal > result.longTermDeductionAmount + 1;
+    setText(
+      'rt-lt-formula',
+      ltCapped
+        ? `= min(${won.format(ltNominal)}, ${won.format(ltCap)}) → 공제한도 적용 → ${won.format(result.longTermDeductionAmount)}`
+        : `= ${won.format(result.taxableGain)} × ${fmtPct2(result.longTermDeductionRate)} = ${won.format(result.longTermDeductionAmount)}`,
+    );
+
     setWon('rt-basic', result.basicDeduction);
+    const isLongResidenceDeduction = result.basicDeduction > 2_500_000;
+    setText(
+      'rt-basic-line',
+      isLongResidenceDeduction
+        ? '= 장기거주 1주택 기본공제 확대 (거주 10년 이상 + 양도가액 30억원 이하)'
+        : '= 양도소득 기본공제 (연 250만원, 소득세법 §103)',
+    );
+    setText('rt-basic-formula', `= ${won.format(result.basicDeduction)}`);
+
     setWon('rt-taxbase', result.taxBase);
+    setText(
+      'rt-taxbase-formula',
+      `= max(0, ${won.format(result.taxableGain)} − ${won.format(result.longTermDeductionAmount)} − ${won.format(result.basicDeduction)}) = ${won.format(result.taxBase)}`,
+    );
+
     setWon('rt-tax', result.calculatedTax);
     const surchargeHints = [
       result.surchargeRate > 0 ? `다주택자 중과 +${pct(result.surchargeRate)}p` : '',
@@ -594,8 +699,33 @@ const [titleMain, titleSub] = meta.title.split(' (');
         : '',
     ].filter(Boolean);
     setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
+    if (result.appliedShortTermRate !== null) {
+      setText('rt-tax-line', '= 과세표준 × 단기 보유 단일세율 (비교과세 결과 이 쪽이 더 큼)');
+      setText(
+        'rt-tax-formula',
+        `= ${won.format(result.taxBase)} × ${fmtPct2(result.appliedShortTermRate)} = ${won.format(result.calculatedTax)}`,
+      );
+    } else {
+      setText(
+        'rt-tax-line',
+        result.surchargeRate > 0
+          ? '= 과세표준 × 누진세율표(+다주택 중과가산율)'
+          : '= 과세표준 × 누진세율표',
+      );
+      const effectiveTaxRate = result.taxBase > 0 ? (result.calculatedTax / result.taxBase) * 100 : 0;
+      setText(
+        'rt-tax-formula',
+        `과세표준 ${won.format(result.taxBase)} → 산출세액 ${won.format(result.calculatedTax)} (실효세율 ${Number(effectiveTaxRate.toFixed(2))}%)`,
+      );
+    }
+
     setWon('rt-local', result.localIncomeTax);
+    setText('rt-local-formula', `= ${won.format(result.calculatedTax)} × 10% = ${won.format(result.localIncomeTax)}`);
     setWon('rt-total', result.totalWithSurtax);
+    setText(
+      'rt-total-formula',
+      `= ${won.format(result.calculatedTax)} + ${won.format(result.localIncomeTax)} = ${won.format(result.totalWithSurtax)}`,
+    );
 
     const allYears = calculateCapitalGainsReformTaxAllYears(commonInput);
     for (const y of [2026, 2027, 2028, 2029] as const) {

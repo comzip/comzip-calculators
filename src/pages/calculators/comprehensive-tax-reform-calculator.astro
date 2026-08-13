@@ -154,39 +154,74 @@ const [titleMain, titleSub] = meta.title.split(' (');
       </caption>
       <tbody>
         <tr>
-          <td>공제금액</td>
+          <td>
+            공제금액
+            <span class="formula-line" id="rt-deduction-line">-</span>
+            <span class="formula-actual" id="rt-deduction-formula">-</span>
+          </td>
           <td id="rt-deduction">-</td>
         </tr>
         <tr>
-          <td>공정시장가액비율</td>
+          <td>
+            공정시장가액비율
+            <span class="formula-line" id="rt-fmv-line">-</span>
+            <span class="formula-actual" id="rt-fmv-formula">-</span>
+          </td>
           <td id="rt-fmv">-</td>
         </tr>
         <tr>
-          <td>과세표준</td>
+          <td>
+            과세표준
+            <span class="formula-line">= max(0, 공시가격합계 − 공제금액) × 공정시장가액비율</span>
+            <span class="formula-actual" id="rt-taxbase-formula">-</span>
+          </td>
           <td id="rt-taxbase">-</td>
         </tr>
         <tr>
-          <td>산출세액 <span class="hint" id="rt-status-badge"></span></td>
+          <td>
+            산출세액 <span class="hint" id="rt-status-badge"></span>
+            <span class="formula-line" id="rt-tax-line">-</span>
+            <span class="formula-actual" id="rt-tax-formula">-</span>
+          </td>
           <td id="rt-tax">-</td>
         </tr>
         <tr>
-          <td>재산세액공제 <span class="hint">(이중과세 조정, 근사치)</span></td>
+          <td>
+            재산세액공제 <span class="hint">(이중과세 조정, 근사치)</span>
+            <span class="formula-line" id="rt-property-credit-line">-</span>
+            <span class="formula-actual" id="rt-property-credit-formula">-</span>
+          </td>
           <td id="rt-property-credit">-</td>
         </tr>
         <tr id="rt-credit-row" class="hidden">
-          <td>세액공제 <span class="hint" id="rt-credit-label"></span></td>
+          <td>
+            세액공제 <span class="hint" id="rt-credit-label"></span>
+            <span class="formula-line">= (산출세액 − 재산세액공제) × 세액공제율(연령·보유/거주공제, 금액상한 적용)</span>
+            <span class="formula-actual" id="rt-credit-formula">-</span>
+          </td>
           <td id="rt-credit">-</td>
         </tr>
         <tr class="total">
-          <td>결정세액</td>
+          <td>
+            결정세액
+            <span class="formula-line">= 산출세액 − 재산세액공제 − 세액공제</span>
+            <span class="formula-actual" id="rt-final-formula">-</span>
+          </td>
           <td id="rt-final">-</td>
         </tr>
         <tr>
-          <td>농어촌특별세 <span class="hint">(결정세액의 20%)</span></td>
+          <td>
+            농어촌특별세 <span class="hint">(결정세액의 20%)</span>
+            <span class="formula-actual" id="rt-rural-formula">-</span>
+          </td>
           <td id="rt-rural">-</td>
         </tr>
         <tr class="total">
-          <td>합계</td>
+          <td>
+            합계
+            <span class="formula-line">= 결정세액 + 농어촌특별세</span>
+            <span class="formula-actual" id="rt-total-formula">-</span>
+          </td>
           <td id="rt-total">-</td>
         </tr>
       </tbody>
@@ -446,6 +481,27 @@ const [titleMain, titleSub] = meta.title.split(' (');
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
+  /* formula-line/formula-actual 패턴 — 결과 항목마다 일반식과 실제 대입값을
+     나란히 보여준다. buy-vs-jeonse-calculator.astro/
+     stock-averaging-calculator.astro에서 도입한 패턴을 그대로 따른다
+     (아직 BaseLayout 전역 CSS로 승격되지 않음, CLAUDE.md 참고). */
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <script>
@@ -482,6 +538,9 @@ const [titleMain, titleSub] = meta.title.split(' (');
     if (el) el.textContent = text;
   };
   const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+  // 세율(0.5%, 1.3%, 43~45% 등) 표시는 pct()의 정수 반올림으로는 부정확해질
+  // 수 있어, 계산식(formula-actual) 표시 전용으로 소수 둘째 자리까지 보존한다.
+  const fmtPct2 = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`;
 
   const form = document.getElementById('reform-form') as HTMLFormElement;
   const resultBox = document.getElementById('reform-result') as HTMLDivElement;
@@ -577,6 +636,73 @@ const [titleMain, titleSub] = meta.title.split(' (');
     const statusBadge = result.bracket.status === 'delegated' ? '(현행법 위임)' : '(확정 구간 기준)';
     setText('rt-status-badge', statusBadge);
 
+    // 공제금액은 연도·1주택 여부·다주택 여부에 따라 산식 자체가 다르므로
+    // formula-line도 실제 적용된 산식으로 바꿔 보여준다.
+    if (year === 2026) {
+      setText('rt-deduction-line', '= 현행법(종합부동산세법 §8) 정액공제 위임');
+      setText('rt-deduction-formula', `= ${won.format(result.deduction)}`);
+    } else if (houseCount === '1주택') {
+      setText('rt-deduction-line', '= 정액공제 (실거주 14억원 / 비거주 9억원)');
+      setText(
+        'rt-deduction-formula',
+        `= ${residency === '비거주' ? '9억원(비거주)' : '14억원(실거주)'} 적용 → ${won.format(result.deduction)}`,
+      );
+    } else {
+      setText('rt-deduction-line', '= 4억원 + 5억원 × (거주주택가액 ÷ 공시가격합계)');
+      const homeValue = residentialHomeValue > 0 ? residentialHomeValue : 0;
+      setText(
+        'rt-deduction-formula',
+        `= ${won.format(400_000_000)} + ${won.format(500_000_000)} × (${won.format(homeValue)} ÷ ${won.format(totalPublicPrice)}) = ${won.format(result.deduction)}`,
+      );
+    }
+
+    // 공정시장가액비율도 연도·트랙에 따라 산식이 다르다(2027년은 트랙 구분
+    // 자체가 없고, 2028년 이후만 A/B 트랙이 실제 비율에 반영된다).
+    if (year === 2026) {
+      setText('rt-fmv-line', '= 현행법 고정비율');
+      setText('rt-fmv-formula', `= ${fmtPct2(result.fairMarketRatio)}`);
+    } else if (year === 2027) {
+      setText('rt-fmv-line', '= 2027년, 주택수·지역 무관 단일비율');
+      setText('rt-fmv-formula', `= ${fmtPct2(result.fairMarketRatio)}`);
+    } else {
+      setText('rt-fmv-line', '= 2028년 이후 트랙별 고정비율 (트랙 A 70% / 트랙 B 80%)');
+      const trackLabel =
+        result.fmvTrack === 'B' ? '트랙 B (조정대상 2주택·3주택 이상)' : '트랙 A (1주택·비조정 2주택)';
+      setText('rt-fmv-formula', `= ${trackLabel} → ${fmtPct2(result.fairMarketRatio)}`);
+    }
+
+    setText(
+      'rt-taxbase-formula',
+      `= max(0, ${won.format(totalPublicPrice)} − ${won.format(result.deduction)}) × ${fmtPct2(result.fairMarketRatio)} = ${won.format(result.taxBase)}`,
+    );
+
+    setText(
+      'rt-tax-line',
+      result.bracket.status === 'delegated'
+        ? '= 현행법(종합부동산세법 §8) 세율표 그대로 적용 (위임)'
+        : '= 과세표준 × 연도별 누진세율표',
+    );
+    const effectiveTaxRate = result.taxBase > 0 ? (result.bracket.calculatedTax / result.taxBase) * 100 : 0;
+    setText(
+      'rt-tax-formula',
+      `과세표준 ${won.format(result.taxBase)} → 산출세액 ${won.format(result.bracket.calculatedTax)} (실효세율 ${Number(effectiveTaxRate.toFixed(2))}%)`,
+    );
+
+    // 재산세액공제는 1주택은 정확값, 다주택은 재산세 누진구조에 따른 분할조정
+    // 비율까지 반영한 근사값이다(propertyTaxCreditCalculator 내부 로직 참고) —
+    // 그 세부 비율은 이 계산기의 result에 노출되지 않으므로, 여기서는 어떤
+    // 규칙이 적용됐는지와 입력→출력 관계만 정확히 보여준다.
+    setText(
+      'rt-property-credit-line',
+      houseCount === '1주택'
+        ? '= 과세표준 × 재산세 1세대1주택 특례 공정시장가액비율(43~45%) × 재산세 최고세율(0.4%)'
+        : '= 과세표준 × 재산세 공정시장가액비율(60%) × 최고세율(0.4%) × 다주택 분할조정비율(근사)',
+    );
+    setText(
+      'rt-property-credit-formula',
+      `과세표준 ${won.format(result.taxBase)} 기준 ${houseCount === '1주택' ? '정확값' : '근사값'} → ${won.format(result.propertyTaxCredit)}`,
+    );
+
     const creditRow = document.getElementById('rt-credit-row') as HTMLTableRowElement;
     creditRow.classList.toggle('hidden', result.creditAmount <= 0);
     if (result.creditAmount > 0) {
@@ -588,12 +714,31 @@ const [titleMain, titleSub] = meta.title.split(' (');
             ? '연령공제 + 보유/거주공제 중 유리한 쪽, 개편안(한도 800만원)'
             : '연령·거주 세액공제, 개편안(한도 600만원)';
       setText('rt-credit-label', `(${creditLabel}, 명목 ${pct(result.creditRate)})`);
+
+      const afterPropertyCredit = Math.max(0, result.bracket.calculatedTax - result.propertyTaxCredit);
+      const nominalCreditAmount = afterPropertyCredit * result.creditRate;
+      const isCapped = nominalCreditAmount > result.creditAmount + 1;
+      setText(
+        'rt-credit-formula',
+        isCapped
+          ? `= (${won.format(afterPropertyCredit)} × ${fmtPct2(result.creditRate)} = ${won.format(nominalCreditAmount)}) → 금액상한 적용 → ${won.format(result.creditAmount)}`
+          : `= ${won.format(afterPropertyCredit)} × ${fmtPct2(result.creditRate)} = ${won.format(result.creditAmount)}`,
+      );
     }
 
     setWon('rt-property-credit', result.propertyTaxCredit);
     setWon('rt-final', result.finalTax);
+    setText(
+      'rt-final-formula',
+      `= ${won.format(result.bracket.calculatedTax)} − ${won.format(result.propertyTaxCredit)} − ${won.format(result.creditAmount)} = ${won.format(result.finalTax)}`,
+    );
     setWon('rt-rural', result.ruralSpecialTax);
+    setText('rt-rural-formula', `= ${won.format(result.finalTax)} × 20% = ${won.format(result.ruralSpecialTax)}`);
     setWon('rt-total', result.totalWithSurtax);
+    setText(
+      'rt-total-formula',
+      `= ${won.format(result.finalTax)} + ${won.format(result.ruralSpecialTax)} = ${won.format(result.totalWithSurtax)}`,
+    );
 
     // 비교표의 마지막 행은 위 상세표의 마지막 행("합계")과 반드시 같은 값을
     // 보여줘야 한다 — 예전엔 여기만 결정세액(농특세 제외)이라, 같은 연도인데

@@ -143,31 +143,58 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
       </caption>
       <tbody>
         <tr>
-          <td>Taxable Gain <span class="hint" id="taxable-gain-hint"></span></td>
+          <td>
+            Taxable Gain <span class="hint" id="taxable-gain-hint"></span>
+            <span class="formula-line" id="rt-taxable-gain-line">-</span>
+            <span class="formula-actual" id="rt-taxable-gain-formula">-</span>
+          </td>
           <td id="rt-taxable-gain">-</td>
         </tr>
         <tr>
-          <td>Long-Term Deduction <span class="hint" id="rt-lt-rate"></span></td>
+          <td>
+            Long-Term Deduction <span class="hint" id="rt-lt-rate"></span>
+            <span class="formula-line">= min(taxable gain × long-term deduction rate, deduction cap)</span>
+            <span class="formula-actual" id="rt-lt-formula">-</span>
+          </td>
           <td id="rt-lt-amount">-</td>
         </tr>
         <tr>
-          <td>Basic Deduction</td>
+          <td>
+            Basic Deduction
+            <span class="formula-line" id="rt-basic-line">-</span>
+            <span class="formula-actual" id="rt-basic-formula">-</span>
+          </td>
           <td id="rt-basic">-</td>
         </tr>
         <tr class="total">
-          <td>Tax Base</td>
+          <td>
+            Tax Base
+            <span class="formula-line">= max(0, taxable gain − long-term deduction − basic deduction)</span>
+            <span class="formula-actual" id="rt-taxbase-formula">-</span>
+          </td>
           <td id="rt-taxbase">-</td>
         </tr>
         <tr>
-          <td>Calculated Tax <span class="hint" id="rt-surcharge-hint"></span></td>
+          <td>
+            Calculated Tax <span class="hint" id="rt-surcharge-hint"></span>
+            <span class="formula-line" id="rt-tax-line">-</span>
+            <span class="formula-actual" id="rt-tax-formula">-</span>
+          </td>
           <td id="rt-tax">-</td>
         </tr>
         <tr>
-          <td>Local Income Tax <span class="hint">(10% of calculated tax)</span></td>
+          <td>
+            Local Income Tax <span class="hint">(10% of calculated tax)</span>
+            <span class="formula-actual" id="rt-local-formula">-</span>
+          </td>
           <td id="rt-local">-</td>
         </tr>
         <tr class="total">
-          <td>Total</td>
+          <td>
+            Total
+            <span class="formula-line">= calculated tax + local income tax</span>
+            <span class="formula-actual" id="rt-total-formula">-</span>
+          </td>
           <td id="rt-total">-</td>
         </tr>
       </tbody>
@@ -489,6 +516,28 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
+  /* formula-line/formula-actual pattern — shows the general formula and the
+     actual substituted numbers side by side for each result row. Follows the
+     pattern introduced in buy-vs-jeonse-calculator.astro/
+     stock-averaging-calculator.astro (not yet promoted to BaseLayout global
+     CSS, see CLAUDE.md). */
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <script>
@@ -524,6 +573,19 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     if (el) el.textContent = text;
   };
   const pct = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
+  // pct()'s integer rounding is too coarse for formula display (0.5%, 1.3%,
+  // 43-45%, etc.), so formula-actual text uses two decimal places instead.
+  const fmtPct2 = (ratio: number) => `${Number((ratio * 100).toFixed(2))}%`;
+  // The 1-home exemption threshold (₩1.2B) and deduction caps (₩2B in 2028,
+  // ₩1B in 2029) match the constants in capitalGainsTaxReformCalculator.ts,
+  // which doesn't export them (display-only constants). Re-declared here for
+  // formula text only — the actual tax calculation always comes from the lib.
+  const SINGLE_HOUSE_EXEMPT_SALE_VALUE_DISPLAY = 1_200_000_000;
+  const deductionCapForYear = (year: CgtReformYear): number => {
+    if (year === 2028) return 2_000_000_000;
+    if (year === 2029) return 1_000_000_000;
+    return Infinity;
+  };
 
   const form = document.getElementById('reform-form') as HTMLFormElement;
   const resultBox = document.getElementById('reform-result') as HTMLDivElement;
@@ -601,14 +663,58 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     }
 
     setWon('rt-taxable-gain', result.taxableGain);
+    // A 1-home owner who doesn't meet the exemption's holding/residency
+    // requirements is taxed on the full gain, so house count alone can't
+    // decide whether the "only the excess is taxed" proration applied —
+    // check whether it actually happened (taxableGain < gain), same fix as
+    // capital-gains-tax-calculator.astro.
+    const isProportional = !result.isExempt && result.taxableGain < Math.max(0, gain);
+    setText('taxable-gain-hint', isProportional ? '(only the portion above ₩1.2B is taxed)' : '');
     setText(
-      'taxable-gain-hint',
-      houseCount === '1주택' ? '(only the portion above ₩1.2B is taxed)' : '',
+      'rt-taxable-gain-line',
+      result.isExempt
+        ? '= exempt as a single-household, single-home sale (sale price ≤ ₩1.2B)'
+        : isProportional
+          ? '= capital gain × (sale price − ₩1.2B) ÷ sale price'
+          : '= full capital gain (exemption requirements not met, or multi-home)',
     );
+    setText(
+      'rt-taxable-gain-formula',
+      result.isExempt
+        ? `= ${won.format(0)} (exempt)`
+        : isProportional
+          ? `= ${won.format(gain)} × (${won.format(saleValue)} − ${won.format(SINGLE_HOUSE_EXEMPT_SALE_VALUE_DISPLAY)}) ÷ ${won.format(saleValue)} = ${won.format(result.taxableGain)}`
+          : `= ${won.format(gain)} (fully taxed) = ${won.format(result.taxableGain)}`,
+    );
+
     setWon('rt-lt-amount', result.longTermDeductionAmount);
     setText('rt-lt-rate', `(rate ${pct(result.longTermDeductionRate)})`);
+    const ltNominal = result.taxableGain * result.longTermDeductionRate;
+    const ltCap = deductionCapForYear(year);
+    const ltCapped = Number.isFinite(ltCap) && ltNominal > result.longTermDeductionAmount + 1;
+    setText(
+      'rt-lt-formula',
+      ltCapped
+        ? `= min(${won.format(ltNominal)}, ${won.format(ltCap)}) → deduction cap applied → ${won.format(result.longTermDeductionAmount)}`
+        : `= ${won.format(result.taxableGain)} × ${fmtPct2(result.longTermDeductionRate)} = ${won.format(result.longTermDeductionAmount)}`,
+    );
+
     setWon('rt-basic', result.basicDeduction);
+    const isLongResidenceDeduction = result.basicDeduction > 2_500_000;
+    setText(
+      'rt-basic-line',
+      isLongResidenceDeduction
+        ? '= expanded long-residence 1-home basic deduction (10+ years residency, sale price ≤ ₩3B)'
+        : '= capital gains basic deduction (₩2.5M/year, Income Tax Act §103)',
+    );
+    setText('rt-basic-formula', `= ${won.format(result.basicDeduction)}`);
+
     setWon('rt-taxbase', result.taxBase);
+    setText(
+      'rt-taxbase-formula',
+      `= max(0, ${won.format(result.taxableGain)} − ${won.format(result.longTermDeductionAmount)} − ${won.format(result.basicDeduction)}) = ${won.format(result.taxBase)}`,
+    );
+
     setWon('rt-tax', result.calculatedTax);
     const surchargeHints = [
       result.surchargeRate > 0 ? `multi-home surcharge +${pct(result.surchargeRate)}p` : '',
@@ -617,8 +723,33 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
         : '',
     ].filter(Boolean);
     setText('rt-surcharge-hint', surchargeHints.length > 0 ? `(${surchargeHints.join(', ')})` : '');
+    if (result.appliedShortTermRate !== null) {
+      setText('rt-tax-line', '= tax base × short-holding flat rate (comparison shows this is larger)');
+      setText(
+        'rt-tax-formula',
+        `= ${won.format(result.taxBase)} × ${fmtPct2(result.appliedShortTermRate)} = ${won.format(result.calculatedTax)}`,
+      );
+    } else {
+      setText(
+        'rt-tax-line',
+        result.surchargeRate > 0
+          ? '= tax base × progressive rate table (+ multi-home surcharge)'
+          : '= tax base × progressive rate table',
+      );
+      const effectiveTaxRate = result.taxBase > 0 ? (result.calculatedTax / result.taxBase) * 100 : 0;
+      setText(
+        'rt-tax-formula',
+        `tax base ${won.format(result.taxBase)} → calculated tax ${won.format(result.calculatedTax)} (effective rate ${Number(effectiveTaxRate.toFixed(2))}%)`,
+      );
+    }
+
     setWon('rt-local', result.localIncomeTax);
+    setText('rt-local-formula', `= ${won.format(result.calculatedTax)} × 10% = ${won.format(result.localIncomeTax)}`);
     setWon('rt-total', result.totalWithSurtax);
+    setText(
+      'rt-total-formula',
+      `= ${won.format(result.calculatedTax)} + ${won.format(result.localIncomeTax)} = ${won.format(result.totalWithSurtax)}`,
+    );
 
     const allYears = calculateCapitalGainsReformTaxAllYears(commonInput);
     for (const y of [2026, 2027, 2028, 2029] as const) {
