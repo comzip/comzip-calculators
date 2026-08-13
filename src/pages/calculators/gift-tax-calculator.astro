@@ -1,0 +1,536 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'gift-tax-calculator')!;
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    증여재산가액과 증여자와의 관계를 입력하면 <strong>증여재산공제·누진세율·
+    신고세액공제</strong>를 반영한 증여세 결정세액을 계산합니다. 부동산·주식
+    등 재산의 시가 평가는 다루지 않으므로, 평가액을 직접 확인해서 입력하세요.
+  </p>
+
+  <form class="calc-form" id="gift-form">
+    <label>
+      증여재산가액 (원)
+      <span class="hint">현금이면 그 금액, 부동산·주식 등이면 증여일 기준 시가 평가액</span>
+      <input
+        type="number"
+        id="giftAmount"
+        name="giftAmount"
+        min="0"
+        step="any"
+        placeholder="예: 150000000"
+        required
+      />
+      <span class="amount-preview" id="giftAmount-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      증여자와의 관계
+      <select id="relationship">
+        <option value="직계존속" selected>직계존속 (부모·조부모 등 → 나)</option>
+        <option value="배우자">배우자</option>
+        <option value="직계비속">직계비속 (자녀·손주 등 → 나)</option>
+        <option value="기타친족">기타친족 (4촌 이내 혈족·3촌 이내 인척)</option>
+        <option value="기타">기타 (친족 관계 없음)</option>
+      </select>
+    </label>
+
+    <div id="ancestor-options">
+      <label class="check-row">
+        <input type="checkbox" id="isMinor" />
+        <span>수증자(증여받는 사람)가 미성년자입니다 <span class="hint">공제 한도가 5천만원 → 2천만원으로 줄어듭니다</span></span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="applyMarriageChildbirthDeduction" />
+        <span>
+          혼인·출산 증여공제를 적용합니다
+          <span class="hint">혼인신고일 전후 2년 이내, 또는 자녀 출생일부터 2년 이내 증여 — 기본공제와 별도로 최대 1억원 추가 공제</span>
+        </span>
+      </label>
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="isGenerationSkipping" />
+      <span>세대를 건너뛴 증여입니다 <span class="hint">예: 조부모 → 손자녀. 산출세액의 30%(미성년자에게 20억원 초과 증여 시 40%)가 할증됩니다</span></span>
+    </label>
+
+    <label class="check-row hidden" id="generation-skip-exempt-row">
+      <input type="checkbox" id="isGenerationSkipSurchargeExempt" />
+      <span>증여자의 자녀가 먼저 사망해 손자녀가 대습으로 증여받는 경우입니다 <span class="hint">이 경우 할증과세가 적용되지 않습니다</span></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="filedOnTime" checked />
+      <span>법정신고기한(증여일이 속한 달의 말일부터 3개월) 이내에 신고합니다 <span class="hint">신고세액공제 3%가 적용됩니다. 체크 해제 시 무신고·과소신고 가산세는 이 계산기에서 다루지 않습니다</span></span>
+    </label>
+
+    <label class="check-row" id="aggregation-toggle-row">
+      <input type="checkbox" id="hasAggregation" />
+      <span>이 증여자에게 10년 이내 다른 증여를 받은 적이 있습니다 <span class="hint">동일인(직계존속이면 그 배우자 포함)에게 10년 이내 받은 증여는 합산과세됩니다</span></span>
+    </label>
+
+    <div id="aggregation-options" class="hidden">
+      <label>
+        10년 이내 이 증여자(또는 그 배우자)에게 받은 기증여재산가액 합계 (원)
+        <input type="number" id="priorGiftAmount" name="priorGiftAmount" min="0" step="any" placeholder="예: 50000000" />
+        <span class="amount-preview" id="priorGiftAmount-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        그 기증여에서 이미 사용한 증여재산공제 합계 (원)
+        <input type="number" id="priorDeductionUsed" name="priorDeductionUsed" min="0" step="any" placeholder="예: 50000000" />
+        <span class="amount-preview" id="priorDeductionUsed-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        그 기증여에 대해 이미 납부(결정)된 증여세액 (원)
+        <span class="hint">이중과세 방지를 위해 이번 세액에서 차감됩니다(기납부세액공제)</span>
+        <input type="number" id="priorTaxPaid" name="priorTaxPaid" min="0" step="any" placeholder="예: 0" />
+        <span class="amount-preview" id="priorTaxPaid-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">결정세액 (자진납부할 세액)</span>
+        <span class="value"><span id="final-tax">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <tbody>
+        <tr>
+          <td>
+            증여세 과세가액
+            <span class="formula-line" id="taxable-value-line">= 증여재산가액</span>
+            <span class="formula-actual" id="taxable-value-formula">-</span>
+          </td>
+          <td id="row-taxable-value">-</td>
+        </tr>
+        <tr>
+          <td>
+            증여재산공제
+            <span class="formula-line" id="deduction-line">-</span>
+            <span class="formula-actual" id="deduction-formula">-</span>
+          </td>
+          <td id="row-deduction">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            증여세 과세표준
+            <span class="formula-line">= 과세가액 − 증여재산공제</span>
+            <span class="formula-actual" id="taxbase-formula">-</span>
+          </td>
+          <td id="row-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>
+            산출세액
+            <span class="formula-line" id="calc-tax-line">= 과세표준 × 누진세율(10~50%)</span>
+            <span class="formula-actual" id="calc-tax-formula">-</span>
+          </td>
+          <td id="row-calc-tax">-</td>
+        </tr>
+        <tr class="hidden" id="surcharge-row">
+          <td>
+            세대생략 할증세액
+            <span class="formula-line" id="surcharge-line">-</span>
+            <span class="formula-actual" id="surcharge-formula">-</span>
+          </td>
+          <td id="row-surcharge">-</td>
+        </tr>
+        <tr class="hidden" id="prior-credit-row">
+          <td>
+            기납부세액공제
+            <span class="formula-line">= min(기납부세액, 산출세액)</span>
+            <span class="formula-actual" id="prior-credit-formula">-</span>
+          </td>
+          <td id="row-prior-credit">-</td>
+        </tr>
+        <tr class="hidden" id="filing-credit-row">
+          <td>
+            신고세액공제
+            <span class="formula-line">= (산출세액 − 기납부세액공제) × 3%</span>
+            <span class="formula-actual" id="filing-credit-formula">-</span>
+          </td>
+          <td id="row-filing-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>결정세액 (자진납부할 세액)</td>
+          <td id="row-final-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="aggregation-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 부동산·비상장주식
+    등 증여재산의 시가 평가, 부담부증여(채무 인수분 차감), 비거주자 특례,
+    창업자금·가업승계 특례 등은 반영하지 않습니다. 세대생략 할증과 10년 합산
+    과세가 동시에 발생하는 경우, 이 계산기는 할증을 합산 기준 산출세액
+    전체에 적용하는 방식으로 근사합니다. 정확한 세액은 국세청 홈택스 또는
+    세무사 상담을 통해 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>법령 근거</h2>
+    <ul>
+      <li>
+        근거: <strong>상속세및증여세법</strong> 제53조(증여재산공제), 제53조의2(혼인·출산 증여재산공제), 제47조제2항(10년 이내 동일인 증여재산 합산), 제56조·제26조(증여세율), 제57조(세대생략 할증과세), 제58조(기납부세액공제), 제69조제2항(신고세액공제) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%83%81%EC%86%8D%EC%84%B8%EB%B0%8F%EC%A6%9D%EC%97%AC%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="gift-tax-calculator" />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>증여재산공제는 어떻게 정해지나요?</summary>
+      <p>
+        증여자와의 관계에 따라 10년간 합산 한도가 다릅니다. 배우자 6억원,
+        직계존속(부모·조부모 등)으로부터 받는 경우 5천만원(미성년자는
+        2천만원), 직계비속(자녀·손주 등)으로부터 받는 경우 5천만원,
+        4촌 이내 혈족·3촌 이내 인척 등 기타친족은 1천만원입니다(상속세및
+        증여세법 제53조). 이 한도는 한 번 쓰면 끝나는 게 아니라
+        <strong>10년 동안 합산</strong>해서 관리됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>혼인·출산 증여공제는 무엇인가요?</summary>
+      <p>
+        직계존속으로부터 혼인신고일 전후 2년 이내, 또는 자녀 출생일부터
+        2년 이내에 증여받으면 기본 증여재산공제(5천만원)와 <strong>별도로
+        최대 1억원</strong>을 추가로 공제받을 수 있습니다(2024년 도입,
+        상속세및증여세법 제53조의2). 혼인공제와 출산공제를 모두 받아도
+        합산 한도는 1억원입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>10년 이내 합산과세는 왜 필요한가요?</summary>
+      <p>
+        누진세율을 우회하기 위해 큰 금액을 여러 번에 나눠 증여하는 것을
+        막기 위한 제도입니다. 동일인(직계존속이면 그 배우자 포함)에게
+        증여받은 재산이 10년 이내에 합계 1천만원 이상이면, 이전 증여재산
+        가액을 이번 과세가액에 합산해서 누진세율을 적용합니다. 대신
+        이전 증여에서 이미 낸 세금은 <strong>기납부세액공제</strong>로
+        차감해줘서 이중과세를 막습니다(상속세및증여세법 제47조제2항,
+        제58조).
+      </p>
+    </details>
+
+    <details>
+      <summary>세대생략 증여는 왜 세금이 더 많이 나오나요?</summary>
+      <p>
+        조부모가 부모를 건너뛰고 손자녀에게 직접 증여하면, 원래 부모
+        세대에서 한 번 더 냈어야 할 증여세(또는 상속세)를 건너뛰게 되므로
+        산출세액의 30%를 할증합니다. 수증자가 미성년자이면서 증여재산가액이
+        20억원을 초과하면 할증률이 40%로 올라갑니다. 다만 증여자의 자녀가
+        먼저 사망해서 손자녀가 그 자리를 대신하는 경우(대습증여)는 할증
+        대상에서 제외됩니다(상속세및증여세법 제57조).
+      </p>
+    </details>
+
+    <details>
+      <summary>신고세액공제는 언제 적용되나요?</summary>
+      <p>
+        증여일이 속한 달의 말일부터 3개월 이내에 증여세 과세표준을
+        신고하면 산출세액(기납부세액공제 반영 후)의 3%를 공제해줍니다
+        (상속세및증여세법 제69조제2항). 신고기한을 넘기면 이 공제를 받지
+        못할 뿐 아니라 무신고·과소신고 가산세가 별도로 부과되는데, 이
+        계산기는 가산세는 계산하지 않습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>부동산이나 주식을 증여받으면 증여재산가액을 어떻게 입력하나요?</summary>
+      <p>
+        원칙적으로 증여일 현재의 시가로 평가합니다(매매사례가액, 감정가액
+        등). 시가를 산정하기 어려우면 개별공시지가·기준시가 등 보충적
+        평가방법을 씁니다. 이 계산기는 평가 자체를 하지 않으므로, 국세청
+        홈택스나 세무사를 통해 확인한 평가액을 직접 입력해 주세요.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #ancestor-options {
+    display: grid;
+    gap: 16px;
+  }
+  #ancestor-options.hidden {
+    display: none;
+  }
+  #aggregation-options {
+    display: grid;
+    gap: 16px;
+  }
+  #aggregation-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateGiftTax } from '../../lib/giftTaxCalculator';
+  import type { GiftRelationship } from '../../lib/giftTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('gift-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  bindAmountPreview('giftAmount', 'giftAmount-preview');
+  bindAmountPreview('priorGiftAmount', 'priorGiftAmount-preview');
+  bindAmountPreview('priorDeductionUsed', 'priorDeductionUsed-preview');
+  bindAmountPreview('priorTaxPaid', 'priorTaxPaid-preview');
+
+  const relationshipSelect = document.getElementById('relationship') as HTMLSelectElement;
+  const ancestorOptions = document.getElementById('ancestor-options') as HTMLDivElement;
+  const syncRelationship = () => {
+    ancestorOptions.classList.toggle('hidden', relationshipSelect.value !== '직계존속');
+  };
+  relationshipSelect.addEventListener('change', syncRelationship);
+  syncRelationship();
+
+  const genSkipCheckbox = document.getElementById('isGenerationSkipping') as HTMLInputElement;
+  const genSkipExemptRow = document.getElementById('generation-skip-exempt-row') as HTMLLabelElement;
+  const syncGenSkip = () => {
+    genSkipExemptRow.classList.toggle('hidden', !genSkipCheckbox.checked);
+  };
+  genSkipCheckbox.addEventListener('change', syncGenSkip);
+  syncGenSkip();
+
+  const aggregationCheckbox = document.getElementById('hasAggregation') as HTMLInputElement;
+  const aggregationOptions = document.getElementById('aggregation-options') as HTMLDivElement;
+  const syncAggregation = () => {
+    aggregationOptions.classList.toggle('hidden', !aggregationCheckbox.checked);
+  };
+  aggregationCheckbox.addEventListener('change', syncAggregation);
+  syncAggregation();
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct2 = (value: number) => `${(value * 100).toFixed(1)}%`;
+
+  const relationshipLabel: Record<GiftRelationship, string> = {
+    배우자: '배우자(6억원)',
+    직계존속: '직계존속',
+    직계비속: '직계비속(5천만원)',
+    기타친족: '기타친족(1천만원)',
+    기타: '기타(공제 없음)',
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const giftAmount = Number((document.getElementById('giftAmount') as HTMLInputElement).value);
+    if (!giftAmount || giftAmount <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '증여재산가액을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const relationship = relationshipSelect.value as GiftRelationship;
+    const isMinor = (document.getElementById('isMinor') as HTMLInputElement).checked;
+    const applyMarriageChildbirthDeduction = (
+      document.getElementById('applyMarriageChildbirthDeduction') as HTMLInputElement
+    ).checked;
+    const isGenerationSkipping = genSkipCheckbox.checked;
+    const isGenerationSkipSurchargeExempt = (
+      document.getElementById('isGenerationSkipSurchargeExempt') as HTMLInputElement
+    ).checked;
+    const filedOnTime = (document.getElementById('filedOnTime') as HTMLInputElement).checked;
+    const hasAggregation = aggregationCheckbox.checked;
+    const priorGiftAmount = hasAggregation
+      ? Number((document.getElementById('priorGiftAmount') as HTMLInputElement).value) || 0
+      : 0;
+    const priorDeductionUsed = hasAggregation
+      ? Number((document.getElementById('priorDeductionUsed') as HTMLInputElement).value) || 0
+      : 0;
+    const priorTaxPaid = hasAggregation
+      ? Number((document.getElementById('priorTaxPaid') as HTMLInputElement).value) || 0
+      : 0;
+
+    const r = calculateGiftTax({
+      giftAmount,
+      relationship,
+      isMinor,
+      applyMarriageChildbirthDeduction,
+      isGenerationSkipping,
+      isGenerationSkipSurchargeExempt,
+      filedOnTime,
+      priorGiftAmount,
+      priorDeductionUsed,
+      priorTaxPaid,
+    });
+
+    setWon('final-tax', r.finalTax);
+
+    setWon('row-taxable-value', r.taxableValue);
+    if (r.isAggregated) {
+      setText('taxable-value-line', '= 증여재산가액 + 10년 이내 동일인 기증여재산가액');
+      setText(
+        'taxable-value-formula',
+        `= ${won.format(Math.round(giftAmount))} + ${won.format(Math.round(priorGiftAmount))}`,
+      );
+    } else {
+      setText('taxable-value-line', '= 증여재산가액');
+      setText('taxable-value-formula', `= ${won.format(Math.round(giftAmount))}`);
+    }
+
+    setWon('row-deduction', r.appliedDeduction);
+    const deductionLimitLabel = relationshipLabel[relationship] + (isMinor && relationship === '직계존속' ? '·미성년자(2천만원)' : '');
+    if (r.marriageChildbirthDeduction > 0) {
+      setText('deduction-line', `= 관계별 공제 한도(${deductionLimitLabel}) + 혼인·출산 증여공제(최대 1억원) − 10년 이내 기사용 공제`);
+    } else if (priorDeductionUsed > 0) {
+      setText('deduction-line', `= 관계별 공제 한도(${deductionLimitLabel}) − 10년 이내 기사용 공제`);
+    } else {
+      setText('deduction-line', `= 관계별 공제 한도(${deductionLimitLabel})`);
+    }
+    setText(
+      'deduction-formula',
+      `= min(${won.format(r.relationshipDeductionLimit)} + ${won.format(r.marriageChildbirthDeduction)} − ${won.format(Math.round(priorDeductionUsed))}, ${won.format(Math.round(r.taxableValue))}) = ${won.format(Math.round(r.appliedDeduction))}`,
+    );
+
+    setWon('row-taxbase', r.taxBase);
+    setText(
+      'taxbase-formula',
+      `= ${won.format(Math.round(r.taxableValue))} − ${won.format(Math.round(r.appliedDeduction))}`,
+    );
+
+    setWon('row-calc-tax', r.calculatedTax);
+    const effRate = r.taxBase > 0 ? r.calculatedTax / r.taxBase : 0;
+    setText(
+      'calc-tax-formula',
+      `과세표준 ${won.format(Math.round(r.taxBase))} → 누진세율 적용 산출세액 ${won.format(Math.round(r.calculatedTax))} (실효세율 약 ${fmtPct2(effRate)})`,
+    );
+
+    const surchargeRow = document.getElementById('surcharge-row') as HTMLTableRowElement;
+    if (r.generationSkipSurcharge > 0) {
+      surchargeRow.classList.remove('hidden');
+      setWon('row-surcharge', r.generationSkipSurcharge);
+      const surchargeRate = r.generationSkipSurcharge / r.calculatedTax;
+      setText('surcharge-line', `= 산출세액 × ${fmtPct2(surchargeRate)}`);
+      setText(
+        'surcharge-formula',
+        `= ${won.format(Math.round(r.calculatedTax))} × ${fmtPct2(surchargeRate)} = ${won.format(Math.round(r.generationSkipSurcharge))}`,
+      );
+    } else {
+      surchargeRow.classList.add('hidden');
+    }
+
+    const priorCreditRow = document.getElementById('prior-credit-row') as HTMLTableRowElement;
+    if (r.priorTaxCredit > 0) {
+      priorCreditRow.classList.remove('hidden');
+      setWon('row-prior-credit', -r.priorTaxCredit);
+      setText(
+        'prior-credit-formula',
+        `= min(${won.format(Math.round(priorTaxPaid))}, ${won.format(Math.round(r.taxAfterSurcharge))}) = −${won.format(Math.round(r.priorTaxCredit))}`,
+      );
+    } else {
+      priorCreditRow.classList.add('hidden');
+    }
+
+    const filingCreditRow = document.getElementById('filing-credit-row') as HTMLTableRowElement;
+    if (r.filingTaxCredit > 0) {
+      filingCreditRow.classList.remove('hidden');
+      setWon('row-filing-credit', -r.filingTaxCredit);
+      setText(
+        'filing-credit-formula',
+        `= ${won.format(Math.round(r.taxAfterPriorCredit))} × 3% = −${won.format(Math.round(r.filingTaxCredit))}`,
+      );
+    } else {
+      filingCreditRow.classList.add('hidden');
+    }
+
+    setWon('row-final-tax', r.finalTax);
+
+    const aggregationNote = document.getElementById('aggregation-note') as HTMLParagraphElement;
+    if (r.isAggregated) {
+      aggregationNote.textContent =
+        '⚠ 10년 이내 동일인 기증여재산가액이 1천만원 이상이라 합산과세가 적용되었습니다. 산출세액은 이번 증여와 과거 증여를 합산한 과세표준 기준이며, 과거 증여에서 이미 낸 세금은 기납부세액공제로 차감했습니다.';
+      aggregationNote.classList.remove('hidden');
+    } else {
+      aggregationNote.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

@@ -1,0 +1,540 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'gift-tax-calculator')!;
+---
+
+<BaseLayout title={meta.titleEn} description={meta.descriptionEn} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the gift amount and your relationship to the giver to calculate
+    Korean gift tax (증여세) — including <strong>the relationship-based
+    deduction, progressive tax rates, and the filing tax credit</strong>.
+    This calculator does not appraise real estate, stock, or other
+    non-cash gifts — enter the fair market value yourself.
+  </p>
+
+  <form class="calc-form" id="gift-form">
+    <label>
+      Gift amount (KRW)
+      <span class="hint">Cash: the amount itself. Other assets: the fair market value as of the gift date</span>
+      <input
+        type="number"
+        id="giftAmount"
+        name="giftAmount"
+        min="0"
+        step="any"
+        placeholder="e.g. 150000000"
+        required
+      />
+      <span class="amount-preview" id="giftAmount-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Relationship to the giver
+      <select id="relationship">
+        <option value="직계존속" selected>Ancestor (parent, grandparent, etc. → you)</option>
+        <option value="배우자">Spouse</option>
+        <option value="직계비속">Descendant (child, grandchild, etc. → you)</option>
+        <option value="기타친족">Other relative (within 4th degree of blood / 3rd degree by marriage)</option>
+        <option value="기타">Other (no qualifying family relationship)</option>
+      </select>
+    </label>
+
+    <div id="ancestor-options">
+      <label class="check-row">
+        <input type="checkbox" id="isMinor" />
+        <span>The recipient is a minor <span class="hint">The deduction cap drops from ₩50 million to ₩20 million</span></span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="applyMarriageChildbirthDeduction" />
+        <span>
+          Apply the marriage/childbirth gift deduction
+          <span class="hint">Within 2 years before/after marriage registration, or within 2 years of a child's birth — up to an extra ₩100 million on top of the basic deduction</span>
+        </span>
+      </label>
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="isGenerationSkipping" />
+      <span>This gift skips a generation <span class="hint">e.g. grandparent → grandchild. Adds a 30% surcharge on the calculated tax (40% if the recipient is a minor and the gift exceeds ₩2 billion)</span></span>
+    </label>
+
+    <label class="check-row hidden" id="generation-skip-exempt-row">
+      <input type="checkbox" id="isGenerationSkipSurchargeExempt" />
+      <span>The giver's child died first, so the grandchild inherits their place (substitute inheritance) <span class="hint">In this case the surcharge does not apply</span></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="filedOnTime" checked />
+      <span>Filing within the statutory deadline (3 months from the end of the month the gift occurred) <span class="hint">A 3% filing tax credit applies. Unchecking this does not model late-filing penalties, which this calculator does not cover</span></span>
+    </label>
+
+    <label class="check-row" id="aggregation-toggle-row">
+      <input type="checkbox" id="hasAggregation" />
+      <span>You've received other gifts from this same giver within the past 10 years <span class="hint">Gifts from the same person (or their spouse, if they're your ancestor) within 10 years are aggregated for tax purposes</span></span>
+    </label>
+
+    <div id="aggregation-options" class="hidden">
+      <label>
+        Total prior gifts from this giver (or their spouse) within the past 10 years (KRW)
+        <input type="number" id="priorGiftAmount" name="priorGiftAmount" min="0" step="any" placeholder="e.g. 50000000" />
+        <span class="amount-preview" id="priorGiftAmount-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        Deduction already used on those prior gifts (KRW)
+        <input type="number" id="priorDeductionUsed" name="priorDeductionUsed" min="0" step="any" placeholder="e.g. 50000000" />
+        <span class="amount-preview" id="priorDeductionUsed-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        Gift tax already paid on those prior gifts (KRW)
+        <span class="hint">Deducted from this gift's tax to avoid double taxation</span>
+        <input type="number" id="priorTaxPaid" name="priorTaxPaid" min="0" step="any" placeholder="e.g. 0" />
+        <span class="amount-preview" id="priorTaxPaid-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Final tax due</span>
+        <span class="value"><span id="final-tax">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <tbody>
+        <tr>
+          <td>
+            Taxable gift value
+            <span class="formula-line" id="taxable-value-line">= Gift amount</span>
+            <span class="formula-actual" id="taxable-value-formula">-</span>
+          </td>
+          <td id="row-taxable-value">-</td>
+        </tr>
+        <tr>
+          <td>
+            Gift deduction
+            <span class="formula-line" id="deduction-line">-</span>
+            <span class="formula-actual" id="deduction-formula">-</span>
+          </td>
+          <td id="row-deduction">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            Taxable base
+            <span class="formula-line">= Taxable value − gift deduction</span>
+            <span class="formula-actual" id="taxbase-formula">-</span>
+          </td>
+          <td id="row-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>
+            Calculated tax
+            <span class="formula-line" id="calc-tax-line">= Taxable base × progressive rate (10-50%)</span>
+            <span class="formula-actual" id="calc-tax-formula">-</span>
+          </td>
+          <td id="row-calc-tax">-</td>
+        </tr>
+        <tr class="hidden" id="surcharge-row">
+          <td>
+            Generation-skipping surcharge
+            <span class="formula-line" id="surcharge-line">-</span>
+            <span class="formula-actual" id="surcharge-formula">-</span>
+          </td>
+          <td id="row-surcharge">-</td>
+        </tr>
+        <tr class="hidden" id="prior-credit-row">
+          <td>
+            Prior tax credit
+            <span class="formula-line">= min(prior tax paid, calculated tax)</span>
+            <span class="formula-actual" id="prior-credit-formula">-</span>
+          </td>
+          <td id="row-prior-credit">-</td>
+        </tr>
+        <tr class="hidden" id="filing-credit-row">
+          <td>
+            Filing tax credit
+            <span class="formula-line">= (calculated tax − prior tax credit) × 3%</span>
+            <span class="formula-actual" id="filing-credit-formula">-</span>
+          </td>
+          <td id="row-filing-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>Final tax due</td>
+          <td id="row-final-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="aggregation-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. It does not
+    appraise real estate or unlisted stock, does not handle gifts with
+    assumed debt (부담부증여), non-resident special rules, or startup-
+    funding/business-succession special deductions. When both the
+    generation-skipping surcharge and 10-year aggregation apply together,
+    this calculator approximates by applying the surcharge to the entire
+    aggregated calculated tax. Confirm exact amounts via Korea's National
+    Tax Service (Hometax) or a licensed tax accountant.
+  </div>
+
+  <section class="law-refs">
+    <h2>Legal basis</h2>
+    <ul>
+      <li>
+        Basis: <strong>Inheritance Tax and Gift Tax Act</strong> (상속세및증여세법) Art. 53 (gift deduction), Art. 53-2 (marriage/childbirth gift deduction), Art. 47(2) (10-year same-donor aggregation), Art. 56 / Art. 26 (gift tax rates), Art. 57 (generation-skipping surcharge), Art. 58 (prior tax credit), Art. 69(2) (filing tax credit) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%83%81%EC%86%8D%EC%84%B8%EB%B0%8F%EC%A6%9D%EC%97%AC%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View statute text</a
+        >
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="gift-tax-calculator" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>How is the gift deduction determined?</summary>
+      <p>
+        It depends on your relationship to the giver, aggregated over a
+        rolling 10-year window. Spouse: ₩600 million. Ancestor (parent,
+        grandparent, etc.): ₩50 million (₩20 million if the recipient is a
+        minor). Descendant (child, grandchild, etc.): ₩50 million. Other
+        relatives within the 4th degree of blood or 3rd degree by marriage:
+        ₩10 million (Inheritance Tax and Gift Tax Act Art. 53). This limit
+        isn't a one-time allowance — it's tracked and shared across all
+        gifts from that person over 10 years.
+      </p>
+    </details>
+
+    <details>
+      <summary>What is the marriage/childbirth gift deduction?</summary>
+      <p>
+        If you receive a gift from an ancestor within 2 years before/after
+        your marriage registration, or within 2 years of a child's birth,
+        you can deduct up to an extra ₩100 million <strong>on top of</strong>
+        the basic gift deduction (₩50 million) — introduced in 2024
+        (Inheritance Tax and Gift Tax Act Art. 53-2). The combined cap for
+        both the marriage and childbirth deductions together is ₩100 million.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why does 10-year aggregation matter?</summary>
+      <p>
+        It exists to prevent splitting a large gift into smaller pieces to
+        dodge the progressive rate structure. If gifts from the same person
+        (or their spouse, when that person is your ancestor) total ₩10
+        million or more within 10 years, the prior gift value is added to
+        this gift's taxable base before applying the progressive rate.
+        Tax already paid on the prior gift is then subtracted as a
+        <strong>prior tax credit</strong> to avoid double taxation
+        (Inheritance Tax and Gift Tax Act Art. 47(2), Art. 58).
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is tax higher for a generation-skipping gift?</summary>
+      <p>
+        When a grandparent gives directly to a grandchild, skipping the
+        parent's generation, that gift effectively avoids the round of gift
+        (or inheritance) tax that generation would otherwise have paid — so
+        a 30% surcharge applies to the calculated tax. If the recipient is a
+        minor and the gift exceeds ₩2 billion, the surcharge rises to 40%.
+        An exception applies when the giver's child died first and the
+        grandchild inherits their place (substitute inheritance) — that
+        case is exempt from the surcharge (Inheritance Tax and Gift Tax Act
+        Art. 57).
+      </p>
+    </details>
+
+    <details>
+      <summary>When does the filing tax credit apply?</summary>
+      <p>
+        Filing your gift tax return within 3 months of the end of the month
+        the gift occurred earns a 3% credit on the calculated tax (after the
+        prior tax credit) (Inheritance Tax and Gift Tax Act Art. 69(2)).
+        Missing the deadline forfeits this credit and triggers separate
+        late-filing/underreporting penalties, which this calculator does
+        not compute.
+      </p>
+    </details>
+
+    <details>
+      <summary>How do I enter the value of a gifted property or stock?</summary>
+      <p>
+        In principle, use the fair market value as of the gift date
+        (comparable sale price, appraised value, etc.). When fair market
+        value is hard to determine, supplementary valuation methods apply
+        (officially assessed value, etc.). This calculator does not perform
+        that appraisal — confirm the value via Hometax or a tax accountant
+        and enter it directly.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #ancestor-options {
+    display: grid;
+    gap: 16px;
+  }
+  #ancestor-options.hidden {
+    display: none;
+  }
+  #aggregation-options {
+    display: grid;
+    gap: 16px;
+  }
+  #aggregation-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateGiftTax } from '../../../lib/giftTaxCalculator';
+  import type { GiftRelationship } from '../../../lib/giftTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('gift-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  bindAmountPreview('giftAmount', 'giftAmount-preview');
+  bindAmountPreview('priorGiftAmount', 'priorGiftAmount-preview');
+  bindAmountPreview('priorDeductionUsed', 'priorDeductionUsed-preview');
+  bindAmountPreview('priorTaxPaid', 'priorTaxPaid-preview');
+
+  const relationshipSelect = document.getElementById('relationship') as HTMLSelectElement;
+  const ancestorOptions = document.getElementById('ancestor-options') as HTMLDivElement;
+  const syncRelationship = () => {
+    ancestorOptions.classList.toggle('hidden', relationshipSelect.value !== '직계존속');
+  };
+  relationshipSelect.addEventListener('change', syncRelationship);
+  syncRelationship();
+
+  const genSkipCheckbox = document.getElementById('isGenerationSkipping') as HTMLInputElement;
+  const genSkipExemptRow = document.getElementById('generation-skip-exempt-row') as HTMLLabelElement;
+  const syncGenSkip = () => {
+    genSkipExemptRow.classList.toggle('hidden', !genSkipCheckbox.checked);
+  };
+  genSkipCheckbox.addEventListener('change', syncGenSkip);
+  syncGenSkip();
+
+  const aggregationCheckbox = document.getElementById('hasAggregation') as HTMLInputElement;
+  const aggregationOptions = document.getElementById('aggregation-options') as HTMLDivElement;
+  const syncAggregation = () => {
+    aggregationOptions.classList.toggle('hidden', !aggregationCheckbox.checked);
+  };
+  aggregationCheckbox.addEventListener('change', syncAggregation);
+  syncAggregation();
+
+  const won = (value: number) => formatWonEn(value);
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct2 = (value: number) => `${(value * 100).toFixed(1)}%`;
+
+  const relationshipLabel: Record<GiftRelationship, string> = {
+    배우자: 'spouse (₩600M)',
+    직계존속: 'ancestor',
+    직계비속: 'descendant (₩50M)',
+    기타친족: 'other relative (₩10M)',
+    기타: 'other (no deduction)',
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const giftAmount = Number((document.getElementById('giftAmount') as HTMLInputElement).value);
+    if (!giftAmount || giftAmount <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid gift amount.';
+      return;
+    }
+
+    const relationship = relationshipSelect.value as GiftRelationship;
+    const isMinor = (document.getElementById('isMinor') as HTMLInputElement).checked;
+    const applyMarriageChildbirthDeduction = (
+      document.getElementById('applyMarriageChildbirthDeduction') as HTMLInputElement
+    ).checked;
+    const isGenerationSkipping = genSkipCheckbox.checked;
+    const isGenerationSkipSurchargeExempt = (
+      document.getElementById('isGenerationSkipSurchargeExempt') as HTMLInputElement
+    ).checked;
+    const filedOnTime = (document.getElementById('filedOnTime') as HTMLInputElement).checked;
+    const hasAggregation = aggregationCheckbox.checked;
+    const priorGiftAmount = hasAggregation
+      ? Number((document.getElementById('priorGiftAmount') as HTMLInputElement).value) || 0
+      : 0;
+    const priorDeductionUsed = hasAggregation
+      ? Number((document.getElementById('priorDeductionUsed') as HTMLInputElement).value) || 0
+      : 0;
+    const priorTaxPaid = hasAggregation
+      ? Number((document.getElementById('priorTaxPaid') as HTMLInputElement).value) || 0
+      : 0;
+
+    const r = calculateGiftTax({
+      giftAmount,
+      relationship,
+      isMinor,
+      applyMarriageChildbirthDeduction,
+      isGenerationSkipping,
+      isGenerationSkipSurchargeExempt,
+      filedOnTime,
+      priorGiftAmount,
+      priorDeductionUsed,
+      priorTaxPaid,
+    });
+
+    setWon('final-tax', r.finalTax);
+
+    setWon('row-taxable-value', r.taxableValue);
+    if (r.isAggregated) {
+      setText('taxable-value-line', '= Gift amount + 10-year same-donor prior gift value');
+      setText('taxable-value-formula', `= ${won(Math.round(giftAmount))} + ${won(Math.round(priorGiftAmount))}`);
+    } else {
+      setText('taxable-value-line', '= Gift amount');
+      setText('taxable-value-formula', `= ${won(Math.round(giftAmount))}`);
+    }
+
+    setWon('row-deduction', r.appliedDeduction);
+    const deductionLimitLabel = relationshipLabel[relationship] + (isMinor && relationship === '직계존속' ? ', minor (₩20M)' : '');
+    if (r.marriageChildbirthDeduction > 0) {
+      setText('deduction-line', `= Relationship deduction (${deductionLimitLabel}) + marriage/childbirth deduction (up to ₩100M) − deduction already used within 10 years`);
+    } else if (priorDeductionUsed > 0) {
+      setText('deduction-line', `= Relationship deduction (${deductionLimitLabel}) − deduction already used within 10 years`);
+    } else {
+      setText('deduction-line', `= Relationship deduction (${deductionLimitLabel})`);
+    }
+    setText(
+      'deduction-formula',
+      `= min(${won(r.relationshipDeductionLimit)} + ${won(r.marriageChildbirthDeduction)} − ${won(Math.round(priorDeductionUsed))}, ${won(Math.round(r.taxableValue))}) = ${won(Math.round(r.appliedDeduction))}`,
+    );
+
+    setWon('row-taxbase', r.taxBase);
+    setText('taxbase-formula', `= ${won(Math.round(r.taxableValue))} − ${won(Math.round(r.appliedDeduction))}`);
+
+    setWon('row-calc-tax', r.calculatedTax);
+    const effRate = r.taxBase > 0 ? r.calculatedTax / r.taxBase : 0;
+    setText(
+      'calc-tax-formula',
+      `Taxable base ${won(Math.round(r.taxBase))} → progressive-rate calculated tax ${won(Math.round(r.calculatedTax))} (effective rate approx. ${fmtPct2(effRate)})`,
+    );
+
+    const surchargeRow = document.getElementById('surcharge-row') as HTMLTableRowElement;
+    if (r.generationSkipSurcharge > 0) {
+      surchargeRow.classList.remove('hidden');
+      setWon('row-surcharge', r.generationSkipSurcharge);
+      const surchargeRate = r.generationSkipSurcharge / r.calculatedTax;
+      setText('surcharge-line', `= Calculated tax × ${fmtPct2(surchargeRate)}`);
+      setText(
+        'surcharge-formula',
+        `= ${won(Math.round(r.calculatedTax))} × ${fmtPct2(surchargeRate)} = ${won(Math.round(r.generationSkipSurcharge))}`,
+      );
+    } else {
+      surchargeRow.classList.add('hidden');
+    }
+
+    const priorCreditRow = document.getElementById('prior-credit-row') as HTMLTableRowElement;
+    if (r.priorTaxCredit > 0) {
+      priorCreditRow.classList.remove('hidden');
+      setText('row-prior-credit', `−${won(Math.round(r.priorTaxCredit))}`);
+      setText(
+        'prior-credit-formula',
+        `= min(${won(Math.round(priorTaxPaid))}, ${won(Math.round(r.taxAfterSurcharge))}) = −${won(Math.round(r.priorTaxCredit))}`,
+      );
+    } else {
+      priorCreditRow.classList.add('hidden');
+    }
+
+    const filingCreditRow = document.getElementById('filing-credit-row') as HTMLTableRowElement;
+    if (r.filingTaxCredit > 0) {
+      filingCreditRow.classList.remove('hidden');
+      setText('row-filing-credit', `−${won(Math.round(r.filingTaxCredit))}`);
+      setText(
+        'filing-credit-formula',
+        `= ${won(Math.round(r.taxAfterPriorCredit))} × 3% = −${won(Math.round(r.filingTaxCredit))}`,
+      );
+    } else {
+      filingCreditRow.classList.add('hidden');
+    }
+
+    setWon('row-final-tax', r.finalTax);
+
+    const aggregationNote = document.getElementById('aggregation-note') as HTMLParagraphElement;
+    if (r.isAggregated) {
+      aggregationNote.textContent =
+        '⚠ 10-year same-donor aggregation applied because the prior gift value is ₩10 million or more. The calculated tax reflects the combined taxable base of this gift and the prior gift(s), with tax already paid on the prior gift(s) subtracted as a prior tax credit.';
+      aggregationNote.classList.remove('hidden');
+    } else {
+      aggregationNote.classList.add('hidden');
+    }
+
+    result.classList.remove('hidden');
+  });
+</script>

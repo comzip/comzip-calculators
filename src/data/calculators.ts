@@ -262,6 +262,18 @@ export const calculators: Calculator[] = [
       'Calculate pre-tax and after-tax interest on Korean lump-sum deposits (예금) and installment savings (적금), including the 15.4% interest income tax withholding, to see your maturity payout.',
   },
   {
+    slug: 'gift-tax-calculator',
+    title: '증여세 계산기',
+    titleEn: 'Korea Gift Tax Calculator',
+    navLabel: '증여세 계산기',
+    navLabelEn: 'Gift Tax',
+    category: '생활',
+    description:
+      '증여재산가액과 증여자와의 관계(배우자·직계존속·직계비속·기타친족)를 입력하면 증여재산공제·혼인출산공제·누진세율·신고세액공제를 반영한 증여세를 계산합니다. 세대생략 할증과세, 10년 이내 동일인 합산과세도 반영합니다.',
+    descriptionEn:
+      "Enter the gift amount and your relationship to the giver (spouse, ancestor, descendant, other relative) to calculate Korean gift tax — including relationship-based deductions, the marriage/childbirth deduction, progressive rates, filing tax credit, generation-skipping surcharge, and 10-year same-donor aggregation.",
+  },
+  {
     slug: 'bmi-calculator',
     title: 'BMI 계산기',
     titleEn: 'BMI Calculator',
