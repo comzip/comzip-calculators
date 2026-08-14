@@ -274,6 +274,18 @@ export const calculators: Calculator[] = [
       "Enter the gift amount and your relationship to the giver (spouse, ancestor, descendant, other relative) to calculate Korean gift tax — including relationship-based deductions, the marriage/childbirth deduction, progressive rates, filing tax credit, generation-skipping surcharge, and 10-year same-donor aggregation.",
   },
   {
+    slug: 'inheritance-tax-calculator',
+    title: '상속세 계산기',
+    titleEn: 'Korea Inheritance Tax Calculator',
+    navLabel: '상속세 계산기',
+    navLabelEn: 'Inheritance Tax',
+    category: '생활',
+    description:
+      '상속재산가액과 상속인 구성(배우자·자녀)을 입력하면 기초공제·인적공제·배우자상속공제(법정상속분 반영)·금융재산상속공제·동거주택상속공제·누진세율·신고세액공제를 반영한 상속세를 계산합니다. 세대생략 할증과세, 사전증여재산 합산도 반영합니다.',
+    descriptionEn:
+      "Enter the estate value and heir composition (spouse, children) to calculate Korean inheritance tax — including the basic deduction, personal deductions, spouse deduction (based on statutory inheritance share), financial asset and co-residence deductions, progressive rates, filing tax credit, generation-skipping surcharge, and prior-gift aggregation.",
+  },
+  {
     slug: 'bmi-calculator',
     title: 'BMI 계산기',
     titleEn: 'BMI Calculator',

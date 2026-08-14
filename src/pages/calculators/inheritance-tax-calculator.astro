@@ -1,0 +1,701 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import RelatedCalculators from '../../components/RelatedCalculators.astro';
+import { calculators } from '../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'inheritance-tax-calculator')!;
+---
+
+<BaseLayout title={meta.title} description={meta.description} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.title}</h1>
+  <p class="note">
+    상속재산가액과 상속인 구성을 입력하면 <strong>상속공제(기초·인적·배우자·
+    금융재산·동거주택)·누진세율·신고세액공제</strong>를 반영한 상속세
+    결정세액을 계산합니다.
+  </p>
+  <p class="note">
+    ⚠ 이 계산기는 <strong>배우자·직계비속(자녀) 중심의 상속</strong>만
+    지원합니다. 자녀도 배우자도 없어 직계존속·형제자매가 상속인이 되는
+    경우는 법정상속분 산정 방식이 달라 이 계산기의 범위 밖입니다.
+  </p>
+
+  <form class="calc-form" id="inheritance-form">
+    <label>
+      총 상속재산가액 (원)
+      <span class="hint">사망 당시 재산의 시가 평가액 합계 (재산 평가 자체는 다루지 않습니다)</span>
+      <input type="number" id="grossEstate" name="grossEstate" min="0" step="any" placeholder="예: 1500000000" required />
+      <span class="amount-preview" id="grossEstate-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      채무 (원)
+      <input type="number" id="debts" name="debts" min="0" step="any" placeholder="예: 0" />
+      <span class="amount-preview" id="debts-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      장례비용 등 (원)
+      <span class="hint">500만원 미만이면 500만원, 1,000만원 초과면 1,000만원으로 인정(상증법 시행령 제9조). 봉안시설·자연장지 비용은 500만원 한도로 별도 추가 가능</span>
+      <input type="number" id="funeralExpenses" name="funeralExpenses" min="0" step="any" placeholder="예: 10000000" />
+      <span class="amount-preview" id="funeralExpenses-preview" aria-live="polite"></span>
+    </label>
+
+    <fieldset class="method-toggle" id="spouse-toggle">
+      <legend>배우자가 상속인입니까?</legend>
+      <label class="method-option">
+        <input type="radio" name="hasSpouse" value="yes" checked />
+        <span>배우자 있음</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="hasSpouse" value="no" />
+        <span>배우자 없음</span>
+      </label>
+    </fieldset>
+
+    <label id="spouse-actual-row">
+      배우자가 실제 상속받는 금액 (원)
+      <input type="number" id="spouseActualInheritance" name="spouseActualInheritance" min="0" step="any" placeholder="예: 1000000000" />
+      <span class="amount-preview" id="spouseActualInheritance-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      자녀(직계비속) 수
+      <span class="hint">배우자 없이 자녀도 0명이면 이 계산기 범위 밖입니다</span>
+      <input type="number" id="childCount" name="childCount" min="0" step="1" value="0" />
+    </label>
+
+    <details class="advanced-section">
+      <summary>인적공제 세부 입력 (미성년·연로자·장애인, 선택)</summary>
+      <div class="advanced-body">
+        <label>
+          미성년 자녀들의 만19세까지 잔여연수 합계
+          <span class="hint">예: 8세 자녀 1명(11년)+12세 자녀 1명(7년) = 18년. 1년당 1천만원 공제</span>
+          <input type="number" id="minorChildRemainingYearsTotal" name="minorChildRemainingYearsTotal" min="0" step="1" value="0" />
+        </label>
+        <label>
+          65세 이상 상속인 수 (배우자 제외)
+          <input type="number" id="elderlyHeirCount" name="elderlyHeirCount" min="0" step="1" value="0" />
+        </label>
+        <label>
+          장애인 상속인들의 기대여명연수 합계
+          <span class="hint">보험개발원 경험생명표 기준. 1년당 1천만원 공제(배우자 포함 가능)</span>
+          <input type="number" id="disabledLifeExpectancyYearsTotal" name="disabledLifeExpectancyYearsTotal" min="0" step="1" value="0" />
+        </label>
+      </div>
+    </details>
+
+    <label class="check-row">
+      <input type="checkbox" id="applyFinancialAssetDeduction" />
+      <span>금융재산상속공제를 적용합니다 <span class="hint">순금융재산가액(금융재산−금융채무)의 20% 또는 2천만원 중 큰 금액, 한도 2억원</span></span>
+    </label>
+    <label id="financial-asset-row" class="hidden">
+      순금융재산가액 (원)
+      <input type="number" id="netFinancialAssets" name="netFinancialAssets" min="0" step="any" placeholder="예: 100000000" />
+      <span class="amount-preview" id="netFinancialAssets-preview" aria-live="polite"></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="applyResidenceDeduction" />
+      <span>동거주택상속공제 요건을 충족합니다 <span class="hint">10년 이상 동거·1세대1주택·상속인이 무주택 등 요건을 모두 충족해야 합니다(상증법 제23조의2)</span></span>
+    </label>
+    <label id="residence-row" class="hidden">
+      동거주택가액 (원)
+      <span class="hint">상속주택가액의 100%(한도 6억원)를 공제합니다</span>
+      <input type="number" id="inheritedHouseValue" name="inheritedHouseValue" min="0" step="any" placeholder="예: 600000000" />
+      <span class="amount-preview" id="inheritedHouseValue-preview" aria-live="polite"></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="isGenerationSkipping" />
+      <span>세대를 건너뛴 상속입니다 <span class="hint">예: 조부모 → 손자녀. 그 상속인이 받는 재산 비율만큼 산출세액의 30%(미성년자+20억원 초과 40%)가 할증됩니다</span></span>
+    </label>
+    <div id="generation-skip-options" class="hidden">
+      <label>
+        세대생략 상속인이 받는 재산가액 (원)
+        <input type="number" id="generationSkippingAmount" name="generationSkippingAmount" min="0" step="any" placeholder="예: 300000000" />
+        <span class="amount-preview" id="generationSkippingAmount-preview" aria-live="polite"></span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="isGenerationSkippingHeirMinor" />
+        <span>그 상속인이 미성년자입니다</span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="isGenerationSkipSurchargeExempt" />
+        <span>증여자의 자녀가 먼저 사망해 대습상속하는 경우입니다 <span class="hint">이 경우 할증과세가 적용되지 않습니다</span></span>
+      </label>
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="filedOnTime" checked />
+      <span>법정신고기한(상속개시일이 속한 달의 말일부터 6개월) 이내에 신고합니다 <span class="hint">신고세액공제 3%가 적용됩니다</span></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="hasPriorGifts" />
+      <span>피상속인이 생전에 증여한 재산이 있습니다 <span class="hint">상속인에게는 10년 이내, 상속인이 아닌 자에게는 5년 이내 증여가 상속재산에 합산됩니다</span></span>
+    </label>
+    <div id="prior-gift-options" class="hidden">
+      <label>
+        상속개시일 전 10년 이내 상속인에게 증여한 재산가액 합계 (원)
+        <input type="number" id="priorGiftToHeirs" name="priorGiftToHeirs" min="0" step="any" placeholder="예: 100000000" />
+        <span class="amount-preview" id="priorGiftToHeirs-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        상속개시일 전 5년 이내 상속인이 아닌 자에게 증여한 재산가액 합계 (원)
+        <input type="number" id="priorGiftToNonHeirs" name="priorGiftToNonHeirs" min="0" step="any" placeholder="예: 0" />
+        <span class="amount-preview" id="priorGiftToNonHeirs-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        그 사전증여재산들에서 이미 사용한 증여재산공제 합계 (원)
+        <input type="number" id="priorGiftDeductionUsed" name="priorGiftDeductionUsed" min="0" step="any" placeholder="예: 50000000" />
+        <span class="amount-preview" id="priorGiftDeductionUsed-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        그 사전증여재산들에 대해 이미 납부(결정)된 증여세액 합계 (원)
+        <span class="hint">이중과세 방지를 위해 이번 세액에서 차감됩니다(증여세액공제)</span>
+        <input type="number" id="priorGiftTaxPaid" name="priorGiftTaxPaid" min="0" step="any" placeholder="예: 0" />
+        <span class="amount-preview" id="priorGiftTaxPaid-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <button class="btn" type="submit">계산하기</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">결정세액 (자진납부할 세액)</span>
+        <span class="value"><span id="final-tax">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <tbody>
+        <tr>
+          <td>
+            상속세 과세가액
+            <span class="formula-line" id="taxable-value-line">= 총상속재산 − 채무 − 장례비용</span>
+            <span class="formula-actual" id="taxable-value-formula">-</span>
+          </td>
+          <td id="row-taxable-value">-</td>
+        </tr>
+        <tr>
+          <td>
+            기초공제+인적공제 (또는 일괄공제)
+            <span class="formula-line" id="basic-line">-</span>
+            <span class="formula-actual" id="basic-formula">-</span>
+          </td>
+          <td id="row-basic">-</td>
+        </tr>
+        <tr class="hidden" id="spouse-deduction-row">
+          <td>
+            배우자상속공제
+            <span class="formula-line" id="spouse-line">-</span>
+            <span class="formula-actual" id="spouse-formula">-</span>
+          </td>
+          <td id="row-spouse">-</td>
+        </tr>
+        <tr class="hidden" id="financial-deduction-row">
+          <td>금융재산상속공제</td>
+          <td id="row-financial">-</td>
+        </tr>
+        <tr class="hidden" id="residence-deduction-row">
+          <td>동거주택상속공제</td>
+          <td id="row-residence">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            상속공제 적용액
+            <span class="formula-line" id="deduction-total-line">-</span>
+            <span class="formula-actual" id="deduction-total-formula">-</span>
+          </td>
+          <td id="row-deduction-total">-</td>
+        </tr>
+        <tr>
+          <td>
+            상속세 과세표준
+            <span class="formula-line">= 과세가액 − 상속공제 적용액</span>
+            <span class="formula-actual" id="taxbase-formula">-</span>
+          </td>
+          <td id="row-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>
+            산출세액
+            <span class="formula-line">= 과세표준 × 누진세율(10~50%)</span>
+            <span class="formula-actual" id="calc-tax-formula">-</span>
+          </td>
+          <td id="row-calc-tax">-</td>
+        </tr>
+        <tr class="hidden" id="surcharge-row">
+          <td>
+            세대생략 할증세액
+            <span class="formula-line" id="surcharge-line">-</span>
+            <span class="formula-actual" id="surcharge-formula">-</span>
+          </td>
+          <td id="row-surcharge">-</td>
+        </tr>
+        <tr class="hidden" id="gift-credit-row">
+          <td>
+            증여세액공제
+            <span class="formula-line">= min(기납부 증여세액, 산출세액)</span>
+            <span class="formula-actual" id="gift-credit-formula">-</span>
+          </td>
+          <td id="row-gift-credit">-</td>
+        </tr>
+        <tr class="hidden" id="filing-credit-row">
+          <td>
+            신고세액공제
+            <span class="formula-line">= (산출세액 − 증여세액공제) × 3%</span>
+            <span class="formula-actual" id="filing-credit-formula">-</span>
+          </td>
+          <td id="row-filing-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>결정세액 (자진납부할 세액)</td>
+          <td id="row-final-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="deduction-limit-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    본 계산 결과는 <strong>단순화된 추정치</strong>입니다. 상속재산의 시가
+    평가, 공과금, 상속인이 아닌 자에게 유증한 재산은 다루지 않으며, 상속인
+    구성은 배우자·직계비속(자녀) 중심의 3가지 케이스만 지원합니다. 장애인
+    기대여명연수는 보험개발원 경험생명표를 직접 확인해서 입력해야 합니다.
+    배우자상속공제 계산 시 사전증여재산은 전액 직계비속 몫으로 가정합니다.
+    정확한 세액은 국세청 홈택스 또는 세무사 상담을 통해 확인하세요.
+  </div>
+
+  <section class="law-refs">
+    <h2>법령 근거</h2>
+    <ul>
+      <li>
+        근거: <strong>상속세및증여세법</strong> 제13조(과세가액·사전증여재산 합산), 제18조(기초공제), 제19조(배우자상속공제), 제20조(그 밖의 인적공제), 제21조(일괄공제), 제22조(금융재산상속공제), 제23조의2(동거주택상속공제), 제24조(공제 적용 한도), 제26조(세율), 제27조(세대생략 할증과세), 제28조(증여세액공제), 제69조제1항(신고세액공제) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%83%81%EC%86%8D%EC%84%B8%EB%B0%8F%EC%A6%9D%EC%97%AC%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">법령 본문 보기</a
+        >
+      </li>
+      <li>
+        근거: <strong>민법</strong> 제1009조(법정상속분 — 배우자는 직계비속 몫의 5할 가산)
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="inheritance-tax-calculator" />
+
+  <section class="faq">
+    <h2>자주 묻는 질문</h2>
+
+    <details>
+      <summary>배우자상속공제는 왜 이렇게 복잡한가요?</summary>
+      <p>
+        배우자상속공제는 <code>min(배우자가 실제 상속받은 금액, 상속재산가액 ×
+        배우자의 법정상속분, 30억원)</code>이고, 최소 5억원은 항상 공제됩니다
+        (상속세및증여세법 제19조). 법정상속분은 민법 제1009조에 따라 배우자가
+        자녀 몫의 1.5배를 가져가는 방식으로 계산됩니다 — 예를 들어 배우자와
+        자녀 2명이면 배우자는 전체의 1.5/3.5(약 42.9%)를 법정상속분으로
+        인정받습니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>일괄공제와 기초공제+인적공제 중 뭐가 적용되나요?</summary>
+      <p>
+        기초공제(2억원)와 그 밖의 인적공제(자녀·미성년자·연로자·장애인공제)를
+        합친 금액과 일괄공제(5억원) 중 <strong>더 큰 금액</strong>이 자동으로
+        적용됩니다(상속세및증여세법 제21조). 다만 <strong>배우자가 단독으로
+        상속받는 경우</strong>에는 일괄공제를 선택할 수 없고 기초공제+인적공제
+        합계만 적용됩니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>상속공제에 왜 한도가 있나요?</summary>
+      <p>
+        상속공제 합계는 상속세 과세가액에서 상속인이 아닌 자에게 유증한
+        재산과 사전증여재산(그 증여 당시 공제받은 증여재산공제는 제외)을
+        뺀 금액을 넘을 수 없습니다(제24조). 사전증여재산을 미리 증여받아
+        상속공제까지 중복으로 받는 것을 막기 위한 규정입니다.
+      </p>
+    </details>
+
+    <details>
+      <summary>사전증여재산은 왜 상속재산에 합산되나요?</summary>
+      <p>
+        상속을 앞두고 미리 증여해서 상속세 누진세율을 피하는 것을 막기 위한
+        규정입니다. 상속인에게는 상속개시일 전 10년 이내, 상속인이 아닌
+        자에게는 5년 이내 증여한 재산이 상속세 과세가액에 합산됩니다. 대신
+        그 증여 당시 이미 낸 증여세액은 <strong>증여세액공제</strong>로
+        차감해서 이중과세를 막습니다(제13조, 제28조).
+      </p>
+    </details>
+
+    <details>
+      <summary>동거주택상속공제 요건이 궁금해요.</summary>
+      <p>
+        ①피상속인과 상속인(직계비속)이 상속개시일부터 소급해 10년 이상
+        (미성년 기간 제외) 하나의 주택에서 계속 동거, ②그 10년 동안 1세대
+        1주택을 유지, ③상속개시일 현재 상속인이 무주택자이거나 피상속인과
+        공동으로 1세대1주택을 보유한 경우여야 합니다(제23조의2). 세 요건을
+        모두 충족해야 상속주택가액의 100%(한도 6억원)를 공제받습니다.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #spouse-actual-row.hidden {
+    display: none;
+  }
+  .advanced-section {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .advanced-section summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .advanced-body {
+    display: grid;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  #financial-asset-row.hidden,
+  #residence-row.hidden {
+    display: none;
+  }
+  #generation-skip-options,
+  #prior-gift-options {
+    display: grid;
+    gap: 16px;
+  }
+  #generation-skip-options.hidden,
+  #prior-gift-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateInheritanceTax } from '../../lib/inheritanceTaxCalculator';
+  import { formatKoreanWon } from '../../lib/formatKoreanWon';
+
+  const form = document.getElementById('inheritance-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatKoreanWon(value) : '';
+    });
+  };
+  [
+    'grossEstate',
+    'debts',
+    'funeralExpenses',
+    'spouseActualInheritance',
+    'netFinancialAssets',
+    'inheritedHouseValue',
+    'generationSkippingAmount',
+    'priorGiftToHeirs',
+    'priorGiftToNonHeirs',
+    'priorGiftDeductionUsed',
+    'priorGiftTaxPaid',
+  ].forEach((id) => bindAmountPreview(id, `${id}-preview`));
+
+  const spouseActualRow = document.getElementById('spouse-actual-row') as HTMLLabelElement;
+  const syncSpouse = () => {
+    const hasSpouse = (form.querySelector('input[name="hasSpouse"]:checked') as HTMLInputElement).value === 'yes';
+    spouseActualRow.classList.toggle('hidden', !hasSpouse);
+  };
+  form.querySelectorAll('input[name="hasSpouse"]').forEach((r) => r.addEventListener('change', syncSpouse));
+  syncSpouse();
+
+  const toggleRow = (checkboxId: string, rowId: string) => {
+    const checkbox = document.getElementById(checkboxId) as HTMLInputElement;
+    const row = document.getElementById(rowId) as HTMLElement;
+    const sync = () => row.classList.toggle('hidden', !checkbox.checked);
+    checkbox.addEventListener('change', sync);
+    sync();
+  };
+  toggleRow('applyFinancialAssetDeduction', 'financial-asset-row');
+  toggleRow('applyResidenceDeduction', 'residence-row');
+  toggleRow('isGenerationSkipping', 'generation-skip-options');
+  toggleRow('hasPriorGifts', 'prior-gift-options');
+
+  const won = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  });
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won.format(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct2 = (value: number) => `${(value * 100).toFixed(1)}%`;
+  const fraction = (n: number) => (Number.isFinite(n) ? n.toFixed(3) : '-');
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const grossEstate = Number((document.getElementById('grossEstate') as HTMLInputElement).value);
+    if (!grossEstate || grossEstate <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = '총 상속재산가액을 올바르게 입력해 주세요.';
+      return;
+    }
+
+    const hasSpouse = (form.querySelector('input[name="hasSpouse"]:checked') as HTMLInputElement).value === 'yes';
+    const childCount = Number((document.getElementById('childCount') as HTMLInputElement).value) || 0;
+
+    if (!hasSpouse && childCount === 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent =
+        '배우자도 자녀도 없는 경우는 이 계산기의 범위 밖입니다(직계존속·형제자매 상속은 법정상속분 산정 방식이 다릅니다).';
+      return;
+    }
+
+    const debts = Number((document.getElementById('debts') as HTMLInputElement).value) || 0;
+    const funeralExpenses = Number((document.getElementById('funeralExpenses') as HTMLInputElement).value) || 0;
+    const spouseActualInheritance =
+      Number((document.getElementById('spouseActualInheritance') as HTMLInputElement).value) || 0;
+    const minorChildRemainingYearsTotal =
+      Number((document.getElementById('minorChildRemainingYearsTotal') as HTMLInputElement).value) || 0;
+    const elderlyHeirCount = Number((document.getElementById('elderlyHeirCount') as HTMLInputElement).value) || 0;
+    const disabledLifeExpectancyYearsTotal =
+      Number((document.getElementById('disabledLifeExpectancyYearsTotal') as HTMLInputElement).value) || 0;
+
+    const applyFinancialAssetDeduction = (document.getElementById('applyFinancialAssetDeduction') as HTMLInputElement).checked;
+    const netFinancialAssets = Number((document.getElementById('netFinancialAssets') as HTMLInputElement).value) || 0;
+    const applyResidenceDeduction = (document.getElementById('applyResidenceDeduction') as HTMLInputElement).checked;
+    const inheritedHouseValue = Number((document.getElementById('inheritedHouseValue') as HTMLInputElement).value) || 0;
+
+    const isGenerationSkipping = (document.getElementById('isGenerationSkipping') as HTMLInputElement).checked;
+    const generationSkippingAmount = Number((document.getElementById('generationSkippingAmount') as HTMLInputElement).value) || 0;
+    const isGenerationSkippingHeirMinor = (document.getElementById('isGenerationSkippingHeirMinor') as HTMLInputElement).checked;
+    const isGenerationSkipSurchargeExempt = (document.getElementById('isGenerationSkipSurchargeExempt') as HTMLInputElement).checked;
+
+    const filedOnTime = (document.getElementById('filedOnTime') as HTMLInputElement).checked;
+
+    const hasPriorGifts = (document.getElementById('hasPriorGifts') as HTMLInputElement).checked;
+    const priorGiftToHeirs = Number((document.getElementById('priorGiftToHeirs') as HTMLInputElement).value) || 0;
+    const priorGiftToNonHeirs = Number((document.getElementById('priorGiftToNonHeirs') as HTMLInputElement).value) || 0;
+    const priorGiftDeductionUsed = Number((document.getElementById('priorGiftDeductionUsed') as HTMLInputElement).value) || 0;
+    const priorGiftTaxPaid = Number((document.getElementById('priorGiftTaxPaid') as HTMLInputElement).value) || 0;
+
+    const r = calculateInheritanceTax({
+      grossEstate,
+      debts,
+      funeralExpenses,
+      hasSpouse,
+      spouseActualInheritance,
+      childCount,
+      minorChildRemainingYearsTotal,
+      elderlyHeirCount,
+      disabledHeirCount: 0,
+      disabledLifeExpectancyYearsTotal,
+      applyFinancialAssetDeduction,
+      netFinancialAssets,
+      applyResidenceDeduction,
+      inheritedHouseValue,
+      isGenerationSkipping,
+      generationSkippingAmount,
+      isGenerationSkippingHeirMinor,
+      isGenerationSkipSurchargeExempt,
+      filedOnTime,
+      hasPriorGifts,
+      priorGiftToHeirs,
+      priorGiftToNonHeirs,
+      priorGiftDeductionUsed,
+      priorGiftTaxPaid,
+    });
+
+    setWon('final-tax', r.finalTax);
+
+    setWon('row-taxable-value', r.taxableValue);
+    if (r.priorGiftAmount > 0) {
+      setText('taxable-value-line', '= 총상속재산 − 채무 − 장례비용 + 사전증여재산가산액');
+      setText(
+        'taxable-value-formula',
+        `= ${won.format(Math.round(grossEstate))} − ${won.format(Math.round(debts))} − ${won.format(Math.round(funeralExpenses))} + ${won.format(Math.round(r.priorGiftAmount))}`,
+      );
+    } else {
+      setText('taxable-value-line', '= 총상속재산 − 채무 − 장례비용');
+      setText(
+        'taxable-value-formula',
+        `= ${won.format(Math.round(grossEstate))} − ${won.format(Math.round(debts))} − ${won.format(Math.round(funeralExpenses))}`,
+      );
+    }
+
+    setWon('row-basic', r.basicAndPersonalDeduction);
+    if (r.useLumpSum) {
+      setText('basic-line', '= max(일괄공제 5억원, 기초공제 2억원 + 인적공제)');
+      setText(
+        'basic-formula',
+        `= max(₩500,000,000, ${won.format(Math.round(r.basicDeduction))} + ${won.format(Math.round(r.personalDeductionTotal))}) = ${won.format(Math.round(r.basicAndPersonalDeduction))}`,
+      );
+    } else {
+      setText('basic-line', '= 기초공제 2억원 + 인적공제 (배우자 단독상속은 일괄공제 불가)');
+      setText(
+        'basic-formula',
+        `= ${won.format(Math.round(r.basicDeduction))} + ${won.format(Math.round(r.personalDeductionTotal))} = ${won.format(Math.round(r.basicAndPersonalDeduction))}`,
+      );
+    }
+
+    const spouseRow = document.getElementById('spouse-deduction-row') as HTMLTableRowElement;
+    if (hasSpouse) {
+      spouseRow.classList.remove('hidden');
+      setWon('row-spouse', r.spouseDeduction);
+      setText(
+        'spouse-line',
+        `= max(5억원, min(배우자 실제상속액, 과세가액 × 법정상속분(${fraction(r.spouseStatutoryShare)}), 30억원))`,
+      );
+      setText(
+        'spouse-formula',
+        `= max(₩500,000,000, min(${won.format(Math.round(spouseActualInheritance))}, ${won.format(Math.round(r.taxableValue))} × ${fraction(r.spouseStatutoryShare)}, ₩3,000,000,000)) = ${won.format(Math.round(r.spouseDeduction))}`,
+      );
+    } else {
+      spouseRow.classList.add('hidden');
+    }
+
+    const financialRow = document.getElementById('financial-deduction-row') as HTMLTableRowElement;
+    if (r.financialAssetDeduction > 0) {
+      financialRow.classList.remove('hidden');
+      setWon('row-financial', r.financialAssetDeduction);
+    } else {
+      financialRow.classList.add('hidden');
+    }
+
+    const residenceRow = document.getElementById('residence-deduction-row') as HTMLTableRowElement;
+    if (r.residenceDeduction > 0) {
+      residenceRow.classList.remove('hidden');
+      setWon('row-residence', r.residenceDeduction);
+    } else {
+      residenceRow.classList.add('hidden');
+    }
+
+    setWon('row-deduction-total', r.totalDeductionApplied);
+    if (r.totalDeductionApplied < r.deductionRequested) {
+      setText('deduction-total-line', '= min(공제 신청액 합계, 공제 적용 한도)');
+      setText(
+        'deduction-total-formula',
+        `= min(${won.format(Math.round(r.deductionRequested))}, ${won.format(Math.round(r.deductionLimit))}) = ${won.format(Math.round(r.totalDeductionApplied))}`,
+      );
+    } else {
+      setText('deduction-total-line', '= 공제 신청액 합계 (공제 한도 이내)');
+      setText('deduction-total-formula', `= ${won.format(Math.round(r.totalDeductionApplied))}`);
+    }
+
+    const deductionLimitNote = document.getElementById('deduction-limit-note') as HTMLParagraphElement;
+    if (r.totalDeductionApplied < r.deductionRequested) {
+      deductionLimitNote.textContent = `⚠ 공제 신청액 합계(${won.format(Math.round(r.deductionRequested))})가 공제 적용 한도(${won.format(Math.round(r.deductionLimit))}, 제24조)를 초과해 한도만큼만 적용되었습니다.`;
+      deductionLimitNote.classList.remove('hidden');
+    } else {
+      deductionLimitNote.classList.add('hidden');
+    }
+
+    setWon('row-taxbase', r.taxBase);
+    setText('taxbase-formula', `= ${won.format(Math.round(r.taxableValue))} − ${won.format(Math.round(r.totalDeductionApplied))}`);
+
+    setWon('row-calc-tax', r.calculatedTax);
+    const effRate = r.taxBase > 0 ? r.calculatedTax / r.taxBase : 0;
+    setText(
+      'calc-tax-formula',
+      `과세표준 ${won.format(Math.round(r.taxBase))} → 누진세율 적용 산출세액 ${won.format(Math.round(r.calculatedTax))} (실효세율 약 ${fmtPct2(effRate)})`,
+    );
+
+    const surchargeRow = document.getElementById('surcharge-row') as HTMLTableRowElement;
+    if (r.generationSkipSurcharge > 0) {
+      surchargeRow.classList.remove('hidden');
+      setWon('row-surcharge', r.generationSkipSurcharge);
+      const ratio = Math.min(1, generationSkippingAmount / grossEstate);
+      const rate = r.generationSkipSurcharge / (r.calculatedTax * ratio || 1);
+      setText('surcharge-line', `= 산출세액 × 상속비율(${fmtPct2(ratio)}) × ${fmtPct2(rate)}`);
+      setText(
+        'surcharge-formula',
+        `= ${won.format(Math.round(r.calculatedTax))} × ${fmtPct2(ratio)} × ${fmtPct2(rate)} = ${won.format(Math.round(r.generationSkipSurcharge))}`,
+      );
+    } else {
+      surchargeRow.classList.add('hidden');
+    }
+
+    const giftCreditRow = document.getElementById('gift-credit-row') as HTMLTableRowElement;
+    if (r.giftTaxCredit > 0) {
+      giftCreditRow.classList.remove('hidden');
+      setText('row-gift-credit', `−${won.format(Math.round(r.giftTaxCredit))}`);
+      setText(
+        'gift-credit-formula',
+        `= min(${won.format(Math.round(priorGiftTaxPaid))}, ${won.format(Math.round(r.taxAfterSurcharge))}) = −${won.format(Math.round(r.giftTaxCredit))}`,
+      );
+    } else {
+      giftCreditRow.classList.add('hidden');
+    }
+
+    const filingCreditRow = document.getElementById('filing-credit-row') as HTMLTableRowElement;
+    if (r.filingTaxCredit > 0) {
+      filingCreditRow.classList.remove('hidden');
+      setText('row-filing-credit', `−${won.format(Math.round(r.filingTaxCredit))}`);
+      setText(
+        'filing-credit-formula',
+        `= ${won.format(Math.round(r.taxAfterGiftCredit))} × 3% = −${won.format(Math.round(r.filingTaxCredit))}`,
+      );
+    } else {
+      filingCreditRow.classList.add('hidden');
+    }
+
+    setWon('row-final-tax', r.finalTax);
+
+    result.classList.remove('hidden');
+  });
+</script>

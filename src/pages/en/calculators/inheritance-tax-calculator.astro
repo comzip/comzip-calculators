@@ -1,0 +1,708 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import RelatedCalculators from '../../../components/RelatedCalculators.astro';
+import { calculators } from '../../../data/calculators';
+
+const meta = calculators.find((c) => c.slug === 'inheritance-tax-calculator')!;
+---
+
+<BaseLayout title={meta.titleEn} description={meta.descriptionEn} path={`/calculators/${meta.slug}`}>
+  <h1>{meta.titleEn}</h1>
+  <p class="note">
+    Enter the estate value and heir composition to calculate Korean
+    inheritance tax (상속세) — including <strong>the basic/personal/spouse/
+    financial-asset/co-residence deductions, progressive rates, and the
+    filing tax credit</strong>.
+  </p>
+  <p class="note">
+    ⚠ This calculator only supports <strong>spouse- and descendant
+    (children)-centered inheritance</strong>. Cases where neither a spouse
+    nor children survive — so ancestors or siblings become the heirs — use a
+    different statutory-share formula and are out of scope.
+  </p>
+
+  <form class="calc-form" id="inheritance-form">
+    <label>
+      Total estate value (KRW)
+      <span class="hint">Fair market value of the estate as of the date of death — this calculator does not appraise property</span>
+      <input type="number" id="grossEstate" name="grossEstate" min="0" step="any" placeholder="e.g. 1500000000" required />
+      <span class="amount-preview" id="grossEstate-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Debts (KRW)
+      <input type="number" id="debts" name="debts" min="0" step="any" placeholder="e.g. 0" />
+      <span class="amount-preview" id="debts-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Funeral expenses (KRW)
+      <span class="hint">Recognized as ₩5 million if under that, or capped at ₩10 million if over (Enforcement Decree Art. 9). Up to an extra ₩5 million for interment/natural burial costs</span>
+      <input type="number" id="funeralExpenses" name="funeralExpenses" min="0" step="any" placeholder="e.g. 10000000" />
+      <span class="amount-preview" id="funeralExpenses-preview" aria-live="polite"></span>
+    </label>
+
+    <fieldset class="method-toggle" id="spouse-toggle">
+      <legend>Is a spouse among the heirs?</legend>
+      <label class="method-option">
+        <input type="radio" name="hasSpouse" value="yes" checked />
+        <span>Spouse survives</span>
+      </label>
+      <label class="method-option">
+        <input type="radio" name="hasSpouse" value="no" />
+        <span>No spouse</span>
+      </label>
+    </fieldset>
+
+    <label id="spouse-actual-row">
+      Amount the spouse actually inherits (KRW)
+      <input type="number" id="spouseActualInheritance" name="spouseActualInheritance" min="0" step="any" placeholder="e.g. 1000000000" />
+      <span class="amount-preview" id="spouseActualInheritance-preview" aria-live="polite"></span>
+    </label>
+
+    <label>
+      Number of children (descendants)
+      <span class="hint">If there's no spouse and 0 children, this calculator's scope doesn't apply</span>
+      <input type="number" id="childCount" name="childCount" min="0" step="1" value="0" />
+    </label>
+
+    <details class="advanced-section">
+      <summary>Detailed personal deductions (minor / elderly / disabled, optional)</summary>
+      <div class="advanced-body">
+        <label>
+          Total remaining years until age 19 across all minor children
+          <span class="hint">e.g. one 8-year-old (11 years) + one 12-year-old (7 years) = 18 years. ₩10 million per year</span>
+          <input type="number" id="minorChildRemainingYearsTotal" name="minorChildRemainingYearsTotal" min="0" step="1" value="0" />
+        </label>
+        <label>
+          Number of heirs aged 65 or older (excluding spouse)
+          <input type="number" id="elderlyHeirCount" name="elderlyHeirCount" min="0" step="1" value="0" />
+        </label>
+        <label>
+          Total remaining life-expectancy years across disabled heirs
+          <span class="hint">Based on the Korea Insurance Development Institute's experience life table. ₩10 million per year (spouse can be included)</span>
+          <input type="number" id="disabledLifeExpectancyYearsTotal" name="disabledLifeExpectancyYearsTotal" min="0" step="1" value="0" />
+        </label>
+      </div>
+    </details>
+
+    <label class="check-row">
+      <input type="checkbox" id="applyFinancialAssetDeduction" />
+      <span>Apply the financial asset deduction <span class="hint">The greater of 20% of net financial assets (financial assets minus financial debt) or ₩20 million, capped at ₩200 million</span></span>
+    </label>
+    <label id="financial-asset-row" class="hidden">
+      Net financial assets (KRW)
+      <input type="number" id="netFinancialAssets" name="netFinancialAssets" min="0" step="any" placeholder="e.g. 100000000" />
+      <span class="amount-preview" id="netFinancialAssets-preview" aria-live="polite"></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="applyResidenceDeduction" />
+      <span>The co-residence house deduction requirements are met <span class="hint">10+ years living together, a single-home-per-household status, the heir being homeless, etc. — all conditions must be met (Art. 23-2)</span></span>
+    </label>
+    <label id="residence-row" class="hidden">
+      Inherited house value (KRW)
+      <span class="hint">100% of the inherited house's value is deducted, capped at ₩600 million</span>
+      <input type="number" id="inheritedHouseValue" name="inheritedHouseValue" min="0" step="any" placeholder="e.g. 600000000" />
+      <span class="amount-preview" id="inheritedHouseValue-preview" aria-live="polite"></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="isGenerationSkipping" />
+      <span>This inheritance skips a generation <span class="hint">e.g. grandparent → grandchild. Adds a 30% surcharge (40% if the heir is a minor and receives over ₩2 billion) on the portion of calculated tax matching that heir's share</span></span>
+    </label>
+    <div id="generation-skip-options" class="hidden">
+      <label>
+        Value received by the generation-skipping heir (KRW)
+        <input type="number" id="generationSkippingAmount" name="generationSkippingAmount" min="0" step="any" placeholder="e.g. 300000000" />
+        <span class="amount-preview" id="generationSkippingAmount-preview" aria-live="polite"></span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="isGenerationSkippingHeirMinor" />
+        <span>That heir is a minor</span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="isGenerationSkipSurchargeExempt" />
+        <span>This is substitute inheritance because the giver's child died first <span class="hint">In this case the surcharge does not apply</span></span>
+      </label>
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="filedOnTime" checked />
+      <span>Filing within the statutory deadline (6 months from the end of the month the death occurred) <span class="hint">A 3% filing tax credit applies</span></span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" id="hasPriorGifts" />
+      <span>The deceased made gifts before death <span class="hint">Gifts to heirs within 10 years, or to non-heirs within 5 years, before death are aggregated into the estate</span></span>
+    </label>
+    <div id="prior-gift-options" class="hidden">
+      <label>
+        Total gifts to heirs within 10 years before death (KRW)
+        <input type="number" id="priorGiftToHeirs" name="priorGiftToHeirs" min="0" step="any" placeholder="e.g. 100000000" />
+        <span class="amount-preview" id="priorGiftToHeirs-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        Total gifts to non-heirs within 5 years before death (KRW)
+        <input type="number" id="priorGiftToNonHeirs" name="priorGiftToNonHeirs" min="0" step="any" placeholder="e.g. 0" />
+        <span class="amount-preview" id="priorGiftToNonHeirs-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        Gift deduction already used on those prior gifts (KRW)
+        <input type="number" id="priorGiftDeductionUsed" name="priorGiftDeductionUsed" min="0" step="any" placeholder="e.g. 50000000" />
+        <span class="amount-preview" id="priorGiftDeductionUsed-preview" aria-live="polite"></span>
+      </label>
+      <label>
+        Gift tax already paid on those prior gifts (KRW)
+        <span class="hint">Deducted from this tax to avoid double taxation (gift tax credit)</span>
+        <input type="number" id="priorGiftTaxPaid" name="priorGiftTaxPaid" min="0" step="any" placeholder="e.g. 0" />
+        <span class="amount-preview" id="priorGiftTaxPaid-preview" aria-live="polite"></span>
+      </label>
+    </div>
+
+    <button class="btn" type="submit">Calculate</button>
+  </form>
+
+  <p class="note" id="error-msg" role="alert"></p>
+
+  <div class="result-box hidden" id="result" aria-live="polite">
+    <div class="result-grid">
+      <div class="result-item">
+        <span class="label">Final tax due</span>
+        <span class="value"><span id="final-tax">-</span></span>
+      </div>
+    </div>
+
+    <table class="breakdown">
+      <tbody>
+        <tr>
+          <td>
+            Taxable estate value
+            <span class="formula-line" id="taxable-value-line">= Gross estate − debts − funeral expenses</span>
+            <span class="formula-actual" id="taxable-value-formula">-</span>
+          </td>
+          <td id="row-taxable-value">-</td>
+        </tr>
+        <tr>
+          <td>
+            Basic + personal deduction (or lump-sum)
+            <span class="formula-line" id="basic-line">-</span>
+            <span class="formula-actual" id="basic-formula">-</span>
+          </td>
+          <td id="row-basic">-</td>
+        </tr>
+        <tr class="hidden" id="spouse-deduction-row">
+          <td>
+            Spouse deduction
+            <span class="formula-line" id="spouse-line">-</span>
+            <span class="formula-actual" id="spouse-formula">-</span>
+          </td>
+          <td id="row-spouse">-</td>
+        </tr>
+        <tr class="hidden" id="financial-deduction-row">
+          <td>Financial asset deduction</td>
+          <td id="row-financial">-</td>
+        </tr>
+        <tr class="hidden" id="residence-deduction-row">
+          <td>Co-residence house deduction</td>
+          <td id="row-residence">-</td>
+        </tr>
+        <tr class="total">
+          <td>
+            Applied deduction total
+            <span class="formula-line" id="deduction-total-line">-</span>
+            <span class="formula-actual" id="deduction-total-formula">-</span>
+          </td>
+          <td id="row-deduction-total">-</td>
+        </tr>
+        <tr>
+          <td>
+            Taxable base
+            <span class="formula-line">= Taxable value − applied deduction total</span>
+            <span class="formula-actual" id="taxbase-formula">-</span>
+          </td>
+          <td id="row-taxbase">-</td>
+        </tr>
+        <tr>
+          <td>
+            Calculated tax
+            <span class="formula-line">= Taxable base × progressive rate (10-50%)</span>
+            <span class="formula-actual" id="calc-tax-formula">-</span>
+          </td>
+          <td id="row-calc-tax">-</td>
+        </tr>
+        <tr class="hidden" id="surcharge-row">
+          <td>
+            Generation-skipping surcharge
+            <span class="formula-line" id="surcharge-line">-</span>
+            <span class="formula-actual" id="surcharge-formula">-</span>
+          </td>
+          <td id="row-surcharge">-</td>
+        </tr>
+        <tr class="hidden" id="gift-credit-row">
+          <td>
+            Gift tax credit
+            <span class="formula-line">= min(gift tax already paid, calculated tax)</span>
+            <span class="formula-actual" id="gift-credit-formula">-</span>
+          </td>
+          <td id="row-gift-credit">-</td>
+        </tr>
+        <tr class="hidden" id="filing-credit-row">
+          <td>
+            Filing tax credit
+            <span class="formula-line">= (calculated tax − gift tax credit) × 3%</span>
+            <span class="formula-actual" id="filing-credit-formula">-</span>
+          </td>
+          <td id="row-filing-credit">-</td>
+        </tr>
+        <tr class="total">
+          <td>Final tax due</td>
+          <td id="row-final-tax">-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note hidden" id="deduction-limit-note"></p>
+  </div>
+
+  <div class="disclaimer">
+    This result is a <strong>simplified estimate</strong>. It does not
+    appraise the estate's fair market value, does not handle miscellaneous
+    dues, and does not handle property bequeathed to non-heirs. Heir
+    composition only supports the spouse/descendant-centered cases. Disabled
+    heirs' remaining life-expectancy years must be looked up from the Korea
+    Insurance Development Institute's experience life table and entered
+    directly. For the spouse deduction, prior gifts are assumed to belong
+    entirely to descendants (an approximation). Confirm exact amounts via
+    Korea's National Tax Service (Hometax) or a licensed tax accountant.
+  </div>
+
+  <section class="law-refs">
+    <h2>Legal basis</h2>
+    <ul>
+      <li>
+        Basis: <strong>Inheritance Tax and Gift Tax Act</strong> (상속세및증여세법) Art. 13 (taxable value / prior-gift aggregation), Art. 18 (basic deduction), Art. 19 (spouse deduction), Art. 20 (other personal deductions), Art. 21 (lump-sum deduction), Art. 22 (financial asset deduction), Art. 23-2 (co-residence house deduction), Art. 24 (deduction limit), Art. 26 (tax rates), Art. 27 (generation-skipping surcharge), Art. 28 (gift tax credit), Art. 69(1) (filing tax credit) —
+        <a
+          href="https://www.law.go.kr/%EB%B2%95%EB%A0%B9/%EC%83%81%EC%86%8D%EC%84%B8%EB%B0%8F%EC%A6%9D%EC%97%AC%EC%84%B8%EB%B2%95"
+          target="_blank"
+          rel="noopener noreferrer">View statute text</a
+        >
+      </li>
+      <li>
+        Basis: <strong>Civil Act</strong> (민법) Art. 1009 (statutory inheritance share — a surviving spouse's share is 1.5× a descendant's share)
+      </li>
+    </ul>
+  </section>
+
+  <AdSlot />
+
+  <RelatedCalculators slug="inheritance-tax-calculator" />
+
+  <section class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why is the spouse deduction so complicated?</summary>
+      <p>
+        The spouse deduction is <code>min(amount the spouse actually
+        inherits, taxable estate value × the spouse's statutory share,
+        ₩3 billion)</code>, with a floor of ₩500 million always applied
+        (Inheritance Tax and Gift Tax Act Art. 19). The statutory share
+        comes from Civil Act Art. 1009: a spouse's share is 1.5× a
+        descendant's share — for example, with a spouse and 2 children, the
+        spouse's statutory share is 1.5/3.5 (about 42.9%) of the estate.
+      </p>
+    </details>
+
+    <details>
+      <summary>Which applies — lump-sum or basic+personal deductions?</summary>
+      <p>
+        Whichever is <strong>larger</strong> between the basic deduction
+        (₩200 million) plus other personal deductions (child/minor/elderly/
+        disabled), and the lump-sum deduction (₩500 million), is applied
+        automatically (Art. 21). However, <strong>when the spouse inherits
+        alone</strong>, the lump-sum option isn't available — only the basic
+        + personal deduction total applies.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why is there a cap on total deductions?</summary>
+      <p>
+        Total inheritance deductions can't exceed the taxable estate value
+        minus property bequeathed to non-heirs and prior-gift value (net of
+        the gift deduction already used on those gifts) (Art. 24). This
+        prevents claiming both a gift deduction on an earlier gift and a
+        full inheritance deduction on the same wealth.
+      </p>
+    </details>
+
+    <details>
+      <summary>Why are prior gifts added back into the estate?</summary>
+      <p>
+        This prevents avoiding the progressive inheritance tax rate by
+        gifting assets away before death. Gifts to heirs within 10 years, or
+        to non-heirs within 5 years, before death are added to the taxable
+        estate value. Gift tax already paid on those gifts is then
+        subtracted as a <strong>gift tax credit</strong> to avoid double
+        taxation (Art. 13, Art. 28).
+      </p>
+    </details>
+
+    <details>
+      <summary>What are the co-residence house deduction requirements?</summary>
+      <p>
+        ① The deceased and the heir (a descendant) must have lived together
+        in one house for 10+ years (excluding the heir's minor years) up to
+        the date of death; ② during that period, they must have maintained
+        single-home-per-household status; ③ as of the date of death, the
+        heir must be homeless or have jointly held that one house with the
+        deceased (Art. 23-2). All three must be met to deduct 100% of the
+        house's value, capped at ₩600 million.
+      </p>
+    </details>
+  </section>
+</BaseLayout>
+
+<style>
+  #spouse-actual-row.hidden {
+    display: none;
+  }
+  .advanced-section {
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .advanced-section summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .advanced-body {
+    display: grid;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  #financial-asset-row.hidden,
+  #residence-row.hidden {
+    display: none;
+  }
+  #generation-skip-options,
+  #prior-gift-options {
+    display: grid;
+    gap: 16px;
+  }
+  #generation-skip-options.hidden,
+  #prior-gift-options.hidden {
+    display: none;
+  }
+  table.breakdown .hint,
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  table.breakdown .hint {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+  table.breakdown .formula-line,
+  table.breakdown .formula-actual {
+    font-size: 0.78rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .law-refs {
+    margin: 24px 0;
+  }
+  .law-refs h2 {
+    font-size: 1.05rem;
+  }
+  .law-refs ul {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .law-refs li {
+    margin: 6px 0;
+  }
+</style>
+
+<script>
+  import { calculateInheritanceTax } from '../../../lib/inheritanceTaxCalculator';
+  import { formatWonEn } from '../../../lib/formatKoreanWon';
+
+  const form = document.getElementById('inheritance-form') as HTMLFormElement;
+  const result = document.getElementById('result') as HTMLDivElement;
+  const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+  const bindAmountPreview = (inputId: string, previewId: string) => {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const preview = document.getElementById(previewId) as HTMLSpanElement;
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      preview.textContent = value > 0 ? formatWonEn(value) : '';
+    });
+  };
+  [
+    'grossEstate',
+    'debts',
+    'funeralExpenses',
+    'spouseActualInheritance',
+    'netFinancialAssets',
+    'inheritedHouseValue',
+    'generationSkippingAmount',
+    'priorGiftToHeirs',
+    'priorGiftToNonHeirs',
+    'priorGiftDeductionUsed',
+    'priorGiftTaxPaid',
+  ].forEach((id) => bindAmountPreview(id, `${id}-preview`));
+
+  const spouseActualRow = document.getElementById('spouse-actual-row') as HTMLLabelElement;
+  const syncSpouse = () => {
+    const hasSpouse = (form.querySelector('input[name="hasSpouse"]:checked') as HTMLInputElement).value === 'yes';
+    spouseActualRow.classList.toggle('hidden', !hasSpouse);
+  };
+  form.querySelectorAll('input[name="hasSpouse"]').forEach((r) => r.addEventListener('change', syncSpouse));
+  syncSpouse();
+
+  const toggleRow = (checkboxId: string, rowId: string) => {
+    const checkbox = document.getElementById(checkboxId) as HTMLInputElement;
+    const row = document.getElementById(rowId) as HTMLElement;
+    const sync = () => row.classList.toggle('hidden', !checkbox.checked);
+    checkbox.addEventListener('change', sync);
+    sync();
+  };
+  toggleRow('applyFinancialAssetDeduction', 'financial-asset-row');
+  toggleRow('applyResidenceDeduction', 'residence-row');
+  toggleRow('isGenerationSkipping', 'generation-skip-options');
+  toggleRow('hasPriorGifts', 'prior-gift-options');
+
+  const won = (value: number) => formatWonEn(value);
+  const setWon = (id: string, value: number) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = won(Math.round(value));
+  };
+  const setText = (id: string, text: string) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const fmtPct2 = (value: number) => `${(value * 100).toFixed(1)}%`;
+  const fraction = (n: number) => (Number.isFinite(n) ? n.toFixed(3) : '-');
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    errorMsg.textContent = '';
+
+    const grossEstate = Number((document.getElementById('grossEstate') as HTMLInputElement).value);
+    if (!grossEstate || grossEstate <= 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent = 'Please enter a valid total estate value.';
+      return;
+    }
+
+    const hasSpouse = (form.querySelector('input[name="hasSpouse"]:checked') as HTMLInputElement).value === 'yes';
+    const childCount = Number((document.getElementById('childCount') as HTMLInputElement).value) || 0;
+
+    if (!hasSpouse && childCount === 0) {
+      result.classList.add('hidden');
+      errorMsg.textContent =
+        "This calculator doesn't support cases with no spouse and no children (ancestor/sibling inheritance uses a different statutory-share formula).";
+      return;
+    }
+
+    const debts = Number((document.getElementById('debts') as HTMLInputElement).value) || 0;
+    const funeralExpenses = Number((document.getElementById('funeralExpenses') as HTMLInputElement).value) || 0;
+    const spouseActualInheritance =
+      Number((document.getElementById('spouseActualInheritance') as HTMLInputElement).value) || 0;
+    const minorChildRemainingYearsTotal =
+      Number((document.getElementById('minorChildRemainingYearsTotal') as HTMLInputElement).value) || 0;
+    const elderlyHeirCount = Number((document.getElementById('elderlyHeirCount') as HTMLInputElement).value) || 0;
+    const disabledLifeExpectancyYearsTotal =
+      Number((document.getElementById('disabledLifeExpectancyYearsTotal') as HTMLInputElement).value) || 0;
+
+    const applyFinancialAssetDeduction = (document.getElementById('applyFinancialAssetDeduction') as HTMLInputElement).checked;
+    const netFinancialAssets = Number((document.getElementById('netFinancialAssets') as HTMLInputElement).value) || 0;
+    const applyResidenceDeduction = (document.getElementById('applyResidenceDeduction') as HTMLInputElement).checked;
+    const inheritedHouseValue = Number((document.getElementById('inheritedHouseValue') as HTMLInputElement).value) || 0;
+
+    const isGenerationSkipping = (document.getElementById('isGenerationSkipping') as HTMLInputElement).checked;
+    const generationSkippingAmount = Number((document.getElementById('generationSkippingAmount') as HTMLInputElement).value) || 0;
+    const isGenerationSkippingHeirMinor = (document.getElementById('isGenerationSkippingHeirMinor') as HTMLInputElement).checked;
+    const isGenerationSkipSurchargeExempt = (document.getElementById('isGenerationSkipSurchargeExempt') as HTMLInputElement).checked;
+
+    const filedOnTime = (document.getElementById('filedOnTime') as HTMLInputElement).checked;
+
+    const hasPriorGifts = (document.getElementById('hasPriorGifts') as HTMLInputElement).checked;
+    const priorGiftToHeirs = Number((document.getElementById('priorGiftToHeirs') as HTMLInputElement).value) || 0;
+    const priorGiftToNonHeirs = Number((document.getElementById('priorGiftToNonHeirs') as HTMLInputElement).value) || 0;
+    const priorGiftDeductionUsed = Number((document.getElementById('priorGiftDeductionUsed') as HTMLInputElement).value) || 0;
+    const priorGiftTaxPaid = Number((document.getElementById('priorGiftTaxPaid') as HTMLInputElement).value) || 0;
+
+    const r = calculateInheritanceTax({
+      grossEstate,
+      debts,
+      funeralExpenses,
+      hasSpouse,
+      spouseActualInheritance,
+      childCount,
+      minorChildRemainingYearsTotal,
+      elderlyHeirCount,
+      disabledHeirCount: 0,
+      disabledLifeExpectancyYearsTotal,
+      applyFinancialAssetDeduction,
+      netFinancialAssets,
+      applyResidenceDeduction,
+      inheritedHouseValue,
+      isGenerationSkipping,
+      generationSkippingAmount,
+      isGenerationSkippingHeirMinor,
+      isGenerationSkipSurchargeExempt,
+      filedOnTime,
+      hasPriorGifts,
+      priorGiftToHeirs,
+      priorGiftToNonHeirs,
+      priorGiftDeductionUsed,
+      priorGiftTaxPaid,
+    });
+
+    setWon('final-tax', r.finalTax);
+
+    setWon('row-taxable-value', r.taxableValue);
+    if (r.priorGiftAmount > 0) {
+      setText('taxable-value-line', '= Gross estate − debts − funeral expenses + prior-gift aggregation');
+      setText(
+        'taxable-value-formula',
+        `= ${won(Math.round(grossEstate))} − ${won(Math.round(debts))} − ${won(Math.round(funeralExpenses))} + ${won(Math.round(r.priorGiftAmount))}`,
+      );
+    } else {
+      setText('taxable-value-line', '= Gross estate − debts − funeral expenses');
+      setText(
+        'taxable-value-formula',
+        `= ${won(Math.round(grossEstate))} − ${won(Math.round(debts))} − ${won(Math.round(funeralExpenses))}`,
+      );
+    }
+
+    setWon('row-basic', r.basicAndPersonalDeduction);
+    if (r.useLumpSum) {
+      setText('basic-line', '= max(lump-sum ₩500M, basic ₩200M + personal deductions)');
+      setText(
+        'basic-formula',
+        `= max(₩500,000,000, ${won(Math.round(r.basicDeduction))} + ${won(Math.round(r.personalDeductionTotal))}) = ${won(Math.round(r.basicAndPersonalDeduction))}`,
+      );
+    } else {
+      setText('basic-line', '= basic ₩200M + personal deductions (lump-sum unavailable — spouse inherits alone)');
+      setText(
+        'basic-formula',
+        `= ${won(Math.round(r.basicDeduction))} + ${won(Math.round(r.personalDeductionTotal))} = ${won(Math.round(r.basicAndPersonalDeduction))}`,
+      );
+    }
+
+    const spouseRow = document.getElementById('spouse-deduction-row') as HTMLTableRowElement;
+    if (hasSpouse) {
+      spouseRow.classList.remove('hidden');
+      setWon('row-spouse', r.spouseDeduction);
+      setText(
+        'spouse-line',
+        `= max(₩500M, min(spouse's actual inheritance, taxable value × statutory share(${fraction(r.spouseStatutoryShare)}), ₩3B))`,
+      );
+      setText(
+        'spouse-formula',
+        `= max(₩500,000,000, min(${won(Math.round(spouseActualInheritance))}, ${won(Math.round(r.taxableValue))} × ${fraction(r.spouseStatutoryShare)}, ₩3,000,000,000)) = ${won(Math.round(r.spouseDeduction))}`,
+      );
+    } else {
+      spouseRow.classList.add('hidden');
+    }
+
+    const financialRow = document.getElementById('financial-deduction-row') as HTMLTableRowElement;
+    if (r.financialAssetDeduction > 0) {
+      financialRow.classList.remove('hidden');
+      setWon('row-financial', r.financialAssetDeduction);
+    } else {
+      financialRow.classList.add('hidden');
+    }
+
+    const residenceRow = document.getElementById('residence-deduction-row') as HTMLTableRowElement;
+    if (r.residenceDeduction > 0) {
+      residenceRow.classList.remove('hidden');
+      setWon('row-residence', r.residenceDeduction);
+    } else {
+      residenceRow.classList.add('hidden');
+    }
+
+    setWon('row-deduction-total', r.totalDeductionApplied);
+    if (r.totalDeductionApplied < r.deductionRequested) {
+      setText('deduction-total-line', '= min(requested deduction total, deduction limit)');
+      setText(
+        'deduction-total-formula',
+        `= min(${won(Math.round(r.deductionRequested))}, ${won(Math.round(r.deductionLimit))}) = ${won(Math.round(r.totalDeductionApplied))}`,
+      );
+    } else {
+      setText('deduction-total-line', '= requested deduction total (within the deduction limit)');
+      setText('deduction-total-formula', `= ${won(Math.round(r.totalDeductionApplied))}`);
+    }
+
+    const deductionLimitNote = document.getElementById('deduction-limit-note') as HTMLParagraphElement;
+    if (r.totalDeductionApplied < r.deductionRequested) {
+      deductionLimitNote.textContent = `⚠ The requested deduction total (${won(Math.round(r.deductionRequested))}) exceeded the deduction limit (${won(Math.round(r.deductionLimit))}, Art. 24), so only the limit was applied.`;
+      deductionLimitNote.classList.remove('hidden');
+    } else {
+      deductionLimitNote.classList.add('hidden');
+    }
+
+    setWon('row-taxbase', r.taxBase);
+    setText('taxbase-formula', `= ${won(Math.round(r.taxableValue))} − ${won(Math.round(r.totalDeductionApplied))}`);
+
+    setWon('row-calc-tax', r.calculatedTax);
+    const effRate = r.taxBase > 0 ? r.calculatedTax / r.taxBase : 0;
+    setText(
+      'calc-tax-formula',
+      `Taxable base ${won(Math.round(r.taxBase))} → progressive-rate calculated tax ${won(Math.round(r.calculatedTax))} (effective rate approx. ${fmtPct2(effRate)})`,
+    );
+
+    const surchargeRow = document.getElementById('surcharge-row') as HTMLTableRowElement;
+    if (r.generationSkipSurcharge > 0) {
+      surchargeRow.classList.remove('hidden');
+      setWon('row-surcharge', r.generationSkipSurcharge);
+      const ratio = Math.min(1, generationSkippingAmount / grossEstate);
+      const rate = r.generationSkipSurcharge / (r.calculatedTax * ratio || 1);
+      setText('surcharge-line', `= Calculated tax × heir's share(${fmtPct2(ratio)}) × ${fmtPct2(rate)}`);
+      setText(
+        'surcharge-formula',
+        `= ${won(Math.round(r.calculatedTax))} × ${fmtPct2(ratio)} × ${fmtPct2(rate)} = ${won(Math.round(r.generationSkipSurcharge))}`,
+      );
+    } else {
+      surchargeRow.classList.add('hidden');
+    }
+
+    const giftCreditRow = document.getElementById('gift-credit-row') as HTMLTableRowElement;
+    if (r.giftTaxCredit > 0) {
+      giftCreditRow.classList.remove('hidden');
+      setText('row-gift-credit', `−${won(Math.round(r.giftTaxCredit))}`);
+      setText(
+        'gift-credit-formula',
+        `= min(${won(Math.round(priorGiftTaxPaid))}, ${won(Math.round(r.taxAfterSurcharge))}) = −${won(Math.round(r.giftTaxCredit))}`,
+      );
+    } else {
+      giftCreditRow.classList.add('hidden');
+    }
+
+    const filingCreditRow = document.getElementById('filing-credit-row') as HTMLTableRowElement;
+    if (r.filingTaxCredit > 0) {
+      filingCreditRow.classList.remove('hidden');
+      setText('row-filing-credit', `−${won(Math.round(r.filingTaxCredit))}`);
+      setText(
+        'filing-credit-formula',
+        `= ${won(Math.round(r.taxAfterGiftCredit))} × 3% = −${won(Math.round(r.filingTaxCredit))}`,
+      );
+    } else {
+      filingCreditRow.classList.add('hidden');
+    }
+
+    setWon('row-final-tax', r.finalTax);
+
+    result.classList.remove('hidden');
+  });
+</script>

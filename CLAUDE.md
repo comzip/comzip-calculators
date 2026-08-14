@@ -141,8 +141,8 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
 ## 작업 검증 방식
 
 - 코드 수정 후 항상 `npm run build`로 빌드 확인 (전체 페이지 수가 예상대로
-  생성되는지까지 확인 — 현재 계산기 ko 24 + en 24, 정책/홈 등 ko 4 + en 3,
-  합계 55페이지. 계산기 카테고리는 급여/부동산/투자/생활 4개, `categoryOrder`
+  생성되는지까지 확인 — 현재 계산기 ko 25 + en 25, 정책/홈 등 ko 4 + en 3,
+  합계 57페이지. 계산기 카테고리는 급여/부동산/투자/생활 4개, `categoryOrder`
   순서를 따른다).
 - UI/레이아웃 변경은 코드만 보고 끝내지 않는다. Playwright로 실제 렌더링을
   확인한다 (스크린샷, `getComputedStyle`, `checkValidity()` 등). Playwright는
