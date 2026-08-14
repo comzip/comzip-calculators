@@ -9,7 +9,7 @@ export interface Props {
 }
 
 const { calculator, lang = 'ko' } = Astro.props;
-const href = lang === 'en' ? `/en/calculators/${calculator.slug}` : `/calculators/${calculator.slug}`;
+const href = lang === 'en' ? `/en/calculators/${calculator.slug}/` : `/calculators/${calculator.slug}/`;
 const title = lang === 'en' ? calculator.titleEn : calculator.title;
 const description = lang === 'en' ? calculator.descriptionEn : calculator.description;
 const categoryLabel = categoryLabels[calculator.category][lang];

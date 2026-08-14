@@ -19,7 +19,7 @@ const localePrefix = lang === 'en' ? '/en' : '';
       <ul>
         {items.map((c) => (
           <li>
-            <a href={`${localePrefix}/calculators/${c.slug}`}>
+            <a href={`${localePrefix}/calculators/${c.slug}/`}>
               {lang === 'en' ? c.titleEn : c.title}
             </a>
             <p>{lang === 'en' ? c.descriptionEn : c.description}</p>

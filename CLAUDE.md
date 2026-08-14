@@ -108,6 +108,22 @@ LEGAL_REFERENCES.md        ← 각 계산기가 참조하는 법령·기준값�
 `.calc-card.hidden`처럼 명시도를 맞춰 다시 선언해야 한다 — 전역 CSS만 고쳐서는
 안 이긴다.
 
+**내부 링크와 canonical은 항상 끝에 `/`를 붙인다.** 정적 빌드는 모든 페이지를
+디렉터리(`slug/index.html`) 형태로 만들기 때문에 실제 서빙 URL은 항상 끝에
+`/`가 붙는다. 그런데 `href="/calculators/dday-calculator"`처럼 끝 슬래시 없이
+링크·canonical을 생성하면, 그 페이지의 `<link rel="canonical">`이 자기 자신이
+아닌 슬래시 없는 URL을 가리키는 self-canonical 불일치가 생긴다. 실제로 이
+버그 때문에 Google Search Console에서 색인 대상 페이지의 상당수가 "적절한
+표준 태그가 포함된 대체 페이지"(캐노니컬이 가리키는 곳이 진짜라고 판단해 이
+URL 자체는 색인 제외)와 "리디렉션이 포함된 페이지"(슬래시 없는 내부 링크를
+크롤러가 따라가다 리다이렉트만 만남)로 잡혀 색인이 누락된 사고가 있었다
+(2026-08-14 확인, 38개 미색인 중 20개가 이 원인). `BaseLayout.astro`는 이제
+`path` prop을 받는 즉시 끝 슬래시를 보정하므로 각 페이지가 넘기는 `path`
+자체는 슬래시 없이 써도 되지만, `CalculatorCard.astro`/
+`RelatedCalculators.astro`/`index.astro`의 카드 링크나 FAQ 본문 등에 새로
+`href="/calculators/..."` 형태의 링크를 하드코딩할 때는 끝에 `/`를 반드시
+붙인다.
+
 **계산식 투명성 패턴 (`formula-line`/`formula-actual`).** `buy-vs-jeonse-calculator`,
 `stock-averaging-calculator`에서 도입한 패턴: 결과 항목마다 일반식
 (`<span class="formula-line">= 매매가 − 보유현금</span>`)과 그 계산에 실제로 대입된

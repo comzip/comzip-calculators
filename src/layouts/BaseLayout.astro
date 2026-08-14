@@ -14,12 +14,18 @@ export interface Props {
   lang?: Lang;
 }
 
-const { title, description, path = '/', lang = 'ko' } = Astro.props;
+const { title, description, path: rawPath = '/', lang = 'ko' } = Astro.props;
 
 const t = ui[lang];
 const resolvedDescription = description ?? t.defaultDescription;
 const siteName = t.siteName;
 const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+
+// The static build serves every page as a directory (`index.html` inside a
+// folder named after the slug), so the real URL always ends in `/`. Links
+// and canonical tags must match that or they mismatch the self-referencing
+// canonical Google expects — see CLAUDE.md's trailing-slash note.
+const path = rawPath.endsWith('/') ? rawPath : `${rawPath}/`;
 
 // English pages live under `/en`; Korean is unprefixed at the site root.
 const localePrefix = lang === 'en' ? '/en' : '';
@@ -101,7 +107,7 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
   <body>
     <header class="site-header">
       <div class="container header-inner">
-        <a href={localePrefix || '/'} class="brand">{siteName}</a>
+        <a href={`${localePrefix}/`} class="brand">{siteName}</a>
         <a href={langSwitchHref} class="lang-switch" hreflang={lang === 'ko' ? 'en' : 'ko'}>
           {t.langSwitchLabel}
         </a>
@@ -115,11 +121,11 @@ const ADSENSE_CLIENT_ID = 'ca-pub-7827578660524156';
     <footer class="site-footer">
       <div class="container">
         <nav class="footer-nav" aria-label={t.policyLabel}>
-          <a href={`${localePrefix}/about`}>{t.about}</a>
+          <a href={`${localePrefix}/about/`}>{t.about}</a>
           <span aria-hidden="true">·</span>
-          <a href={`${localePrefix}/privacy`}>{t.privacy}</a>
+          <a href={`${localePrefix}/privacy/`}>{t.privacy}</a>
           <span aria-hidden="true">·</span>
-          <a href={`${localePrefix}/terms`}>{t.terms}</a>
+          <a href={`${localePrefix}/terms/`}>{t.terms}</a>
         </nav>
         <p class="copyright">&copy; {year} {siteName}. All rights reserved.</p>
       </div>

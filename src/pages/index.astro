@@ -46,7 +46,7 @@ const featuredCalculators = featuredSlugs
   </div>
 
   {featuredCalculators.map((calculator) => (
-    <a class="hot-banner" href={`/calculators/${calculator.slug}`}>
+    <a class="hot-banner" href={`/calculators/${calculator.slug}/`}>
       <span class="hot-badge">🔥 지금 화제의 계산기</span>
       <h2>{calculator.titleMain}<br />({calculator.titleSub}</h2>
       <p>{calculator.description}</p>
