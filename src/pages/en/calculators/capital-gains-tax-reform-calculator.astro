@@ -17,15 +17,18 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     <p class="lead">⚠️ This calculator is not law yet</p>
     <p>
       This tool previews the capital gains tax reform direction announced by Korea's Ministry of
-      Economy and Finance on August 3, 2026 (the <strong>"2026 Tax Reform Proposal"</strong>). It
-      still needs to go through pre-announcement, cabinet approval, submission to and passage by
-      the National Assembly, and promulgation — the details may change or the proposal may be
-      scrapped entirely during legislative review.
+      Economy and Finance on August 3, 2026 (the <strong>"2026 Tax Reform Proposal"</strong>).
+      After the public comment period (Aug 4–20) and cabinet approval on September 1, the bill
+      was submitted to the National Assembly on September 3. The cabinet's revisions (to the
+      comprehensive real estate tax deduction, burden ceiling, etc.) <strong>did not touch the
+      capital gains tax items, which went to the Assembly unchanged</strong>. It is now under
+      legislative review — the long-term deduction overhaul in particular is expected to be
+      debated further — so details may still change or the proposal may be scrapped entirely.
     </p>
     <ol class="progress-steps">
-      <li>Pre-announcement</li>
-      <li>Cabinet meeting</li>
-      <li>National Assembly</li>
+      <li class="done">Pre-announcement</li>
+      <li class="done">Cabinet meeting</li>
+      <li class="current">National Assembly review</li>
       <li>Enactment</li>
     </ol>
     <p class="banner-link">
@@ -311,6 +314,13 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
       </li>
       <li>
         <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000079193&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">Ministry of Economy and Finance — "2026 Tax Reform Bill Finalized" press release (Sept 1, 2026 cabinet meeting — its revision list contains no capital gains tax items, confirming the original proposal went to the Assembly unchanged)</a
+        >
+      </li>
+      <li>
+        <a
           href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
           target="_blank"
           rel="noopener noreferrer">Ministry of Economy and Finance — official "2026 Tax Reform" infographic</a
@@ -338,10 +348,13 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     <details>
       <summary>Is this calculator based on enacted law?</summary>
       <p>
-        No. This reflects a tax reform proposal announced by Korea's Ministry of Economy and
-        Finance on August 3, 2026. It still needs to go through pre-announcement, cabinet
-        approval, and National Assembly review and passage. Specific figures may change, or the
-        proposal itself may be scrapped, during legislative review.
+        No. The reform proposal announced by Korea's Ministry of Economy and Finance on August 3,
+        2026 went through public comment and cabinet approval on September 1, and was submitted to
+        the National Assembly on September 3 — but it still must pass the Assembly and be
+        promulgated. The cabinet-stage revisions did not change any capital gains tax item, so
+        this calculator's figures match the August 3 original. The long-term deduction overhaul
+        in particular is expected to be debated further in the Assembly, so figures may change or
+        the proposal may be scrapped.
       </p>
     </details>
 
@@ -461,6 +474,13 @@ const meta = calculators.find((c) => c.slug === 'capital-gains-tax-reform-calcul
     border: 1px solid #fca5a5;
     border-radius: 999px;
     padding: 3px 10px;
+  }
+  .progress-steps li.done::before {
+    content: '✓ ';
+  }
+  .progress-steps li.current {
+    background: #b91c1c;
+    color: #fff;
   }
   .progress-steps li:not(:last-child)::after {
     content: '→';

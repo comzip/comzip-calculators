@@ -18,14 +18,17 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     <p>
       This tool previews the comprehensive real estate tax reform direction announced by Korea's
       Ministry of Economy and Finance on August 3, 2026 (the <strong>"2026 Tax Reform
-      Proposal"</strong>). It still needs to go through pre-announcement, cabinet approval,
-      submission to and passage by the National Assembly, and promulgation — the details may
-      change or the proposal may be scrapped entirely during legislative review.
+      Proposal"</strong>). After the public comment period (Aug 4–20), the <strong>cabinet
+      approved a partially revised bill on September 1</strong> (the non-occupying single-home
+      deduction stays at the current ₩1.2 billion, and the tax burden ceiling stays at the current
+      150% — both reflected in this calculator), and it was submitted to the National Assembly on
+      September 3. It is now under legislative review, where details may still change or the
+      proposal may be scrapped entirely.
     </p>
     <ol class="progress-steps">
-      <li>Pre-announcement</li>
-      <li>Cabinet meeting</li>
-      <li>National Assembly</li>
+      <li class="done">Pre-announcement</li>
+      <li class="done">Cabinet meeting (revised)</li>
+      <li class="current">National Assembly review</li>
       <li>Enactment</li>
     </ol>
     <p class="banner-link">
@@ -284,9 +287,17 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
           <strong>slightly higher</strong> than shown.
         </li>
         <li>
-          <strong>Tax burden ceiling</strong> (proposed to rise from 150% to 200%) is not
-          reflected — same reason as the existing calculator: no prior-year paid-tax data is
-          available.
+          <strong>Tax burden ceiling</strong> is not reflected — same reason as the existing
+          calculator: no prior-year paid-tax data is available. (The original proposal's increase
+          from 150% to 200% was withdrawn in the September 1 cabinet revision; the current 150%
+          ceiling remains.)
+        </li>
+        <li>
+          <strong>Jointly owned single homes</strong> (spouses who did not elect the joint-owner
+          special treatment) are not covered — this calculator assumes sole ownership. Under the
+          revised bill, the joint-owner deduction is ₩900 million per spouse when owner-occupied
+          (unchanged from current law) and ₩600 million per spouse when not occupied (eased from
+          ₩400 million in the original proposal).
         </li>
         <li>
           Tax credits (age / holding / residency) apply <strong>only to 1-household-1-home
@@ -307,9 +318,16 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     <ul>
       <li>
         <a
+          href="https://www.mofe.go.kr/nw/nes/detailNesDtaView.do?searchBbsId1=MOSFBBS_000000000028&searchNttId1=MOSF_000000000079193&menuNo=4010100"
+          target="_blank"
+          rel="noopener noreferrer">Ministry of Economy and Finance — "2026 Tax Reform Bill Finalized" press release (Sept 1, 2026 cabinet revision — non-occupying deduction kept at ₩1.2B, burden ceiling kept at 150%; primary source)</a
+        >
+      </li>
+      <li>
+        <a
           href="https://www.mofe.go.kr/nw/mosfnw/detailInfograpView.do?searchNttId1=MOSF_000000000078819&menuNo=4040500"
           target="_blank"
-          rel="noopener noreferrer">Korea's Ministry of Economy and Finance — official "2026 Tax Reform" infographic (primary source)</a
+          rel="noopener noreferrer">Korea's Ministry of Economy and Finance — official "2026 Tax Reform" infographic (Aug 3 original proposal, primary source)</a
         >
       </li>
       <li>
@@ -342,10 +360,27 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     <details>
       <summary>Is this calculator based on enacted law?</summary>
       <p>
-        No. This reflects a tax reform proposal announced by Korea's Ministry of Economy and
-        Finance on August 3, 2026. It still needs to go through pre-announcement, cabinet
-        approval, and National Assembly review and passage. Specific figures may change, or the
-        proposal itself may be scrapped, during legislative review.
+        No. The reform proposal announced by Korea's Ministry of Economy and Finance on August 3,
+        2026 went through public comment and a partially revised cabinet approval on September 1,
+        and was submitted to the National Assembly on September 3 — but it still must pass the
+        Assembly and be promulgated. Specific figures may change, or the proposal itself may be
+        scrapped, during legislative review.
+      </p>
+    </details>
+
+    <details>
+      <summary>What changed in the September cabinet revision?</summary>
+      <p>
+        Reflecting public comments, two items from the August 3 original were rolled back.
+        ① The <strong>non-occupying 1-household-1-home basic deduction</strong>: originally to be
+        cut from ₩1.2 billion to ₩900 million, the revision <strong>keeps the current ₩1.2
+        billion</strong> — this calculator reflects that. ② The <strong>tax burden
+        ceiling</strong>: the proposed increase from 150% to 200% was withdrawn, keeping the
+        current 150%. In addition, the non-occupying deduction for jointly owned single homes was
+        eased from ₩400 million to ₩600 million per spouse (joint ownership is not covered by this
+        calculator). Everything else — the ₩1.4 billion owner-occupied deduction, multi-home
+        deductions, rate tables, and fair market value ratios — went to the National Assembly
+        unchanged from the original proposal.
       </p>
     </details>
 
@@ -435,6 +470,13 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
     border: 1px solid #fca5a5;
     border-radius: 999px;
     padding: 3px 10px;
+  }
+  .progress-steps li.done::before {
+    content: '✓ ';
+  }
+  .progress-steps li.current {
+    background: #b91c1c;
+    color: #fff;
   }
   .progress-steps li:not(:last-child)::after {
     content: '→';
@@ -662,10 +704,10 @@ const meta = calculators.find((c) => c.slug === 'comprehensive-tax-reform-calcul
       setText('rt-deduction-line', '= flat deduction under current law (Comprehensive Real Estate Tax Act §8), delegated');
       setText('rt-deduction-formula', `= ${won.format(result.deduction)}`);
     } else if (houseCount === '1주택') {
-      setText('rt-deduction-line', '= flat deduction (₩1.4B owner-occupied / ₩900M not occupied)');
+      setText('rt-deduction-line', '= flat deduction (₩1.4B owner-occupied / ₩1.2B not occupied, unchanged from current law)');
       setText(
         'rt-deduction-formula',
-        `= ${residency === '비거주' ? '₩900M (not occupied)' : '₩1.4B (owner-occupied)'} applied → ${won.format(result.deduction)}`,
+        `= ${residency === '비거주' ? '₩1.2B (not occupied, unchanged)' : '₩1.4B (owner-occupied)'} applied → ${won.format(result.deduction)}`,
       );
     } else {
       setText('rt-deduction-line', '= ₩400M + ₩500M × (value of home you live in ÷ total announced value)');
