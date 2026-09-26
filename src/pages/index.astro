@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CalculatorCard from '../components/CalculatorCard.astro';
 import { calculators, categoryOrder, categoryLabels } from '../data/calculators';
+import { latestUpdate } from '../data/updates';
 
 // 지금 시점에 화제성이 높은 계산기들을 홈 상단에 배너로 노출한다. 여러 개를
 // 순환 노출하는 범용 추천 시스템이 아니라, 지금 이 계산기들만을 위한
@@ -24,6 +25,9 @@ const featuredCalculators = featuredSlugs
 <BaseLayout title="콤집계산기" path="/" lang="ko">
   <section class="intro">
     <h1>일상에 필요한 계산기 모음</h1>
+    <a class="update-badge" href={latestUpdate.href}>
+      <strong>🗓️ {latestUpdate.labelKo}</strong> {latestUpdate.textKo}
+    </a>
     <p>
       월급 명세서를 확인할 때, 집을 살지 전세로 갈지 고민할 때, 투자 타이밍을
       잡을 때 — 그때그때 검색해서 여기저기 흩어진 계산기를 찾아다니는 대신,
@@ -48,6 +52,9 @@ const featuredCalculators = featuredSlugs
   {featuredCalculators.map((calculator) => (
     <a class="hot-banner" href={`/calculators/${calculator.slug}/`}>
       <span class="hot-badge">🔥 지금 화제의 계산기</span>
+      {latestUpdate.slugs.includes(calculator.slug) && (
+        <span class="update-chip">✓ {latestUpdate.labelKo}</span>
+      )}
       <h2>{calculator.titleMain}<br />({calculator.titleSub}</h2>
       <p>{calculator.description}</p>
     </a>
@@ -101,6 +108,39 @@ const featuredCalculators = featuredSlugs
   .intro h1 {
     font-size: 1.6rem;
     margin: 8px 0 12px;
+  }
+  /* 홈 최상단 "최근 반영" 배지 — 첫 화면(스크롤 0)에서 보이도록 h1 바로
+     아래에 둔다. 문구는 src/data/updates.ts(SSOT)에서 온다. */
+  .update-badge {
+    display: inline-block;
+    margin: 0 0 12px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--accent-dark);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+  }
+  .update-badge:hover {
+    border-color: var(--accent);
+  }
+  .update-badge strong {
+    margin-right: 4px;
+  }
+  .hot-banner .update-chip {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #15803d;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 5px;
+    padding: 2px 8px;
+    margin: 0 0 8px 6px;
   }
   .intro p {
     color: var(--text-muted);

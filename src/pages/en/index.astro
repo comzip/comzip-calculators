@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import CalculatorCard from '../../components/CalculatorCard.astro';
 import { calculators, categoryOrder, categoryLabels } from '../../data/calculators';
+import { latestUpdate } from '../../data/updates';
 
 // See ko/index.astro for the rationale — same hardcoded-list banner, mirrored
 // here for the English homepage.
@@ -14,6 +15,9 @@ const featuredCalculators = featuredSlugs
 <BaseLayout title="Comzip Calculators" path="/" lang="en">
   <section class="intro">
     <h1>Everyday Calculators</h1>
+    <a class="update-badge" href={`/en${latestUpdate.href}`}>
+      <strong>🗓️ {latestUpdate.labelEn}</strong> {latestUpdate.textEn}
+    </a>
     <p>
       Checking your pay stub, deciding whether to buy or rent, timing an
       investment — instead of searching for a different calculator every
@@ -39,6 +43,9 @@ const featuredCalculators = featuredSlugs
   {featuredCalculators.map((calculator) => (
     <a class="hot-banner" href={`/en/calculators/${calculator.slug}/`}>
       <span class="hot-badge">🔥 Trending Calculator</span>
+      {latestUpdate.slugs.includes(calculator.slug) && (
+        <span class="update-chip">✓ {latestUpdate.labelEn}</span>
+      )}
       <h2>{calculator.titleEn}</h2>
       <p>{calculator.descriptionEn}</p>
     </a>
@@ -92,6 +99,39 @@ const featuredCalculators = featuredSlugs
   .intro h1 {
     font-size: 1.6rem;
     margin: 8px 0 12px;
+  }
+  /* Top-of-page "latest update" badge — placed right under the h1 so it is
+     visible at scroll 0. Copy comes from src/data/updates.ts (SSOT). */
+  .update-badge {
+    display: inline-block;
+    margin: 0 0 12px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--accent-dark);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+  }
+  .update-badge:hover {
+    border-color: var(--accent);
+  }
+  .update-badge strong {
+    margin-right: 4px;
+  }
+  .hot-banner .update-chip {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #15803d;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 5px;
+    padding: 2px 8px;
+    margin: 0 0 8px 6px;
   }
   .intro p {
     color: var(--text-muted);
